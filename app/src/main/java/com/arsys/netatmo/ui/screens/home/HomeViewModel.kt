@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AuthRepository
+import com.arsys.netatmo.data.repository.ThermostatRepository
 import com.arsys.netatmo.domain.model.ThermostatMode
 import com.arsys.netatmo.domain.model.ThermostatState
 import com.arsys.netatmo.domain.usecase.GetThermostatStateUseCase
@@ -29,7 +30,8 @@ class HomeViewModel @Inject constructor(
     private val getThermostatState: GetThermostatStateUseCase,
     private val setTemperature: SetTemperatureUseCase,
     private val setMode: SetModeUseCase,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val repository: ThermostatRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -90,6 +92,17 @@ class HomeViewModel @Inject constructor(
                 is ApiResult.Error -> {
                     _uiState.update { it.copy(error = result.message) }
                 }
+                ApiResult.Loading -> {}
+            }
+        }
+    }
+
+    fun switchSchedule(scheduleId: String) {
+        val homeId = _uiState.value.thermostatState?.homeId ?: return
+        viewModelScope.launch {
+            when (repository.switchSchedule(homeId, scheduleId)) {
+                is ApiResult.Success -> loadThermostatData()
+                is ApiResult.Error -> { /* silent */ }
                 ApiResult.Loading -> {}
             }
         }

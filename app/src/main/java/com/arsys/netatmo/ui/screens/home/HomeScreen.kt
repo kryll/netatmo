@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.domain.model.ModuleState
 import com.arsys.netatmo.domain.model.RoomState
+import com.arsys.netatmo.domain.model.ScheduleInfo
 import com.arsys.netatmo.domain.model.ThermostatMode
 import com.arsys.netatmo.ui.components.TemperatureSlider
 import com.arsys.netatmo.ui.theme.*
@@ -158,6 +159,28 @@ fun HomeScreen(
                                 }
                                 items(modules, key = { it.id }) { module ->
                                     ModuleCard(module = module)
+                                }
+                            }
+                        }
+
+                        // Schedules section
+                        uiState.thermostatState?.schedules?.let { schedules ->
+                            if (schedules.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        text = "Programaciones",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    )
+                                }
+                                item {
+                                    ScheduleCard(
+                                        schedules = schedules,
+                                        onSwitchSchedule = { scheduleId ->
+                                            viewModel.switchSchedule(scheduleId)
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -403,6 +426,52 @@ fun ModuleCard(module: ModuleState) {
                         }
                     )
                     Text("$battery%", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ScheduleCard(
+    schedules: List<ScheduleInfo>,
+    onSwitchSchedule: (String) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            schedules.forEach { schedule ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (schedule.isActive) Icons.Default.RadioButtonChecked
+                                      else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = null,
+                        tint = if (schedule.isActive) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = schedule.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (schedule.isActive) FontWeight.SemiBold else FontWeight.Normal,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!schedule.isActive) {
+                        TextButton(onClick = { onSwitchSchedule(schedule.id) }) {
+                            Text("Activar")
+                        }
+                    } else {
+                        Text(
+                            "Activa",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }

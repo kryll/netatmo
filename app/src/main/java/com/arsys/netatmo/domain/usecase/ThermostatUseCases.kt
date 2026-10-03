@@ -5,6 +5,7 @@ import com.arsys.netatmo.data.api.models.HomeStatus
 import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.ThermostatRepository
 import com.arsys.netatmo.domain.model.*
+import com.arsys.netatmo.domain.model.ScheduleInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -56,7 +57,9 @@ class GetThermostatStateUseCase @Inject constructor(
                     wifiStrength = module.wifiStrength,
                     boilerStatus = module.boilerStatus
                 )
-            } ?: emptyList()
+            } ?: emptyList(),
+            activeScheduleId = home?.schedules?.find { it.selected == true }?.id,
+            schedules = home?.schedules?.map { ScheduleInfo(it.id, it.name, it.selected == true) } ?: emptyList()
         )
     }
 }
