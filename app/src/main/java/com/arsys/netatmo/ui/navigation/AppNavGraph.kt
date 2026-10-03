@@ -75,11 +75,12 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
     // Navigate reactively when login state changes
     LaunchedEffect(isLoggedIn) {
         val onAuthScreen = currentRoute == Screen.Auth.route || currentRoute == null
-        if (isLoggedIn && onAuthScreen) {
+        val onOnboardingScreen = currentRoute == Screen.Onboarding.route
+        if (isLoggedIn && (onAuthScreen || onOnboardingScreen)) {
             navController.navigate(Screen.Home.route) {
-                popUpTo(Screen.Auth.route) { inclusive = true }
+                popUpTo(0) { inclusive = true }
             }
-        } else if (!isLoggedIn && !onAuthScreen) {
+        } else if (!isLoggedIn && !onAuthScreen && !onOnboardingScreen) {
             navController.navigate(Screen.Auth.route) {
                 popUpTo(0) { inclusive = true }
             }
