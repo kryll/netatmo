@@ -19,6 +19,6 @@ interface AuthApiService {
         @Field("refresh_token") refreshToken: String? = null,
         @Field("username") username: String? = null,
         @Field("password") password: String? = null,
-        @Field("scope") scope: String = "read_thermostat write_thermostat read_presence"
+        @Field("scope") scope: String? = null
     ): Response<TokenResponse>
 }
