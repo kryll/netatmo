@@ -1,17 +1,19 @@
 package com.arsys.netatmo.data.repository
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.AuthApiService
 import com.arsys.netatmo.util.AuthDebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,30 +24,41 @@ class AuthRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val authApiService: AuthApiService
 ) {
-    private object Keys {
-        val ACCESS_TOKEN = stringPreferencesKey("access_token")
-        val REFRESH_TOKEN = stringPreferencesKey("refresh_token")
-        val EXPIRES_AT = longPreferencesKey("expires_at")
-        val HOME_ID = stringPreferencesKey("selected_home_id")
+    private companion object {
+        const val KEY_ACCESS_TOKEN = "access_token"
+        const val KEY_REFRESH_TOKEN = "refresh_token"
+        const val KEY_EXPIRES_AT = "expires_at"
+        const val KEY_HOME_ID = "selected_home_id"
+        const val KEY_OAUTH_STATE = "oauth_state"
+        const val KEY_PKCE_VERIFIER = "pkce_code_verifier"
     }
 
-    val isLoggedIn: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[Keys.ACCESS_TOKEN] != null
+    private val encryptedPrefs: SharedPreferences by lazy {
+        EncryptedSharedPreferences.create(
+            context,
+            "auth_secure_prefs",
+            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
     }
 
-    val accessToken: Flow<String?> = context.dataStore.data.map { prefs ->
-        prefs[Keys.ACCESS_TOKEN]
+    val isLoggedIn: Flow<Boolean> = flow {
+        emit(encryptedPrefs.getString(KEY_ACCESS_TOKEN, null) != null)
     }
 
-    val selectedHomeId: Flow<String?> = context.dataStore.data.map { prefs ->
-        prefs[Keys.HOME_ID]
+    val accessToken: Flow<String?> = flow {
+        emit(encryptedPrefs.getString(KEY_ACCESS_TOKEN, null))
+    }
+
+    val selectedHomeId: Flow<String?> = flow {
+        emit(encryptedPrefs.getString(KEY_HOME_ID, null))
     }
 
     suspend fun getValidAccessToken(): String? {
-        val prefs = context.dataStore.data.first()
-        val token = prefs[Keys.ACCESS_TOKEN] ?: return null
-        val expiresAt = prefs[Keys.EXPIRES_AT] ?: 0L
-        val refreshToken = prefs[Keys.REFRESH_TOKEN] ?: return null
+        val token = encryptedPrefs.getString(KEY_ACCESS_TOKEN, null) ?: return null
+        val expiresAt = encryptedPrefs.getLong(KEY_EXPIRES_AT, 0L)
+        val refreshToken = encryptedPrefs.getString(KEY_REFRESH_TOKEN, null) ?: return null
 
         return if (System.currentTimeMillis() < expiresAt - 60_000) {
             token
@@ -54,37 +67,63 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun loginWithCode(code: String): Result<Unit> {
-        val L = AuthDebugLogger
-        L.log("loginWithCode() → code=${code.take(8)}...", context)
-        L.log("  clientId=${BuildConfig.NETATMO_CLIENT_ID}", context)
-        L.log("  redirectUri=${BuildConfig.NETATMO_REDIRECT_URI}", context)
+    suspend fun loginWithCode(code: String, receivedState: String? = null): Result<Unit> {
+        // F-3: Validate OAuth state parameter to prevent CSRF
+        val storedState = encryptedPrefs.getString(KEY_OAUTH_STATE, null)
+        encryptedPrefs.edit().remove(KEY_OAUTH_STATE).apply()
+        if (storedState != null && receivedState != storedState) {
+            if (BuildConfig.DEBUG) {
+                AuthDebugLogger.log("loginWithCode() → ❌ State mismatch — possible CSRF. received=$receivedState stored=$storedState")
+            }
+            return Result.failure(Exception("OAuth state mismatch — request rejected"))
+        }
+
+        // F-4: Read and clear PKCE code_verifier
+        val codeVerifier = encryptedPrefs.getString(KEY_PKCE_VERIFIER, null)
+        encryptedPrefs.edit().remove(KEY_PKCE_VERIFIER).apply()
+
+        if (BuildConfig.DEBUG) {
+            AuthDebugLogger.log("loginWithCode() → code=${code.take(8)}...", context)
+            AuthDebugLogger.log("  clientId=${BuildConfig.NETATMO_CLIENT_ID}", context)
+            AuthDebugLogger.log("  redirectUri=${BuildConfig.NETATMO_REDIRECT_URI}", context)
+        }
         return try {
             val response = authApiService.getToken(
                 grantType = "authorization_code",
                 clientId = BuildConfig.NETATMO_CLIENT_ID,
                 clientSecret = BuildConfig.NETATMO_CLIENT_SECRET,
                 code = code,
-                redirectUri = BuildConfig.NETATMO_REDIRECT_URI
+                redirectUri = BuildConfig.NETATMO_REDIRECT_URI,
+                codeVerifier = codeVerifier
             )
-            L.log("  HTTP ${response.code()} ${response.message()}", context)
+            if (BuildConfig.DEBUG) {
+                AuthDebugLogger.log("  HTTP ${response.code()} ${response.message()}", context)
+            }
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    L.log("  ✅ Token OK · scope=${body.scope.joinToString(" ")} · expiresIn=${body.expiresIn}s", context)
+                    if (BuildConfig.DEBUG) {
+                        AuthDebugLogger.log("  ✅ Token OK · scope=${body.scope.joinToString(" ")} · expiresIn=${body.expiresIn}s", context)
+                    }
                     saveTokens(body.accessToken, body.refreshToken, body.expiresIn)
                     Result.success(Unit)
                 } else {
-                    L.log("  ❌ Body nulo a pesar de 200", context)
+                    if (BuildConfig.DEBUG) {
+                        AuthDebugLogger.log("  ❌ Body nulo a pesar de 200", context)
+                    }
                     Result.failure(Exception("Respuesta vacía del servidor"))
                 }
             } else {
                 val errBody = response.errorBody()?.string() ?: "(sin cuerpo)"
-                L.log("  ❌ Error ${response.code()}: $errBody", context)
+                if (BuildConfig.DEBUG) {
+                    AuthDebugLogger.log("  ❌ Error ${response.code()}: $errBody", context)
+                }
                 Result.failure(Exception("Auth error ${response.code()}: $errBody"))
             }
         } catch (e: Exception) {
-            L.log("  ❌ Excepción: ${e.javaClass.simpleName}: ${e.message}", context)
+            if (BuildConfig.DEBUG) {
+                AuthDebugLogger.log("  ❌ Excepción: ${e.javaClass.simpleName}: ${e.message}", context)
+            }
             Result.failure(e)
         }
     }
@@ -108,32 +147,48 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    private suspend fun saveTokens(accessToken: String, refreshToken: String, expiresIn: Int) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.ACCESS_TOKEN] = accessToken
-            prefs[Keys.REFRESH_TOKEN] = refreshToken
-            prefs[Keys.EXPIRES_AT] = System.currentTimeMillis() + (expiresIn * 1000L)
-        }
+    private fun saveTokens(accessToken: String, refreshToken: String, expiresIn: Int) {
+        encryptedPrefs.edit()
+            .putString(KEY_ACCESS_TOKEN, accessToken)
+            .putString(KEY_REFRESH_TOKEN, refreshToken)
+            .putLong(KEY_EXPIRES_AT, System.currentTimeMillis() + (expiresIn * 1000L))
+            .apply()
     }
 
-    suspend fun setSelectedHome(homeId: String) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.HOME_ID] = homeId
-        }
+    fun setSelectedHome(homeId: String) {
+        encryptedPrefs.edit().putString(KEY_HOME_ID, homeId).apply()
     }
 
-    suspend fun logout() {
-        context.dataStore.edit { it.clear() }
+    fun logout() {
+        encryptedPrefs.edit().clear().apply()
     }
 
     fun getAuthUrl(): String {
+        // F-3: Generate and store OAuth state parameter
+        val stateBytes = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+        val state = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(stateBytes)
+        encryptedPrefs.edit().putString(KEY_OAUTH_STATE, state).apply()
+
+        // F-4: Generate PKCE code_verifier and derive code_challenge (S256)
+        val codeVerifierBytes = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+        val codeVerifier = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(codeVerifierBytes)
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(codeVerifier.toByteArray(Charsets.US_ASCII))
+        val codeChallenge = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
+        encryptedPrefs.edit().putString(KEY_PKCE_VERIFIER, codeVerifier).apply()
+
         val redirectUri = Uri.encode(BuildConfig.NETATMO_REDIRECT_URI)
         val url = "https://api.netatmo.com/oauth2/authorize" +
                 "?client_id=${BuildConfig.NETATMO_CLIENT_ID}" +
                 "&redirect_uri=$redirectUri" +
                 "&scope=read_thermostat%20write_thermostat" +
-                "&response_type=code"
-        AuthDebugLogger.log("getAuthUrl() → $url", context)
+                "&response_type=code" +
+                "&state=$state" +
+                "&code_challenge=$codeChallenge" +
+                "&code_challenge_method=S256"
+        if (BuildConfig.DEBUG) {
+            AuthDebugLogger.log("getAuthUrl() → $url", context)
+        }
         return url
     }
 }

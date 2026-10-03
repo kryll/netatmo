@@ -60,28 +60,48 @@ class MainActivity : ComponentActivity() {
 
     private fun handleAuthIntent(intent: Intent) {
         val uri = intent.data
-        AuthDebugLogger.log("handleAuthIntent: action=${intent.action} uri=$uri", this)
+        if (BuildConfig.DEBUG) {
+            AuthDebugLogger.log("handleAuthIntent: action=${intent.action} uri=$uri", this)
+        }
         if (uri == null) return
         if (uri.scheme == "com.arsys.netatmo" && uri.host == "oauth") {
             val code = uri.getQueryParameter("code")
+            val receivedState = uri.getQueryParameter("state")
             val error = uri.getQueryParameter("error")
             val errorDesc = uri.getQueryParameter("error_description")
-            AuthDebugLogger.log("  deep link recibido · code=${code?.take(8)}... error=$error desc=$errorDesc", this)
+            if (BuildConfig.DEBUG) {
+                AuthDebugLogger.log("  deep link recibido · code=${code?.take(8)}... error=$error desc=$errorDesc", this)
+            }
             if (error != null) {
-                AuthDebugLogger.log("  ❌ Netatmo devolvió error: $error – $errorDesc", this)
+                if (BuildConfig.DEBUG) {
+                    AuthDebugLogger.log("  ❌ Netatmo devolvió error: $error – $errorDesc", this)
+                }
                 return
             }
             if (code == null) {
-                AuthDebugLogger.log("  ❌ Sin code ni error en el deep link", this)
+                if (BuildConfig.DEBUG) {
+                    AuthDebugLogger.log("  ❌ Sin code ni error en el deep link", this)
+                }
                 return
             }
             authViewModel.handleAuthCode(
                 code = code,
-                onSuccess = { AuthDebugLogger.log("  ✅ Login exitoso", this) },
-                onError = { msg -> AuthDebugLogger.log("  ❌ handleAuthCode error: $msg", this) }
+                receivedState = receivedState,
+                onSuccess = {
+                    if (BuildConfig.DEBUG) {
+                        AuthDebugLogger.log("  ✅ Login exitoso", this)
+                    }
+                },
+                onError = { msg ->
+                    if (BuildConfig.DEBUG) {
+                        AuthDebugLogger.log("  ❌ handleAuthCode error: $msg", this)
+                    }
+                }
             )
         } else {
-            AuthDebugLogger.log("  URI no reconocida: $uri", this)
+            if (BuildConfig.DEBUG) {
+                AuthDebugLogger.log("  URI no reconocida: $uri", this)
+            }
         }
     }
 }
