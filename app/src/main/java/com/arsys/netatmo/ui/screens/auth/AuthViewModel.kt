@@ -20,6 +20,8 @@ class AuthViewModel @Inject constructor(
 
     fun getAuthUrl(): String = authRepository.getAuthUrl()
 
+    fun hasCredentials(): Boolean = authRepository.hasCredentials()
+
     fun handleAuthCode(
         code: String,
         receivedState: String? = null,

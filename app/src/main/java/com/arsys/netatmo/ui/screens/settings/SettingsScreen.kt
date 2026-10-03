@@ -27,6 +27,7 @@ import com.arsys.netatmo.data.repository.UpdateStatus
 @Composable
 fun SettingsScreen(
     onLogout: () -> Unit,
+    onNavigateToCredentials: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -169,6 +170,30 @@ fun SettingsScreen(
                             }
                         )
                     }
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            // Netatmo credentials
+            item {
+                Text("Cuenta de desarrollador", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 4.dp))
+            }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onNavigateToCredentials
+                ) {
+                    SettingRow(
+                        icon = Icons.Default.Key,
+                        title = "Credenciales Netatmo",
+                        subtitle = "Client ID y Client Secret para OAuth",
+                        trailing = {
+                            Icon(Icons.Default.ChevronRight, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    )
                 }
             }
 
