@@ -85,7 +85,7 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             }
             !isLoggedIn && !onAuthScreen && !onOnboardingScreen -> {
                 navController.navigate(Screen.Auth.route) {
-                    popUpTo(0) { inclusive = true }
+                popUpTo(0) { inclusive = true }
                 }
             }
         }
