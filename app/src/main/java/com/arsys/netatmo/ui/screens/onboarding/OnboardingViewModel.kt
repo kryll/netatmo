@@ -24,9 +24,10 @@ class OnboardingViewModel @Inject constructor(
         val ONBOARDING_COMPLETED_KEY = booleanPreferencesKey("onboarding_completed")
     }
 
-    val onboardingCompleted: StateFlow<Boolean> = context.dataStore.data
-        .map { prefs -> prefs[ONBOARDING_COMPLETED_KEY] ?: false }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    // null = DataStore not yet read; false = not completed; true = completed
+    val onboardingCompleted: StateFlow<Boolean?> = context.dataStore.data
+        .map { prefs -> prefs[ONBOARDING_COMPLETED_KEY] }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun markOnboardingCompleted() {
         viewModelScope.launch {

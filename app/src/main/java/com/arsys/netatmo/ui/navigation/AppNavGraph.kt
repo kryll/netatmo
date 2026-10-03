@@ -63,26 +63,30 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
 
-    LaunchedEffect(isOnboardingCompleted) {
-        if (!isOnboardingCompleted) {
-            navController.navigate(Screen.Onboarding.route) {
-                popUpTo(0) { inclusive = true }
-                launchSingleTop = true
-            }
-        }
-    }
-
-    // Navigate reactively when login state changes
-    LaunchedEffect(isLoggedIn) {
+    // Single effect: onboarding takes priority over login state.
+    // isOnboardingCompleted is null while DataStore is loading — skip until real value arrives.
+    LaunchedEffect(isLoggedIn, isOnboardingCompleted) {
+        val completed = isOnboardingCompleted ?: return@LaunchedEffect
         val onAuthScreen = currentRoute == Screen.Auth.route || currentRoute == null
         val onOnboardingScreen = currentRoute == Screen.Onboarding.route
-        if (isLoggedIn && (onAuthScreen || onOnboardingScreen)) {
-            navController.navigate(Screen.Home.route) {
-                popUpTo(0) { inclusive = true }
+        when {
+            !completed -> {
+                if (!onOnboardingScreen) {
+                    navController.navigate(Screen.Onboarding.route) {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             }
-        } else if (!isLoggedIn && !onAuthScreen && !onOnboardingScreen) {
-            navController.navigate(Screen.Auth.route) {
-                popUpTo(0) { inclusive = true }
+            isLoggedIn && (onAuthScreen || onOnboardingScreen) -> {
+                navController.navigate(Screen.Home.route) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+            !isLoggedIn && !onAuthScreen && !onOnboardingScreen -> {
+                navController.navigate(Screen.Auth.route) {
+                    popUpTo(0) { inclusive = true }
+                }
             }
         }
     }
