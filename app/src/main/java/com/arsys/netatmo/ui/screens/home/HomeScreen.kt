@@ -288,16 +288,26 @@ fun RoomCard(
                 // Temperature display
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = room.currentTemp?.let { "%.1f°C".format(it) } ?: "--",
+                        text = room.currentTemp?.let { "%.1f°".format(it) } ?: "--",
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         color = temperatureColor(room.currentTemp)
                     )
-                    Text(
-                        text = "Obj: ${room.targetTemp?.let { "%.1f°C".format(it) } ?: "--"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.ThermostatAuto,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = room.targetTemp?.let { "%.1f°".format(it) } ?: "--",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 
@@ -309,6 +319,33 @@ fun RoomCard(
 
                     Text("Temperatura objetivo", style = MaterialTheme.typography.labelLarge)
                     Spacer(modifier = Modifier.height(8.dp))
+                    // +/- quick buttons + current value
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilledTonalIconButton(
+                            onClick = { tempValue = (tempValue - 0.5).coerceAtLeast(7.0) },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Default.Remove, contentDescription = "-0.5°C")
+                        }
+                        Text(
+                            text = "%.1f°C".format(tempValue),
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                        FilledTonalIconButton(
+                            onClick = { tempValue = (tempValue + 0.5).coerceAtMost(30.0) },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "+0.5°C")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                     TemperatureSlider(
                         value = tempValue,
                         onValueChange = { tempValue = it }
@@ -384,6 +421,12 @@ fun RoomCard(
 
 @Composable
 fun ModuleCard(module: ModuleState) {
+    val isPlug = module.type == "NAPlug"
+    // Netatmo returns battery_level in mV (3500–6000) for most modules; normalize to 0–100
+    val batteryPct = module.batteryLevel?.let { raw ->
+        if (raw <= 100) raw else ((raw - 3500).coerceIn(0, 2500) * 100 / 2500)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -399,6 +442,8 @@ fun ModuleCard(module: ModuleState) {
                     "NATherm1", "NTH01" -> Icons.Default.DeviceThermostat
                     "NRV" -> Icons.Default.Thermostat
                     "OTM" -> Icons.Default.Settings
+                    "NAPlug" -> Icons.Default.Power
+                    "NAMain" -> Icons.Default.Hub
                     else -> Icons.Default.DeviceHub
                 },
                 contentDescription = null,
@@ -409,7 +454,14 @@ fun ModuleCard(module: ModuleState) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = module.type,
+                    text = when (module.type) {
+                        "NATherm1", "NTH01" -> "Termostato"
+                        "NRV" -> "Válvula de radiador"
+                        "OTM" -> "Módulo OpenTherm"
+                        "NAPlug" -> "Relé / Enchufe"
+                        "NAMain" -> "Estación principal"
+                        else -> module.type
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
@@ -420,23 +472,32 @@ fun ModuleCard(module: ModuleState) {
                             else MaterialTheme.colorScheme.error
                 )
             }
-            module.batteryLevel?.let { battery ->
-                Column(horizontalAlignment = Alignment.End) {
-                    Icon(
-                        imageVector = when {
-                            battery > 75 -> Icons.Default.BatteryFull
-                            battery > 50 -> Icons.Default.Battery5Bar
-                            battery > 25 -> Icons.Default.Battery3Bar
-                            else -> Icons.Default.BatteryAlert
-                        },
-                        contentDescription = null,
-                        tint = when {
-                            battery > 50 -> ComfortColor
-                            battery > 25 -> Color(0xFFFF9800)
-                            else -> MaterialTheme.colorScheme.error
-                        }
-                    )
-                    Text("$battery%", style = MaterialTheme.typography.labelSmall)
+            if (isPlug) {
+                // NAPlug is mains-powered — show plug icon instead of battery
+                Icon(
+                    Icons.Default.ElectricalServices,
+                    contentDescription = "Enchufado",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                batteryPct?.let { pct ->
+                    Column(horizontalAlignment = Alignment.End) {
+                        Icon(
+                            imageVector = when {
+                                pct > 75 -> Icons.Default.BatteryFull
+                                pct > 50 -> Icons.Default.Battery5Bar
+                                pct > 25 -> Icons.Default.Battery3Bar
+                                else -> Icons.Default.BatteryAlert
+                            },
+                            contentDescription = null,
+                            tint = when {
+                                pct > 50 -> ComfortColor
+                                pct > 25 -> Color(0xFFFF9800)
+                                else -> MaterialTheme.colorScheme.error
+                            }
+                        )
+                        Text("$pct%", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
         }

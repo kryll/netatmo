@@ -184,8 +184,8 @@ fun AuthScreen(
                 textAlign = TextAlign.Center
             )
 
-            // Panel de debug — visible siempre para diagnóstico
-            if (debugLogs.isNotEmpty()) {
+            // Panel de debug — visible solo en builds de depuración
+            if (BuildConfig.DEBUG && debugLogs.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 AuthDebugPanel(
                     logs = debugLogs,

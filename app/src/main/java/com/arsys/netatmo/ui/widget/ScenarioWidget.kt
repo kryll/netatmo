@@ -30,8 +30,8 @@ import androidx.glance.unit.ColorProvider
 class ScenarioWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val scenarioName = currentState<String>() ?: "Escenario"
         provideContent {
+            val scenarioName = currentState<String>() ?: "Escenario"
             ScenarioWidgetContent(scenarioName = scenarioName)
         }
     }

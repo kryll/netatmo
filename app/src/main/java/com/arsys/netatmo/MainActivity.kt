@@ -9,6 +9,9 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.arsys.netatmo.ui.navigation.AppNavGraph
 import com.arsys.netatmo.ui.screens.auth.AuthViewModel
@@ -20,18 +23,23 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val authViewModel: AuthViewModel by viewModels()
+    private var pendingRoute by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleAuthIntent(intent)
+        resolveShortcutIntent(intent)
         setContent {
             NetatmoTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavGraph()
+                    AppNavGraph(
+                        pendingRoute = pendingRoute,
+                        onRoutePending = { pendingRoute = null }
+                    )
                 }
             }
         }
@@ -41,32 +49,59 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleAuthIntent(intent)
+        resolveShortcutIntent(intent)
+    }
+
+    private fun resolveShortcutIntent(intent: Intent) {
+        if (intent.action == "com.arsys.netatmo.OPEN_SCENARIOS") {
+            pendingRoute = "scenarios"
+        }
     }
 
     private fun handleAuthIntent(intent: Intent) {
         val uri = intent.data
-        AuthDebugLogger.log("handleAuthIntent: action=${intent.action} uri=$uri", this)
+        if (BuildConfig.DEBUG) {
+            AuthDebugLogger.log("handleAuthIntent: action=${intent.action} uri=$uri", this)
+        }
         if (uri == null) return
         if (uri.scheme == "com.arsys.netatmo" && uri.host == "oauth") {
             val code = uri.getQueryParameter("code")
+            val receivedState = uri.getQueryParameter("state")
             val error = uri.getQueryParameter("error")
             val errorDesc = uri.getQueryParameter("error_description")
-            AuthDebugLogger.log("  deep link recibido · code=${code?.take(8)}... error=$error desc=$errorDesc", this)
+            if (BuildConfig.DEBUG) {
+                AuthDebugLogger.log("  deep link recibido · code=${code?.take(8)}... error=$error desc=$errorDesc", this)
+            }
             if (error != null) {
-                AuthDebugLogger.log("  ❌ Netatmo devolvió error: $error – $errorDesc", this)
+                if (BuildConfig.DEBUG) {
+                    AuthDebugLogger.log("  ❌ Netatmo devolvió error: $error – $errorDesc", this)
+                }
                 return
             }
             if (code == null) {
-                AuthDebugLogger.log("  ❌ Sin code ni error en el deep link", this)
+                if (BuildConfig.DEBUG) {
+                    AuthDebugLogger.log("  ❌ Sin code ni error en el deep link", this)
+                }
                 return
             }
             authViewModel.handleAuthCode(
                 code = code,
-                onSuccess = { AuthDebugLogger.log("  ✅ Login exitoso", this) },
-                onError = { msg -> AuthDebugLogger.log("  ❌ handleAuthCode error: $msg", this) }
+                receivedState = receivedState,
+                onSuccess = {
+                    if (BuildConfig.DEBUG) {
+                        AuthDebugLogger.log("  ✅ Login exitoso", this)
+                    }
+                },
+                onError = { msg ->
+                    if (BuildConfig.DEBUG) {
+                        AuthDebugLogger.log("  ❌ handleAuthCode error: $msg", this)
+                    }
+                }
             )
         } else {
-            AuthDebugLogger.log("  URI no reconocida: $uri", this)
+            if (BuildConfig.DEBUG) {
+                AuthDebugLogger.log("  URI no reconocida: $uri", this)
+            }
         }
     }
 }

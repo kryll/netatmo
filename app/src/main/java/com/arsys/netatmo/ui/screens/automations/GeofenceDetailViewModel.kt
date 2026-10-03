@@ -10,6 +10,8 @@ import com.arsys.netatmo.data.repository.AutomationRepository
 import com.arsys.netatmo.data.repository.AuthRepository
 import com.arsys.netatmo.service.GeofenceManager
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import javax.inject.Inject
 
@@ -32,6 +35,7 @@ data class GeofenceDetailUiState(
     val tempOnEnter: Double = 21.0,
     val tempOnExit: Double = 17.0,
     val isSaving: Boolean = false,
+    val isLoadingLocation: Boolean = false,
     val saved: Boolean = false,
     val error: String? = null
 )
@@ -85,15 +89,31 @@ class GeofenceDetailViewModel @Inject constructor(
 
     @SuppressLint("MissingPermission")
     fun useCurrentLocation() {
-        val fusedClient = LocationServices.getFusedLocationProviderClient(context)
-        fusedClient.lastLocation.addOnSuccessListener { location ->
-            location?.let {
-                _uiState.update { state ->
-                    state.copy(
-                        latitude = it.latitude.toString(),
-                        longitude = it.longitude.toString()
-                    )
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingLocation = true, error = null) }
+            try {
+                val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+                val cts = CancellationTokenSource()
+                val location = fusedClient
+                    .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                    .await()
+                if (location != null) {
+                    _uiState.update { it.copy(
+                        latitude = location.latitude.toString(),
+                        longitude = location.longitude.toString(),
+                        isLoadingLocation = false
+                    ) }
+                } else {
+                    _uiState.update { it.copy(
+                        isLoadingLocation = false,
+                        error = "No se pudo obtener la ubicación. Activa el GPS e inténtalo de nuevo."
+                    ) }
                 }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(
+                    isLoadingLocation = false,
+                    error = "Error al obtener ubicación: ${e.message}"
+                ) }
             }
         }
     }
