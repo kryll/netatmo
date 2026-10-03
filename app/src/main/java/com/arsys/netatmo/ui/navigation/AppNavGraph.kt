@@ -22,6 +22,7 @@ import com.arsys.netatmo.ui.screens.automations.CalendarAutomationScreen
 import com.arsys.netatmo.ui.screens.home.HomeScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenariosScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenarioDetailScreen
+import com.arsys.netatmo.ui.screens.schedule.ScheduleEditorScreen
 import com.arsys.netatmo.ui.screens.settings.SettingsScreen
 import com.arsys.netatmo.ui.screens.statistics.StatisticsScreen
 
@@ -35,6 +36,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object GeofenceDetail : Screen("geofence/{id}", "Geovalla", Icons.Default.LocationOn)
     object CalendarAutomation : Screen("calendar_automation/{id}", "Calendario", Icons.Default.CalendarToday)
     object ScenarioDetail : Screen("scenario/{id}", "Escenario", Icons.Default.AutoAwesome)
+    object ScheduleDetail : Screen("schedule/{id}", "Programación", Icons.Default.Schedule)
 }
 
 val bottomNavItems = listOf(
@@ -148,6 +150,18 @@ fun AppNavGraph() {
                             popUpTo(0) { inclusive = true }
                         }
                     }
+                )
+            }
+            composable(
+                route = Screen.ScheduleDetail.route,
+                arguments = listOf(
+                    navArgument("id") { type = NavType.StringType; defaultValue = "new" }
+                )
+            ) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id") ?: "new"
+                ScheduleEditorScreen(
+                    scheduleId = id,
+                    navController = navController
                 )
             }
         }

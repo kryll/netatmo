@@ -179,6 +179,12 @@ fun HomeScreen(
                                         schedules = schedules,
                                         onSwitchSchedule = { scheduleId ->
                                             viewModel.switchSchedule(scheduleId)
+                                        },
+                                        onEditSchedule = { scheduleId ->
+                                            navController.navigate("schedule/$scheduleId")
+                                        },
+                                        onNewSchedule = {
+                                            navController.navigate("schedule/new")
                                         }
                                     )
                                 }
@@ -440,7 +446,9 @@ fun ModuleCard(module: ModuleState) {
 @Composable
 fun ScheduleCard(
     schedules: List<ScheduleInfo>,
-    onSwitchSchedule: (String) -> Unit
+    onSwitchSchedule: (String) -> Unit,
+    onEditSchedule: (String) -> Unit = {},
+    onNewSchedule: () -> Unit = {}
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -477,7 +485,26 @@ fun ScheduleCard(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
+                    IconButton(
+                        onClick = { onEditSchedule(schedule.id) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Editar programación",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            TextButton(
+                onClick = onNewSchedule,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Nueva programación")
             }
         }
     }

@@ -148,6 +148,26 @@ class ThermostatRepository @Inject constructor(
         }
     }
 
+    suspend fun syncSchedule(homeId: String, body: Map<String, Any>): ApiResult<Unit> {
+        return try {
+            val response = apiService.syncHomeSchedule(body)
+            if (response.isSuccessful) ApiResult.Success(Unit)
+            else ApiResult.Error("Error ${response.code()}", response.code())
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Error de red")
+        }
+    }
+
+    suspend fun createSchedule(homeId: String, body: Map<String, Any>): ApiResult<Unit> {
+        return try {
+            val response = apiService.createHomeSchedule(body)
+            if (response.isSuccessful) ApiResult.Success(Unit)
+            else ApiResult.Error("Error ${response.code()}", response.code())
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Error de red")
+        }
+    }
+
     fun getTemperatureHistory(
         homeId: String,
         roomId: String,
