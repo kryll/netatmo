@@ -64,17 +64,30 @@ class UpdateRepository @Inject constructor(
             ?: return Result.failure(Exception("No hay APK disponible en esta versión"))
 
         return try {
-            val apkFile = File(context.cacheDir, "update.apk")
+            val apkFile = File(context.cacheDir, "update_${release.tagName}.apk")
             withContext(Dispatchers.IO) {
-                val connection = URL(downloadUrl).openConnection() as HttpURLConnection
+                var connection = URL(downloadUrl).openConnection() as HttpURLConnection
                 connection.instanceFollowRedirects = true
+                connection.connectTimeout = 30_000
+                connection.readTimeout = 60_000
                 connection.connect()
+
+                // GitHub redirects to CDN; follow manually if needed
+                if (connection.responseCode in 301..302) {
+                    val redirectUrl = connection.getHeaderField("Location")
+                    connection.disconnect()
+                    connection = URL(redirectUrl).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 30_000
+                    connection.readTimeout = 60_000
+                    connection.connect()
+                }
+
                 val total = connection.contentLength.toLong()
                 var downloaded = 0L
 
                 apkFile.outputStream().use { out ->
                     connection.inputStream.use { input ->
-                        val buf = ByteArray(16384)
+                        val buf = ByteArray(32768)
                         var n: Int
                         while (input.read(buf).also { n = it } != -1) {
                             out.write(buf, 0, n)

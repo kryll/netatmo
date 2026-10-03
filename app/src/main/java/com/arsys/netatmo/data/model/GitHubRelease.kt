@@ -10,7 +10,9 @@ data class GitHubRelease(
     @SerializedName("assets") val assets: List<GitHubAsset>
 ) {
     val versionCode: Int get() = tagName.removePrefix("v").toIntOrNull() ?: 0
-    val downloadUrl: String? get() = assets.firstOrNull { it.name.endsWith(".apk") }?.browserDownloadUrl
+    val apkAsset: GitHubAsset? get() = assets.firstOrNull { it.name.endsWith(".apk") }
+    val downloadUrl: String? get() = apkAsset?.browserDownloadUrl
+    val apkSizeMb: String get() = apkAsset?.let { "%.1f MB".format(it.size / 1_048_576.0) } ?: ""
     val displayName: String get() = if (name.isNotBlank()) name else tagName
 }
 

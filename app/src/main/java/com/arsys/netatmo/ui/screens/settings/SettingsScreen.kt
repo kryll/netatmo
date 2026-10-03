@@ -342,7 +342,11 @@ fun UpdateSection(
                                 Text("Nueva versión disponible",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold)
-                                Text(updateStatus.release.displayName,
+                                Text(buildString {
+                                    append(updateStatus.release.displayName)
+                                    if (updateStatus.release.apkSizeMb.isNotEmpty())
+                                        append(" · ${updateStatus.release.apkSizeMb}")
+                                },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
