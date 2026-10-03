@@ -1,0 +1,6 @@
+-keep class com.arsys.netatmo.data.api.models.** { *; }
+-keep class com.arsys.netatmo.domain.model.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
