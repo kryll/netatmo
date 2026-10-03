@@ -108,8 +108,15 @@ interface CalendarAutomationDao {
     @Query("SELECT * FROM calendar_automations ORDER BY id DESC")
     fun getAllCalendarAutomations(): Flow<List<CalendarAutomationEntity>>
 
-    @Query("SELECT * FROM calendar_automations WHERE enabled = 1")
+    @Query("""
+        SELECT ca.* FROM calendar_automations ca
+        INNER JOIN automations a ON ca.automationId = a.id
+        WHERE ca.enabled = 1 AND a.enabled = 1
+    """)
     suspend fun getEnabledCalendarAutomations(): List<CalendarAutomationEntity>
+
+    @Query("SELECT * FROM calendar_automations WHERE automationId = :automationId LIMIT 1")
+    suspend fun getByAutomationId(automationId: Long): CalendarAutomationEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(automation: CalendarAutomationEntity): Long

@@ -78,6 +78,7 @@ data class CalendarAutomationEntity(
     val calendarId: Long,
     val calendarName: String,
     val eventTitleFilter: String? = null, // null = todos los eventos
+    val eventTitleExactMatch: Boolean = false, // true = coincidencia exacta; false = contiene
     val minutesBefore: Int = 30, // precalentar N minutos antes
     val targetTemperature: Double,
     val mode: String = "manual",

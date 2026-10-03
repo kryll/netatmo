@@ -61,6 +61,9 @@ class AutomationRepository @Inject constructor(
     suspend fun getEnabledCalendarAutomations(): List<CalendarAutomationEntity> =
         calendarDao.getEnabledCalendarAutomations()
 
+    suspend fun getCalendarAutomationByAutomationId(automationId: Long): CalendarAutomationEntity? =
+        calendarDao.getByAutomationId(automationId)
+
     // Escenarios
     fun getAllScenarios(): Flow<List<ScenarioEntity>> = scenarioDao.getAllScenarios()
 

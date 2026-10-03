@@ -32,6 +32,7 @@ class CalendarWorker @AssistedInject constructor(
             val upcomingEvents = getUpcomingEvents(
                 calendarId = calAuto.calendarId,
                 titleFilter = calAuto.eventTitleFilter,
+                exactMatch = calAuto.eventTitleExactMatch,
                 withinMs = (calAuto.minutesBefore + 15) * 60 * 1000L,
                 now = now
             )
@@ -50,6 +51,7 @@ class CalendarWorker @AssistedInject constructor(
     private fun getUpcomingEvents(
         calendarId: Long,
         titleFilter: String?,
+        exactMatch: Boolean,
         withinMs: Long,
         now: Long
     ): List<Long> {
@@ -76,9 +78,12 @@ class CalendarWorker @AssistedInject constructor(
                 while (cursor.moveToNext()) {
                     val title = cursor.getString(1) ?: ""
                     val start = cursor.getLong(2)
-                    if (titleFilter == null || title.contains(titleFilter, ignoreCase = true)) {
-                        events.add(start)
+                    val matches = when {
+                        titleFilter == null -> true
+                        exactMatch -> title.equals(titleFilter, ignoreCase = true)
+                        else -> title.contains(titleFilter, ignoreCase = true)
                     }
+                    if (matches) events.add(start)
                 }
             }
         } catch (e: SecurityException) {
