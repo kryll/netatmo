@@ -1,0 +1,12 @@
+## Template - copy to local.properties and fill in your values
+## This file is NOT tracked by git
+
+# Android SDK path (replace with your actual path)
+sdk.dir=/Users/YOUR_USER/Library/Android/sdk
+# On Linux:  sdk.dir=/home/YOUR_USER/Android/Sdk
+# On Windows: sdk.dir=C\:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk
+
+# Netatmo API credentials (from https://dev.netatmo.com/apps)
+# Add these as Build Config fields in app/build.gradle.kts
+# NETATMO_CLIENT_ID=your_client_id_here
+# NETATMO_CLIENT_SECRET=your_client_secret_here

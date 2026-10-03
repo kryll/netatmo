@@ -21,8 +21,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
 import com.arsys.netatmo.ui.theme.ComfortColor
 import com.arsys.netatmo.ui.theme.WarmColor
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,7 +31,7 @@ fun StatisticsScreen(
     val periods = listOf("24h" to 1, "7 días" to 7, "30 días" to 30)
     var selectedPeriod by remember { mutableStateOf(7) }
 
-    LaunchedEffect(selectedPeriod) {
+    LaunchedEffect(selectedPeriod, uiState.selectedRoomId) {
         viewModel.loadStatistics(selectedPeriod)
     }
 
@@ -51,6 +49,21 @@ fun StatisticsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Room selector
+            if (uiState.availableRooms.size > 1) {
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(uiState.availableRooms) { (roomId, roomName) ->
+                            FilterChip(
+                                selected = uiState.selectedRoomId == roomId,
+                                onClick = { viewModel.selectRoom(roomId) },
+                                label = { Text(roomName) }
+                            )
+                        }
+                    }
+                }
+            }
+
             // Period selector
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

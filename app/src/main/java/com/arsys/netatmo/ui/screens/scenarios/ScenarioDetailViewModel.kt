@@ -6,7 +6,6 @@ import com.arsys.netatmo.data.local.dao.HomeCacheDao
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
 import com.arsys.netatmo.data.repository.AutomationRepository
 import com.arsys.netatmo.data.repository.AuthRepository
-import com.arsys.netatmo.domain.model.Room
 import com.arsys.netatmo.domain.model.ScenarioAction
 import com.arsys.netatmo.domain.model.ThermostatMode
 import com.google.gson.Gson
