@@ -20,9 +20,14 @@ class AuthViewModel @Inject constructor(
 
     fun getAuthUrl(): String = authRepository.getAuthUrl()
 
-    fun handleAuthCode(code: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun handleAuthCode(
+        code: String,
+        receivedState: String? = null,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
         viewModelScope.launch {
-            val result = authRepository.loginWithCode(code)
+            val result = authRepository.loginWithCode(code, receivedState)
             result.fold(
                 onSuccess = { onSuccess() },
                 onFailure = { onError(it.message ?: "Error de autenticación") }
