@@ -1,11 +1,15 @@
 package com.arsys.netatmo.service
 
+import android.Manifest
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.arsys.netatmo.MainActivity
 import com.arsys.netatmo.NetatmoApp
 import com.arsys.netatmo.R
@@ -34,11 +38,16 @@ class GeofenceTransitionService : Service() {
     override fun onBind(intent: Intent?) = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        intent?.let { handleGeofenceEvent(it) }
+        if (intent != null) {
+            serviceScope.launch {
+                handleGeofenceEvent(intent)
+                stopSelf(startId)
+            }
+        }
         return START_NOT_STICKY
     }
 
-    private fun handleGeofenceEvent(intent: Intent) {
+    private suspend fun handleGeofenceEvent(intent: Intent) {
         val geofencingEvent = GeofencingEvent.fromIntent(intent) ?: return
         if (geofencingEvent.hasError()) {
             Log.e("GeofenceService", "Error: ${geofencingEvent.errorCode}")
@@ -48,10 +57,8 @@ class GeofenceTransitionService : Service() {
         val transition = geofencingEvent.geofenceTransition
         val triggeredGeofences = geofencingEvent.triggeringGeofences ?: return
 
-        serviceScope.launch {
-            triggeredGeofences.forEach { geofence ->
-                processGeofenceTrigger(geofence.requestId, transition)
-            }
+        triggeredGeofences.forEach { geofence ->
+            processGeofenceTrigger(geofence.requestId, transition)
         }
     }
 
@@ -84,6 +91,11 @@ class GeofenceTransitionService : Service() {
     }
 
     private fun showNotification(title: String, message: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) return
+
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
@@ -94,11 +106,12 @@ class GeofenceTransitionService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle(title)
             .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
 
         val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(System.currentTimeMillis().toInt(), notification)
+        manager.notify(title.hashCode(), notification)
     }
 }

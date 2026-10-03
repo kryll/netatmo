@@ -43,8 +43,9 @@ class GeofenceManager @Inject constructor(
             .setTransitionTypes(transitions.reduce { acc, i -> acc or i })
             .build()
 
+        val initialTrigger = if (entity.triggerOnEnter) GeofencingRequest.INITIAL_TRIGGER_ENTER else 0
         val request = GeofencingRequest.Builder()
-            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+            .setInitialTrigger(initialTrigger)
             .addGeofence(geofence)
             .build()
 
