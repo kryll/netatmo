@@ -71,7 +71,7 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
-                    L.log("  ✅ Token OK · scope=${body.scope} · expiresIn=${body.expiresIn}s", context)
+                    L.log("  ✅ Token OK · scope=${body.scope.joinToString(" ")} · expiresIn=${body.expiresIn}s", context)
                     saveTokens(body.accessToken, body.refreshToken, body.expiresIn)
                     Result.success(Unit)
                 } else {
