@@ -2,10 +2,10 @@ package com.arsys.netatmo.service
 
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.lifecycle.LifecycleService
 import com.arsys.netatmo.MainActivity
 import com.arsys.netatmo.NetatmoApp
 import com.arsys.netatmo.R
@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class GeofenceTransitionService : LifecycleService() {
+class GeofenceTransitionService : Service() {
 
     @Inject lateinit var automationRepository: AutomationRepository
     @Inject lateinit var thermostatRepository: ThermostatRepository
@@ -31,8 +31,9 @@ class GeofenceTransitionService : LifecycleService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    override fun onBind(intent: Intent?) = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        super.onStartCommand(intent, flags, startId)
         intent?.let { handleGeofenceEvent(it) }
         return START_NOT_STICKY
     }
