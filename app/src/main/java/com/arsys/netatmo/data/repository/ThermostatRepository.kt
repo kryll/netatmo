@@ -91,7 +91,9 @@ class ThermostatRepository @Inject constructor(
         durationMinutes: Int = 60
     ): ApiResult<Unit> {
         return try {
-            val endTime = (System.currentTimeMillis() / 1000) + (durationMinutes * 60)
+            val endTime = if (durationMinutes > 0)
+                (System.currentTimeMillis() / 1000) + (durationMinutes * 60L)
+            else null
             val response = apiService.setRoomThermpoint(
                 homeId = homeId,
                 roomId = roomId,
@@ -112,13 +114,15 @@ class ThermostatRepository @Inject constructor(
         mode: String
     ): ApiResult<Unit> {
         return try {
-            val response = apiService.setRoomThermpoint(
-                homeId = homeId,
-                roomId = roomId,
-                mode = mode
-            )
+            // away, hg (frost guard) and off are home-level modes — must use setthermmode
+            val response = if (mode in listOf("away", "hg", "off")) {
+                apiService.setThermMode(homeId, mode)
+            } else {
+                // "schedule" cancels a manual override; "manual" (without temp) resets to schedule too
+                apiService.setRoomThermpoint(homeId = homeId, roomId = roomId, mode = mode)
+            }
             if (response.isSuccessful) ApiResult.Success(Unit)
-            else ApiResult.Error("Error ${response.code()}", response.code())
+            else ApiResult.Error("Error ${response.code()}: ${response.errorBody()?.string()}", response.code())
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error de red")
         }

@@ -230,6 +230,7 @@ fun RoomCard(
 ) {
     var tempValue by remember(room.targetTemp) { mutableStateOf(room.targetTemp ?: 19.0) }
     var duration by remember { mutableStateOf(60) }
+    val durationOptions = listOf(60 to "1h", 120 to "2h", 180 to "3h", 0 to "Sin límite")
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -312,11 +313,11 @@ fun RoomCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(30, 60, 120, 180).forEach { mins ->
+                        durationOptions.forEach { (mins, label) ->
                             FilterChip(
                                 selected = duration == mins,
                                 onClick = { duration = mins },
-                                label = { Text("${mins}min") }
+                                label = { Text(label) }
                             )
                         }
                     }
@@ -328,7 +329,11 @@ fun RoomCard(
                         enabled = !isSetting
                     ) {
                         if (isSetting) CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        else Text("Aplicar %.1f°C durante ${duration}min".format(tempValue))
+                        else {
+                            val label = if (duration == 0) "Aplicar %.1f°C sin límite de tiempo".format(tempValue)
+                                        else "Aplicar %.1f°C durante ${durationOptions.first { it.first == duration }.second}".format(tempValue)
+                            Text(label)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
