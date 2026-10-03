@@ -1,6 +1,7 @@
 package com.arsys.netatmo.data.repository
 
 import android.content.Context
+import android.net.Uri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
@@ -112,10 +113,11 @@ class AuthRepository @Inject constructor(
     }
 
     fun getAuthUrl(): String {
+        val redirectUri = Uri.encode(BuildConfig.NETATMO_REDIRECT_URI)
         return "https://api.netatmo.com/oauth2/authorize" +
                 "?client_id=${BuildConfig.NETATMO_CLIENT_ID}" +
-                "&redirect_uri=${BuildConfig.NETATMO_REDIRECT_URI}" +
-                "&scope=read_thermostat+write_thermostat" +
+                "&redirect_uri=$redirectUri" +
+                "&scope=read_thermostat%20write_thermostat" +
                 "&response_type=code"
     }
 }
