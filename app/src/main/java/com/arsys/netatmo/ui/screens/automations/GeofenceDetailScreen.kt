@@ -1,5 +1,9 @@
 package com.arsys.netatmo.ui.screens.automations
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -9,8 +13,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.ui.components.TemperatureSlider
@@ -23,6 +29,15 @@ fun GeofenceDetailScreen(
     viewModel: GeofenceDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) viewModel.useCurrentLocation()
+    }
 
     LaunchedEffect(automationId) {
         viewModel.load(automationId)
@@ -115,12 +130,34 @@ fun GeofenceDetailScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedButton(
-                        onClick = { viewModel.useCurrentLocation() },
-                        modifier = Modifier.fillMaxWidth()
+                        onClick = {
+                            val fineGranted = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            val coarseGranted = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (fineGranted || coarseGranted) {
+                                viewModel.useCurrentLocation()
+                            } else {
+                                permissionLauncher.launch(arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                ))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isLoadingLocation
                     ) {
-                        Icon(Icons.Default.MyLocation, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Usar mi ubicación actual")
+                        if (uiState.isLoadingLocation) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Obteniendo ubicación…")
+                        } else {
+                            Icon(Icons.Default.MyLocation, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Usar mi ubicación actual")
+                        }
                     }
                 }
             }
