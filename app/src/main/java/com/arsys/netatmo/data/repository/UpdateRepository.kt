@@ -2,6 +2,7 @@ package com.arsys.netatmo.data.repository
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.core.content.FileProvider
 import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.GitHubApiService
@@ -64,7 +65,8 @@ class UpdateRepository @Inject constructor(
             ?: return Result.failure(Exception("No hay APK disponible en esta versión"))
 
         return try {
-            val apkFile = File(context.cacheDir, "update_${release.tagName}.apk")
+            val apkFile = File(context.cacheDir, "updates/update_${release.tagName}.apk")
+            apkFile.parentFile?.mkdirs()
             withContext(Dispatchers.IO) {
                 var connection = URL(downloadUrl).openConnection() as HttpURLConnection
                 connection.instanceFollowRedirects = true
@@ -98,9 +100,44 @@ class UpdateRepository @Inject constructor(
                 }
                 connection.disconnect()
             }
+            // Verify the downloaded APK is signed with the same certificate as the installed app
+            if (!verifyApkSignature(apkFile)) {
+                apkFile.delete()
+                return Result.failure(Exception("El APK descargado no tiene una firma válida"))
+            }
             Result.success(apkFile)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun verifyApkSignature(apkFile: File): Boolean {
+        return try {
+            val pm = context.packageManager
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                val downloadedInfo = pm.getPackageArchiveInfo(
+                    apkFile.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES
+                ) ?: return false
+                val installedInfo = pm.getPackageInfo(
+                    context.packageName, PackageManager.GET_SIGNING_CERTIFICATES
+                )
+                val downloadedCerts = downloadedInfo.signingInfo?.apkContentsSigners ?: return false
+                val installedCerts = installedInfo.signingInfo?.apkContentsSigners ?: return false
+                downloadedCerts.any { dc -> installedCerts.any { ic -> dc.toCharsString() == ic.toCharsString() } }
+            } else {
+                val downloadedInfo = pm.getPackageArchiveInfo(
+                    apkFile.absolutePath, PackageManager.GET_SIGNATURES
+                ) ?: return false
+                val installedInfo = pm.getPackageInfo(
+                    context.packageName, PackageManager.GET_SIGNATURES
+                )
+                val downloadedSigs = downloadedInfo.signatures ?: return false
+                val installedSigs = installedInfo.signatures ?: return false
+                downloadedSigs.any { ds -> installedSigs.any { is_ -> ds.toCharsString() == is_.toCharsString() } }
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 
