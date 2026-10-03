@@ -14,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +34,7 @@ import com.arsys.netatmo.util.AuthDebugLogger
 @Composable
 fun AuthScreen(
     onLoginSuccess: () -> Unit,
+    onConfigureCredentials: () -> Unit = {},
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -40,6 +43,7 @@ fun AuthScreen(
     val debugLogs by AuthDebugLogger.logs.collectAsState()
 
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val credentialsConfigured = remember { viewModel.hasCredentials() }
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) onLoginSuccess()
@@ -131,6 +135,42 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
+            // Credentials warning
+            if (!credentialsConfigured) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Configura tus credenciales primero",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        }
+                        Text(
+                            "Para iniciar sesión necesitas un Client ID y Client Secret de Netatmo. Son gratuitos.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        OutlinedButton(
+                            onClick = onConfigureCredentials,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Key, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Configurar credenciales")
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             if (errorMessage != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -159,7 +199,7 @@ fun AuthScreen(
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                enabled = !isLoading
+                enabled = !isLoading && credentialsConfigured
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(

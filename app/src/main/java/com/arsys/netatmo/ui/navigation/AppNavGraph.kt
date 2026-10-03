@@ -23,6 +23,7 @@ import com.arsys.netatmo.ui.screens.home.HomeScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenariosScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenarioDetailScreen
 import com.arsys.netatmo.ui.screens.schedule.ScheduleEditorScreen
+import com.arsys.netatmo.ui.screens.settings.NetatmoCredentialsScreen
 import com.arsys.netatmo.ui.screens.settings.SettingsScreen
 import com.arsys.netatmo.ui.screens.statistics.StatisticsScreen
 
@@ -37,6 +38,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object CalendarAutomation : Screen("calendar_automation/{id}", "Calendario", Icons.Default.CalendarToday)
     object ScenarioDetail : Screen("scenario/{id}", "Escenario", Icons.Default.AutoAwesome)
     object ScheduleDetail : Screen("schedule/{id}", "Programación", Icons.Default.Schedule)
+    object NetatmoCredentials : Screen("netatmo_credentials", "Credenciales", Icons.Default.Key)
 }
 
 val bottomNavItems = listOf(
@@ -119,6 +121,9 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                         navController.navigate(Screen.Home.route) {
                             popUpTo(Screen.Auth.route) { inclusive = true }
                         }
+                    },
+                    onConfigureCredentials = {
+                        navController.navigate(Screen.NetatmoCredentials.route)
                     }
                 )
             }
@@ -161,8 +166,14 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                         navController.navigate(Screen.Auth.route) {
                             popUpTo(0) { inclusive = true }
                         }
+                    },
+                    onNavigateToCredentials = {
+                        navController.navigate(Screen.NetatmoCredentials.route)
                     }
                 )
+            }
+            composable(Screen.NetatmoCredentials.route) {
+                NetatmoCredentialsScreen(navController = navController)
             }
             composable(
                 route = Screen.ScheduleDetail.route,

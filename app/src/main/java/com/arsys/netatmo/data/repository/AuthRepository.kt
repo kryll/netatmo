@@ -31,6 +31,8 @@ class AuthRepository @Inject constructor(
         const val KEY_HOME_ID = "selected_home_id"
         const val KEY_OAUTH_STATE = "oauth_state"
         const val KEY_PKCE_VERIFIER = "pkce_code_verifier"
+        const val KEY_CLIENT_ID = "client_id"
+        const val KEY_CLIENT_SECRET = "client_secret"
     }
 
     private val encryptedPrefs: SharedPreferences by lazy {
@@ -46,6 +48,35 @@ class AuthRepository @Inject constructor(
     val isLoggedIn: Flow<Boolean> = flow {
         emit(encryptedPrefs.getString(KEY_ACCESS_TOKEN, null) != null)
     }
+
+    val hasCustomCredentials: Flow<Boolean> = flow {
+        emit(encryptedPrefs.getString(KEY_CLIENT_ID, null) != null)
+    }
+
+    fun getStoredClientId(): String? = encryptedPrefs.getString(KEY_CLIENT_ID, null)
+
+    fun hasCredentials(): Boolean =
+        encryptedPrefs.getString(KEY_CLIENT_ID, null) != null ||
+                (BuildConfig.DEBUG && BuildConfig.NETATMO_CLIENT_ID.isNotBlank())
+
+    fun saveCredentials(clientId: String, clientSecret: String) {
+        encryptedPrefs.edit()
+            .putString(KEY_CLIENT_ID, clientId.trim())
+            .putString(KEY_CLIENT_SECRET, clientSecret.trim())
+            .apply()
+    }
+
+    fun clearCredentials() {
+        encryptedPrefs.edit().remove(KEY_CLIENT_ID).remove(KEY_CLIENT_SECRET).apply()
+    }
+
+    private fun effectiveClientId(): String =
+        encryptedPrefs.getString(KEY_CLIENT_ID, null)
+            ?: if (BuildConfig.DEBUG) BuildConfig.NETATMO_CLIENT_ID else ""
+
+    private fun effectiveClientSecret(): String =
+        encryptedPrefs.getString(KEY_CLIENT_SECRET, null)
+            ?: if (BuildConfig.DEBUG) BuildConfig.NETATMO_CLIENT_SECRET else ""
 
     val accessToken: Flow<String?> = flow {
         emit(encryptedPrefs.getString(KEY_ACCESS_TOKEN, null))
@@ -84,14 +115,14 @@ class AuthRepository @Inject constructor(
 
         if (BuildConfig.DEBUG) {
             AuthDebugLogger.log("loginWithCode() → code=${code.take(8)}...", context)
-            AuthDebugLogger.log("  clientId=${BuildConfig.NETATMO_CLIENT_ID}", context)
+            AuthDebugLogger.log("  clientId=${effectiveClientId()}", context)
             AuthDebugLogger.log("  redirectUri=${BuildConfig.NETATMO_REDIRECT_URI}", context)
         }
         return try {
             val response = authApiService.getToken(
                 grantType = "authorization_code",
-                clientId = BuildConfig.NETATMO_CLIENT_ID,
-                clientSecret = BuildConfig.NETATMO_CLIENT_SECRET,
+                clientId = effectiveClientId(),
+                clientSecret = effectiveClientSecret(),
                 code = code,
                 redirectUri = BuildConfig.NETATMO_REDIRECT_URI,
                 codeVerifier = codeVerifier
@@ -132,8 +163,8 @@ class AuthRepository @Inject constructor(
         return try {
             val response = authApiService.getToken(
                 grantType = "refresh_token",
-                clientId = BuildConfig.NETATMO_CLIENT_ID,
-                clientSecret = BuildConfig.NETATMO_CLIENT_SECRET,
+                clientId = effectiveClientId(),
+                clientSecret = effectiveClientSecret(),
                 refreshToken = refreshToken
             )
             if (response.isSuccessful) {
@@ -160,7 +191,14 @@ class AuthRepository @Inject constructor(
     }
 
     fun logout() {
-        encryptedPrefs.edit().clear().apply()
+        encryptedPrefs.edit()
+            .remove(KEY_ACCESS_TOKEN)
+            .remove(KEY_REFRESH_TOKEN)
+            .remove(KEY_EXPIRES_AT)
+            .remove(KEY_HOME_ID)
+            .remove(KEY_OAUTH_STATE)
+            .remove(KEY_PKCE_VERIFIER)
+            .apply()
     }
 
     fun getAuthUrl(): String {
@@ -179,7 +217,7 @@ class AuthRepository @Inject constructor(
 
         val redirectUri = Uri.encode(BuildConfig.NETATMO_REDIRECT_URI)
         val url = "https://api.netatmo.com/oauth2/authorize" +
-                "?client_id=${BuildConfig.NETATMO_CLIENT_ID}" +
+                "?client_id=${effectiveClientId()}" +
                 "&redirect_uri=$redirectUri" +
                 "&scope=read_thermostat%20write_thermostat" +
                 "&response_type=code" +
