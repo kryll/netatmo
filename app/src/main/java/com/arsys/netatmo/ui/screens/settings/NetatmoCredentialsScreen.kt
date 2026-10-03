@@ -117,7 +117,7 @@ fun NetatmoCredentialsScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     listOf(
                         "Entra en dev.netatmo.com e inicia sesión",
-                        "Pulsa "Create an app"",
+                        "Pulsa \"Create an app\"",
                         "Pon un nombre (ej: Mi Termostato) y guarda",
                         "Copia el Client ID y el Client secret",
                         "Pégalos aquí abajo y guarda"
