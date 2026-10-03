@@ -46,7 +46,7 @@ val bottomNavItems = listOf(
 )
 
 @Composable
-fun AppNavGraph() {
+fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = hiltViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
@@ -65,6 +65,18 @@ fun AppNavGraph() {
             navController.navigate(Screen.Auth.route) {
                 popUpTo(0) { inclusive = true }
             }
+        }
+    }
+
+    // Navigate to pending route (e.g. from a home screen shortcut)
+    LaunchedEffect(pendingRoute, isLoggedIn) {
+        if (pendingRoute != null && isLoggedIn) {
+            navController.navigate(pendingRoute) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+            onRoutePending()
         }
     }
 

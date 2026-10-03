@@ -44,6 +44,10 @@
                     android:host="oauth"
                     android:scheme="com.arsys.netatmo" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.arsys.netatmo.OPEN_SCENARIOS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <receiver

@@ -1,5 +1,11 @@
 package com.arsys.netatmo.ui.screens.scenarios
 
+import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,11 +18,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.arsys.netatmo.MainActivity
+import com.arsys.netatmo.R
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,6 +35,7 @@ fun ScenariosScreen(
     viewModel: ScenariosViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -100,7 +110,25 @@ fun ScenariosScreen(
                         isRunning = uiState.runningScenarioId == scenario.id,
                         onRun = { viewModel.runScenario(scenario) },
                         onEdit = { navController.navigate("scenario/${scenario.id}") },
-                        onDelete = { viewModel.deleteScenario(scenario) }
+                        onDelete = { viewModel.deleteScenario(scenario) },
+                        onPin = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                val sm = context.getSystemService(ShortcutManager::class.java)
+                                if (sm.isRequestPinShortcutSupported) {
+                                    val intent = Intent(context, MainActivity::class.java).apply {
+                                        action = "com.arsys.netatmo.OPEN_SCENARIOS"
+                                        putExtra("scenario_id", scenario.id)
+                                    }
+                                    val info = ShortcutInfo.Builder(context, "sc_${scenario.id}")
+                                        .setShortLabel(scenario.name)
+                                        .setLongLabel(scenario.name)
+                                        .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
+                                        .setIntent(intent)
+                                        .build()
+                                    sm.requestPinShortcut(info, null)
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -159,7 +187,8 @@ fun ScenarioCard(
     isRunning: Boolean,
     onRun: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onPin: (() -> Unit)? = null
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -217,6 +246,12 @@ fun ScenarioCard(
                 IconButton(onClick = onRun) {
                     Icon(Icons.Default.PlayArrow, contentDescription = "Ejecutar",
                         tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+            if (onPin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                IconButton(onClick = onPin) {
+                    Icon(Icons.Default.AddToHomeScreen, contentDescription = "Añadir al inicio",
+                        tint = MaterialTheme.colorScheme.secondary)
                 }
             }
             IconButton(onClick = onEdit) {

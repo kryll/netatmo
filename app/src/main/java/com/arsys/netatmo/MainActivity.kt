@@ -9,6 +9,9 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.arsys.netatmo.ui.navigation.AppNavGraph
 import com.arsys.netatmo.ui.screens.auth.AuthViewModel
@@ -20,18 +23,23 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val authViewModel: AuthViewModel by viewModels()
+    private var pendingRoute by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleAuthIntent(intent)
+        resolveShortcutIntent(intent)
         setContent {
             NetatmoTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavGraph()
+                    AppNavGraph(
+                        pendingRoute = pendingRoute,
+                        onRoutePending = { pendingRoute = null }
+                    )
                 }
             }
         }
@@ -41,6 +49,13 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleAuthIntent(intent)
+        resolveShortcutIntent(intent)
+    }
+
+    private fun resolveShortcutIntent(intent: Intent) {
+        if (intent.action == "com.arsys.netatmo.OPEN_SCENARIOS") {
+            pendingRoute = "scenarios"
+        }
     }
 
     private fun handleAuthIntent(intent: Intent) {
