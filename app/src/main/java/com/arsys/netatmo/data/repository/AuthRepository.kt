@@ -13,7 +13,8 @@ import com.arsys.netatmo.data.api.AuthApiService
 import com.arsys.netatmo.util.AuthDebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -45,13 +46,14 @@ class AuthRepository @Inject constructor(
         )
     }
 
-    val isLoggedIn: Flow<Boolean> = flow {
-        emit(encryptedPrefs.getString(KEY_ACCESS_TOKEN, null) != null)
-    }
+    private val _isLoggedIn = MutableStateFlow(
+        encryptedPrefs.getString(KEY_ACCESS_TOKEN, null) != null
+    )
+    val isLoggedIn: Flow<Boolean> = _isLoggedIn.asStateFlow()
 
-    val hasCustomCredentials: Flow<Boolean> = flow {
-        emit(encryptedPrefs.getString(KEY_CLIENT_ID, null) != null)
-    }
+    val hasCustomCredentials: Flow<Boolean> = MutableStateFlow(
+        encryptedPrefs.getString(KEY_CLIENT_ID, null) != null
+    ).asStateFlow()
 
     fun getStoredClientId(): String? = encryptedPrefs.getString(KEY_CLIENT_ID, null)
 
@@ -184,6 +186,7 @@ class AuthRepository @Inject constructor(
             .putString(KEY_REFRESH_TOKEN, refreshToken)
             .putLong(KEY_EXPIRES_AT, System.currentTimeMillis() + (expiresIn * 1000L))
             .apply()
+        _isLoggedIn.value = true
     }
 
     fun setSelectedHome(homeId: String) {
@@ -199,6 +202,7 @@ class AuthRepository @Inject constructor(
             .remove(KEY_OAUTH_STATE)
             .remove(KEY_PKCE_VERIFIER)
             .apply()
+        _isLoggedIn.value = false
     }
 
     fun getAuthUrl(): String {
