@@ -2,6 +2,7 @@ package com.arsys.netatmo.di
 
 import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.AuthApiService
+import com.arsys.netatmo.data.api.GitHubApiService
 import com.arsys.netatmo.data.api.NetatmoApiService
 import com.arsys.netatmo.data.repository.AuthRepository
 import dagger.Module
@@ -81,4 +82,24 @@ object NetworkModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(NetatmoApiService::class.java)
+
+    @Provides
+    @Singleton
+    @Named("github")
+    fun provideGitHubOkHttpClient(logging: HttpLoggingInterceptor): OkHttpClient =
+        OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideGitHubApiService(@Named("github") client: OkHttpClient): GitHubApiService =
+        Retrofit.Builder()
+            .baseUrl("https://api.github.com/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(GitHubApiService::class.java)
 }

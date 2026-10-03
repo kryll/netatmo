@@ -12,7 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.models.Home
+import com.arsys.netatmo.data.repository.UpdateStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -148,8 +150,8 @@ fun SettingsScreen(
                     Column {
                         SettingRow(
                             icon = Icons.Default.Info,
-                            title = "Versión",
-                            subtitle = "1.0.0"
+                            title = "Versión instalada",
+                            subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
                         )
                         HorizontalDivider()
                         SettingRow(
@@ -159,6 +161,23 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            // Updates
+            item {
+                Text("Actualización", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 4.dp))
+            }
+
+            item {
+                UpdateSection(
+                    updateStatus = uiState.updateStatus,
+                    onCheckUpdates = { viewModel.checkForUpdates() },
+                    onDownloadAndInstall = { release -> viewModel.downloadAndInstall(release) },
+                    onDismissError = { viewModel.dismissUpdateError() }
+                )
             }
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -247,5 +266,157 @@ fun SettingRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         trailing?.invoke()
+    }
+}
+
+@Composable
+fun UpdateSection(
+    updateStatus: UpdateStatus,
+    onCheckUpdates: () -> Unit,
+    onDownloadAndInstall: (com.arsys.netatmo.data.model.GitHubRelease) -> Unit,
+    onDismissError: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            when (updateStatus) {
+                is UpdateStatus.Idle -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Buscar actualizaciones",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium)
+                        }
+                        TextButton(onClick = onCheckUpdates) { Text("Verificar") }
+                    }
+                }
+
+                is UpdateStatus.Checking -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Buscando actualizaciones...",
+                            style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                is UpdateStatus.UpToDate -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("App actualizada",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium)
+                                Text("Tienes la última versión",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        TextButton(onClick = onCheckUpdates) { Text("Revisar") }
+                    }
+                }
+
+                is UpdateStatus.UpdateAvailable -> {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.NewReleases, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Nueva versión disponible",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold)
+                                Text(updateStatus.release.displayName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { onDownloadAndInstall(updateStatus.release) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Descargar e instalar")
+                        }
+                    }
+                }
+
+                is UpdateStatus.Downloading -> {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Downloading, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Descargando actualización...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LinearProgressIndicator(
+                            progress = { updateStatus.progress },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "${(updateStatus.progress * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                is UpdateStatus.Installing -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Iniciando instalación...",
+                            style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                is UpdateStatus.Error -> {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ErrorOutline, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Error al actualizar",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.error)
+                                Text(updateStatus.message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                            TextButton(onClick = onDismissError) { Text("Cerrar") }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = onCheckUpdates) { Text("Reintentar") }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

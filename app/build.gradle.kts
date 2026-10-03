@@ -14,6 +14,9 @@ val localProps = Properties().apply {
     if (f.exists()) load(f.inputStream())
 }
 
+val buildVersionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull() ?: 1
+val buildVersionName = "1.0.$buildVersionCode"
+
 android {
     namespace = "com.arsys.netatmo"
     compileSdk = 35
@@ -22,8 +25,8 @@ android {
         applicationId = "com.arsys.netatmo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = buildVersionCode
+        versionName = buildVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -31,6 +34,7 @@ android {
         buildConfigField("String", "NETATMO_CLIENT_SECRET", "\"${localProps["netatmo.clientSecret"] ?: "YOUR_CLIENT_SECRET"}\"")
         buildConfigField("String", "NETATMO_REDIRECT_URI", "\"com.arsys.netatmo://oauth\"")
         buildConfigField("String", "NETATMO_BASE_URL", "\"https://api.netatmo.com/\"")
+        buildConfigField("String", "GITHUB_REPO", "\"kryll/netatmo\"")
     }
 
     buildTypes {
