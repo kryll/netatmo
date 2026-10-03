@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,10 +51,22 @@ fun AppNavGraph() {
     val authViewModel: AuthViewModel = hiltViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
 
-    val startDestination = if (isLoggedIn) Screen.Home.route else Screen.Auth.route
-
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
+
+    // Navigate reactively when login state changes
+    LaunchedEffect(isLoggedIn) {
+        val onAuthScreen = currentRoute == Screen.Auth.route || currentRoute == null
+        if (isLoggedIn && onAuthScreen) {
+            navController.navigate(Screen.Home.route) {
+                popUpTo(Screen.Auth.route) { inclusive = true }
+            }
+        } else if (!isLoggedIn && !onAuthScreen) {
+            navController.navigate(Screen.Auth.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
 
     val showBottomBar = bottomNavItems.any { it.route == currentRoute }
 
@@ -83,7 +96,7 @@ fun AppNavGraph() {
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = startDestination,
+            startDestination = Screen.Auth.route,
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(Screen.Auth.route) {
