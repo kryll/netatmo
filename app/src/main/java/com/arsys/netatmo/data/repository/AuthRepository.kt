@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.AuthApiService
+import com.arsys.netatmo.util.AuthDebugLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -54,6 +55,10 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun loginWithCode(code: String): Result<Unit> {
+        val L = AuthDebugLogger
+        L.log("loginWithCode() → code=${code.take(8)}...", context)
+        L.log("  clientId=${BuildConfig.NETATMO_CLIENT_ID}", context)
+        L.log("  redirectUri=${BuildConfig.NETATMO_REDIRECT_URI}", context)
         return try {
             val response = authApiService.getToken(
                 grantType = "authorization_code",
@@ -62,15 +67,24 @@ class AuthRepository @Inject constructor(
                 code = code,
                 redirectUri = BuildConfig.NETATMO_REDIRECT_URI
             )
+            L.log("  HTTP ${response.code()} ${response.message()}", context)
             if (response.isSuccessful) {
-                response.body()?.let { token ->
-                    saveTokens(token.accessToken, token.refreshToken, token.expiresIn)
+                val body = response.body()
+                if (body != null) {
+                    L.log("  ✅ Token OK · scope=${body.scope} · expiresIn=${body.expiresIn}s", context)
+                    saveTokens(body.accessToken, body.refreshToken, body.expiresIn)
+                    Result.success(Unit)
+                } else {
+                    L.log("  ❌ Body nulo a pesar de 200", context)
+                    Result.failure(Exception("Respuesta vacía del servidor"))
                 }
-                Result.success(Unit)
             } else {
-                Result.failure(Exception("Auth error: ${response.code()}"))
+                val errBody = response.errorBody()?.string() ?: "(sin cuerpo)"
+                L.log("  ❌ Error ${response.code()}: $errBody", context)
+                Result.failure(Exception("Auth error ${response.code()}: $errBody"))
             }
         } catch (e: Exception) {
+            L.log("  ❌ Excepción: ${e.javaClass.simpleName}: ${e.message}", context)
             Result.failure(e)
         }
     }
@@ -114,10 +128,12 @@ class AuthRepository @Inject constructor(
 
     fun getAuthUrl(): String {
         val redirectUri = Uri.encode(BuildConfig.NETATMO_REDIRECT_URI)
-        return "https://api.netatmo.com/oauth2/authorize" +
+        val url = "https://api.netatmo.com/oauth2/authorize" +
                 "?client_id=${BuildConfig.NETATMO_CLIENT_ID}" +
                 "&redirect_uri=$redirectUri" +
                 "&scope=read_thermostat%20write_thermostat" +
                 "&response_type=code"
+        AuthDebugLogger.log("getAuthUrl() → $url", context)
+        return url
     }
 }
