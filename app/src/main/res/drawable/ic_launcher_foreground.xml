@@ -5,20 +5,25 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Thermometer tube outer -->
+    <!-- Thermometer tube outer (white silhouette) -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M54,22 C50.69,22 48,24.69 48,28 L48,63.5 C44.42,66.14 42,70.3 42,75 C42,83.28 47.72,89 56,89 C64.28,89 70,83.28 70,75 C70,70.3 67.58,66.14 64,63.5 L64,28 C64,24.69 61.31,22 58,22 Z" />
 
-    <!-- Thermometer tube inner (cutout) -->
+    <!-- Thermometer tube inner (mercury — semi-transparent white) -->
     <path
-        android:fillColor="#00618A"
+        android:fillColor="#CCFFFFFF"
         android:pathData="M54,27 C52.9,27 52,27.9 52,29 L52,65 L54,66.5 L54,83.5 C54.66,83.83 55.32,84 56,84 C56.68,84 57.34,83.83 58,83.5 L58,66.5 L60,65 L60,29 C60,27.9 59.1,27 58,27 Z" />
 
-    <!-- Bulb (white circle) -->
+    <!-- Bulb outer (white) -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M56,67 m-9,8 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
+
+    <!-- Bulb inner accent (sky blue — matches onboarding logo) -->
+    <path
+        android:fillColor="#0EA5E9"
+        android:pathData="M51,75 A5,5 0 1,0 61,75 A5,5 0 1,0 51,75 Z" />
 
     <!-- Tick mark 1 -->
     <path
