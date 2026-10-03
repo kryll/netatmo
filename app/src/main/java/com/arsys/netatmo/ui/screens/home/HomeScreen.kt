@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.domain.model.ModuleState
 import com.arsys.netatmo.domain.model.RoomState
+import com.arsys.netatmo.domain.model.ScheduleInfo
 import com.arsys.netatmo.domain.model.ThermostatMode
 import com.arsys.netatmo.ui.components.TemperatureSlider
 import com.arsys.netatmo.ui.theme.*
@@ -161,6 +162,34 @@ fun HomeScreen(
                                 }
                             }
                         }
+
+                        // Schedules section
+                        uiState.thermostatState?.schedules?.let { schedules ->
+                            if (schedules.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        text = "Programaciones",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    )
+                                }
+                                item {
+                                    ScheduleCard(
+                                        schedules = schedules,
+                                        onSwitchSchedule = { scheduleId ->
+                                            viewModel.switchSchedule(scheduleId)
+                                        },
+                                        onEditSchedule = { scheduleId ->
+                                            navController.navigate("schedule/$scheduleId")
+                                        },
+                                        onNewSchedule = {
+                                            navController.navigate("schedule/new")
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -207,6 +236,7 @@ fun RoomCard(
 ) {
     var tempValue by remember(room.targetTemp) { mutableStateOf(room.targetTemp ?: 19.0) }
     var duration by remember { mutableStateOf(60) }
+    val durationOptions = listOf(60 to "1h", 120 to "2h", 180 to "3h", 0 to "Sin límite")
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -326,11 +356,11 @@ fun RoomCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(30, 60, 120, 180).forEach { mins ->
+                        durationOptions.forEach { (mins, label) ->
                             FilterChip(
                                 selected = duration == mins,
                                 onClick = { duration = mins },
-                                label = { Text("${mins}min") }
+                                label = { Text(label) }
                             )
                         }
                     }
@@ -342,7 +372,11 @@ fun RoomCard(
                         enabled = !isSetting
                     ) {
                         if (isSetting) CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        else Text("Aplicar %.1f°C durante ${duration}min".format(tempValue))
+                        else {
+                            val label = if (duration == 0) "Aplicar %.1f°C sin límite de tiempo".format(tempValue)
+                                        else "Aplicar %.1f°C durante ${durationOptions.first { it.first == duration }.second}".format(tempValue)
+                            Text(label)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -465,6 +499,73 @@ fun ModuleCard(module: ModuleState) {
                         Text("$pct%", style = MaterialTheme.typography.labelSmall)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ScheduleCard(
+    schedules: List<ScheduleInfo>,
+    onSwitchSchedule: (String) -> Unit,
+    onEditSchedule: (String) -> Unit = {},
+    onNewSchedule: () -> Unit = {}
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            schedules.forEach { schedule ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (schedule.isActive) Icons.Default.RadioButtonChecked
+                                      else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = null,
+                        tint = if (schedule.isActive) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = schedule.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (schedule.isActive) FontWeight.SemiBold else FontWeight.Normal,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!schedule.isActive) {
+                        TextButton(onClick = { onSwitchSchedule(schedule.id) }) {
+                            Text("Activar")
+                        }
+                    } else {
+                        Text(
+                            "Activa",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(
+                        onClick = { onEditSchedule(schedule.id) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Editar programación",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            TextButton(
+                onClick = onNewSchedule,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Nueva programación")
             }
         }
     }

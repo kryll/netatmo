@@ -5,7 +5,14 @@ data class ThermostatState(
     val homeName: String,
     val rooms: List<RoomState>,
     val modules: List<ModuleState>,
-    val activeScheduleId: String? = null
+    val activeScheduleId: String? = null,
+    val schedules: List<ScheduleInfo> = emptyList()
+)
+
+data class ScheduleInfo(
+    val id: String,
+    val name: String,
+    val isActive: Boolean
 )
 
 data class RoomState(
