@@ -24,6 +24,7 @@ class GeofenceManager @Inject constructor(
         val intent = Intent(context, GeofenceTransitionService::class.java)
         PendingIntent.getService(
             context, 0, intent,
+            // FLAG_MUTABLE required: Geofencing API writes trigger data into the PendingIntent before delivery
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
     }
