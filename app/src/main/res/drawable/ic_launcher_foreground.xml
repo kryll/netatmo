@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Thermostat body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,20 C49.58,20 46,23.58 46,28 L46,62.5 C42.5,65.1 40,69.3 40,74 C40,82.28 46.72,89 55,89 C63.28,89 70,82.28 70,74 C70,69.3 67.5,65.1 64,62.5 L64,28 C64,23.58 60.42,20 56,20 Z" />
+
+    <!-- Thermometer tube (inner cutout) -->
+    <path
+        android:fillColor="#00618A"
+        android:pathData="M54,25 C52.34,25 51,26.34 51,28 L51,64 L53,65.5 L53,84 C53.66,84.0 54.34,84.0 55,84 C55.66,84.0 56.34,84.0 57,84 L57,65.5 L59,64 L59,28 C59,26.34 57.66,25 56,25 Z" />
+
+    <!-- Mercury fill -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,68 L54,80 C51.24,78.76 49.5,75.96 49.5,73 C49.5,70.08 51.24,67.28 54,66.08 Z" />
+
+    <!-- Bulb highlight -->
+    <circle
+        android:fillColor="#FFFFFF"
+        android:cx="55"
+        android:cy="74"
+        android:r="8" />
+
+    <!-- Temperature marks -->
+    <rect android:fillColor="#FFFFFF" android:x="60" android:y="35" android:width="4" android:height="2" android:rx="1"/>
+    <rect android:fillColor="#FFFFFF" android:x="60" android:y="43" android:width="3" android:height="2" android:rx="1"/>
+    <rect android:fillColor="#FFFFFF" android:x="60" android:y="51" android:width="4" android:height="2" android:rx="1"/>
+    <rect android:fillColor="#FFFFFF" android:x="60" android:y="59" android:width="3" android:height="2" android:rx="1"/>
+
+</vector>
