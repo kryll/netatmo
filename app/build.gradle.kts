@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,11 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
+}
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
 }
 
 android {
@@ -20,8 +27,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "NETATMO_CLIENT_ID", "\"YOUR_CLIENT_ID\"")
-        buildConfigField("String", "NETATMO_CLIENT_SECRET", "\"YOUR_CLIENT_SECRET\"")
+        buildConfigField("String", "NETATMO_CLIENT_ID", "\"${localProps["netatmo.clientId"] ?: "YOUR_CLIENT_ID"}\"")
+        buildConfigField("String", "NETATMO_CLIENT_SECRET", "\"${localProps["netatmo.clientSecret"] ?: "YOUR_CLIENT_SECRET"}\"")
         buildConfigField("String", "NETATMO_REDIRECT_URI", "\"com.arsys.netatmo://oauth\"")
         buildConfigField("String", "NETATMO_BASE_URL", "\"https://api.netatmo.com/\"")
     }
