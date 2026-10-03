@@ -52,6 +52,14 @@ class NetatmoApp : Application(), Configuration.Provider {
                     NotificationManager.IMPORTANCE_LOW
                 ).apply { description = "Automatizaciones por eventos de calendario" }
             )
+
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_BATTERY,
+                    "Batería baja",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply { description = "Alerta cuando la batería de un dispositivo está baja" }
+            )
         }
     }
 
@@ -59,5 +67,6 @@ class NetatmoApp : Application(), Configuration.Provider {
         const val CHANNEL_AUTOMATIONS = "channel_automations"
         const val CHANNEL_GEOFENCE = "channel_geofence"
         const val CHANNEL_CALENDAR = "channel_calendar"
+        const val CHANNEL_BATTERY = "channel_battery"
     }
 }
