@@ -25,6 +25,8 @@ import com.arsys.netatmo.ui.screens.scenarios.ScenarioDetailScreen
 import com.arsys.netatmo.ui.screens.schedule.ScheduleEditorScreen
 import com.arsys.netatmo.ui.screens.settings.NetatmoCredentialsScreen
 import com.arsys.netatmo.ui.screens.settings.SettingsScreen
+import com.arsys.netatmo.ui.screens.onboarding.OnboardingScreen
+import com.arsys.netatmo.ui.screens.onboarding.OnboardingViewModel
 import com.arsys.netatmo.ui.screens.statistics.StatisticsScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
@@ -39,6 +41,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object ScenarioDetail : Screen("scenario/{id}", "Escenario", Icons.Default.AutoAwesome)
     object ScheduleDetail : Screen("schedule/{id}", "Programación", Icons.Default.Schedule)
     object NetatmoCredentials : Screen("netatmo_credentials", "Credenciales", Icons.Default.Key)
+    object Onboarding : Screen("onboarding", "Bienvenido", Icons.Default.StarOutline)
 }
 
 val bottomNavItems = listOf(
@@ -54,9 +57,20 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = hiltViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
+    val onboardingViewModel: OnboardingViewModel = hiltViewModel()
+    val isOnboardingCompleted by onboardingViewModel.onboardingCompleted.collectAsState()
 
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
+
+    LaunchedEffect(isOnboardingCompleted) {
+        if (!isOnboardingCompleted) {
+            navController.navigate(Screen.Onboarding.route) {
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     // Navigate reactively when login state changes
     LaunchedEffect(isLoggedIn) {
@@ -112,9 +126,23 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Auth.route,
+            startDestination = Screen.Onboarding.route,
             modifier = Modifier.padding(paddingValues)
         ) {
+            composable(Screen.Onboarding.route) {
+                OnboardingScreen(
+                    onComplete = {
+                        navController.navigate(Screen.Auth.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    },
+                    onSkip = {
+                        navController.navigate(Screen.Auth.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable(Screen.Auth.route) {
                 AuthScreen(
                     onLoginSuccess = {
