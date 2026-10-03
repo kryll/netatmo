@@ -1,5 +1,10 @@
 package com.arsys.netatmo.ui.screens.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,11 +14,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.models.Home
+import com.arsys.netatmo.data.model.GitHubRelease
 import com.arsys.netatmo.data.repository.UpdateStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,7 +30,35 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var pendingInstallRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        // User returned from system settings — retry if permission now granted
+        pendingInstallRelease?.let { release ->
+            if (context.packageManager.canRequestPackageInstalls()) {
+                viewModel.downloadAndInstall(release)
+                pendingInstallRelease = null
+            }
+        }
+    }
+
+    fun requestInstall(release: GitHubRelease) {
+        if (context.packageManager.canRequestPackageInstalls()) {
+            viewModel.downloadAndInstall(release)
+        } else {
+            pendingInstallRelease = release
+            installPermissionLauncher.launch(
+                Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${context.packageName}")
+                )
+            )
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadHomes()
@@ -175,7 +210,7 @@ fun SettingsScreen(
                 UpdateSection(
                     updateStatus = uiState.updateStatus,
                     onCheckUpdates = { viewModel.checkForUpdates() },
-                    onDownloadAndInstall = { release -> viewModel.downloadAndInstall(release) },
+                    onDownloadAndInstall = { release -> requestInstall(release) },
                     onDismissError = { viewModel.dismissUpdateError() }
                 )
             }
