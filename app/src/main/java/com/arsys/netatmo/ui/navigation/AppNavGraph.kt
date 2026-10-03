@@ -58,7 +58,7 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
     val authViewModel: AuthViewModel = hiltViewModel()
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
     val onboardingViewModel: OnboardingViewModel = hiltViewModel()
-    val isOnboardingCompleted by onboardingViewModel.isOnboardingCompleted.collectAsState()
+    val isOnboardingCompleted by onboardingViewModel.onboardingCompleted.collectAsState()
 
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route

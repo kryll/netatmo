@@ -9,6 +9,7 @@ import com.arsys.netatmo.data.repository.dataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -23,7 +24,7 @@ class OnboardingViewModel @Inject constructor(
         val ONBOARDING_COMPLETED_KEY = booleanPreferencesKey("onboarding_completed")
     }
 
-    val onboardingCompleted = context.dataStore.data
+    val onboardingCompleted: StateFlow<Boolean> = context.dataStore.data
         .map { prefs -> prefs[ONBOARDING_COMPLETED_KEY] ?: false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
