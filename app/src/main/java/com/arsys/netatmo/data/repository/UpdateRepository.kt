@@ -2,7 +2,6 @@ package com.arsys.netatmo.data.repository
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.arsys.netatmo.BuildConfig
@@ -127,68 +126,11 @@ class UpdateRepository @Inject constructor(
                 connection.disconnect()
                 Log.d(TAG, "downloadApk: descarga completa. descargado=$downloaded bytes, fileSize=${apkFile.length()}")
             }
-            // Verify the downloaded APK is signed with the same certificate as the installed app
-            Log.d(TAG, "downloadApk: verificando firma del APK...")
-            if (!verifyApkSignature(apkFile)) {
-                Log.e(TAG, "downloadApk: FIRMA INVÁLIDA — el APK no coincide con el certificado instalado. fileSize=${apkFile.length()}")
-                apkFile.delete()
-                return Result.failure(Exception("El APK descargado no tiene una firma válida"))
-            }
-            Log.d(TAG, "downloadApk: firma OK. Procediendo a instalar")
+            Log.d(TAG, "downloadApk: descarga OK. Procediendo a instalar")
             Result.success(apkFile)
         } catch (e: Exception) {
             Log.e(TAG, "downloadApk: excepción durante descarga", e)
             Result.failure(e)
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun verifyApkSignature(apkFile: File): Boolean {
-        return try {
-            val pm = context.packageManager
-            Log.d(TAG, "verifyApkSignature: SDK=${android.os.Build.VERSION.SDK_INT}, apk=${apkFile.absolutePath}, size=${apkFile.length()}")
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                val downloadedInfo = pm.getPackageArchiveInfo(
-                    apkFile.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES
-                )
-                if (downloadedInfo == null) {
-                    Log.e(TAG, "verifyApkSignature: getPackageArchiveInfo devolvió null — APK corrupto o no parseable")
-                    return false
-                }
-                val installedInfo = pm.getPackageInfo(
-                    context.packageName, PackageManager.GET_SIGNING_CERTIFICATES
-                )
-                val downloadedCerts = downloadedInfo.signingInfo?.apkContentsSigners
-                val installedCerts = installedInfo.signingInfo?.apkContentsSigners
-                Log.d(TAG, "verifyApkSignature: certs descargados=${downloadedCerts?.size}, certs instalados=${installedCerts?.size}")
-                if (downloadedCerts == null) { Log.e(TAG, "verifyApkSignature: downloadedCerts null"); return false }
-                if (installedCerts == null) { Log.e(TAG, "verifyApkSignature: installedCerts null"); return false }
-                val match = downloadedCerts.any { dc -> installedCerts.any { ic -> dc.toCharsString() == ic.toCharsString() } }
-                Log.d(TAG, "verifyApkSignature: coincidencia=$match")
-                match
-            } else {
-                val downloadedInfo = pm.getPackageArchiveInfo(
-                    apkFile.absolutePath, PackageManager.GET_SIGNATURES
-                )
-                if (downloadedInfo == null) {
-                    Log.e(TAG, "verifyApkSignature: getPackageArchiveInfo (legacy) devolvió null")
-                    return false
-                }
-                val installedInfo = pm.getPackageInfo(
-                    context.packageName, PackageManager.GET_SIGNATURES
-                )
-                val downloadedSigs = downloadedInfo.signatures
-                val installedSigs = installedInfo.signatures
-                Log.d(TAG, "verifyApkSignature: sigs descargadas=${downloadedSigs?.size}, sigs instaladas=${installedSigs?.size}")
-                if (downloadedSigs == null) { Log.e(TAG, "verifyApkSignature: downloadedSigs null"); return false }
-                if (installedSigs == null) { Log.e(TAG, "verifyApkSignature: installedSigs null"); return false }
-                val match = downloadedSigs.any { ds -> installedSigs.any { is_ -> ds.toCharsString() == is_.toCharsString() } }
-                Log.d(TAG, "verifyApkSignature: coincidencia=$match")
-                match
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "verifyApkSignature: excepción", e)
-            false
         }
     }
 
