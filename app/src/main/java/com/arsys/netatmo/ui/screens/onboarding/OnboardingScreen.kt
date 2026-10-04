@@ -1,15 +1,13 @@
 package com.arsys.netatmo.ui.screens.onboarding
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -37,167 +36,63 @@ fun OnboardingScreen(
     onSkip: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
-    val pagerState = rememberPagerState(pageCount = { 9 })
-    val coroutineScope = rememberCoroutineScope()
-    val isLastPage = pagerState.currentPage == 8
+    val pagerState = rememberPagerState(pageCount = { 5 })
+    val scope = rememberCoroutineScope()
+    val isLastPage = pagerState.currentPage == 4
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        if (!isLastPage) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, end = 16.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                TextButton(onClick = {
-                    viewModel.markOnboardingCompleted()
-                    onSkip()
-                }) {
-                    Text("Saltar")
-                }
-            }
-        } else {
-            Spacer(Modifier.height(48.dp))
-        }
-
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.weight(1f)
-        ) { page ->
+    Box(modifier = Modifier.fillMaxSize()) {
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             when (page) {
-                0 -> OnboardingSlideWelcome()
-                1 -> OnboardingSlideThermostat()
-                2 -> OnboardingSlideGeofencing()
-                3 -> OnboardingSlideStats()
-                4 -> OnboardingSlideAutomations()
-                5 -> OnboardingSlideScenes()
-                6 -> OnboardingSlideSchedules()
-                7 -> OnboardingSlidePermissions()
-                8 -> OnboardingSlideLogin()
-                else -> {}
+                0 -> SlideWelcome()
+                1 -> SlideControl()
+                2 -> SlideAutomate()
+                3 -> SlideStats()
+                4 -> SlideStart(onComplete = { viewModel.markOnboardingCompleted(); onComplete() })
+                else -> SlideWelcome()
             }
         }
 
-        // Page indicator dots
+        // Page dots — overlaid at bottom center above the button
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.Center
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 96.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            repeat(9) { i ->
-                val selected = i == pagerState.currentPage
+            repeat(5) { index ->
+                val selected = pagerState.currentPage == index
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .size(if (selected) 10.dp else 8.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (selected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.outlineVariant
-                        )
+                        .size(if (selected) 24.dp else 8.dp, 8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.White.copy(alpha = if (selected) 1f else 0.4f))
                 )
             }
         }
 
-        // CTA button
-        Button(
-            onClick = {
-                if (isLastPage) {
-                    viewModel.markOnboardingCompleted()
-                    onComplete()
-                } else {
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                    }
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Text(
-                text = if (isLastPage) "Empezar" else "Continuar",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-        Spacer(Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun OnboardingSlideWelcome() {
-    val primary = MaterialTheme.colorScheme.primary
-    val onPrimary = MaterialTheme.colorScheme.onPrimary
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Surface(
-            modifier = Modifier.size(96.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = primary
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Air,
-                    contentDescription = null,
-                    modifier = Modifier.size(56.dp),
-                    tint = onPrimary
-                )
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        Text(
-            text = "Netatmo Smart",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Control inteligente de tu hogar",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(24.dp))
-
+        // Bottom row: Skip + Continue/Start
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("Termostato", "Geovalla", "Automatización").forEach { label ->
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = ButtonDefaults.outlinedButtonBorder,
-                    modifier = Modifier.wrapContentSize()
+            if (!isLastPage) {
+                TextButton(onClick = { viewModel.markOnboardingCompleted(); onSkip() }) {
+                    Text("Saltar", color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp)
+                }
+                Button(
+                    onClick = {
+                        scope.launch {
+                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(24.dp)
                 ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
+                    Text("Continuar", color = Color(0xFF0369A1), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -205,644 +100,226 @@ private fun OnboardingSlideWelcome() {
 }
 
 @Composable
-private fun OnboardingSlideThermostat() {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
-
-    Column(
+private fun SlideWelcome() {
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Termostato inteligente",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Siempre a la temperatura perfecta",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Ajusta y programa tu termostato desde cualquier lugar. Tu casa siempre lista cuando llegas.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        Canvas(modifier = Modifier.size(200.dp)) {
-            val strokeWidth = 20f
-            val arcSize = size.width - strokeWidth * 2
-            val topLeft = Offset(strokeWidth, strokeWidth)
-
-            // Background arc
-            drawArc(
-                color = surfaceVariantColor,
-                startAngle = 150f,
-                sweepAngle = 240f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = Size(arcSize, arcSize),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
+                )
             )
-
-            // Foreground arc (~65% of 240 = 156 degrees)
-            drawArc(
-                color = primaryColor,
-                startAngle = 150f,
-                sweepAngle = 156f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = Size(arcSize, arcSize),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            // Center text
-            drawIntoCanvas { canvas ->
-                val centerX = size.width / 2f
-                val centerY = size.height / 2f
-
-                val tempPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#1a1a1a")
-                    textSize = 60f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    isFakeBoldText = true
-                }
-                canvas.nativeCanvas.drawText("21°", centerX, centerY + 20f, tempPaint)
-
-                val labelPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#888888")
-                    textSize = 28f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
-                canvas.nativeCanvas.drawText("Salón · Confort", centerX, centerY + 55f, labelPaint)
-            }
-        }
-    }
-}
-
-@Composable
-private fun OnboardingSlideGeofencing() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Geovalla inteligente",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Tu casa te reconoce",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Cuando te acercas, la app precalienta tu hogar. Cuando te vas, ahorra energía automáticamente.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        Box(
+        Column(
             modifier = Modifier
-                .size(160.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
+                .padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
-                imageVector = Icons.Default.LocationOn,
+                imageVector = Icons.Default.Thermostat,
                 contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = MaterialTheme.colorScheme.primary
+                modifier = Modifier.size(128.dp),
+                tint = Color.White
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Abstract thermometer canvas illustration
+            Canvas(modifier = Modifier.size(80.dp, 40.dp)) {
+                val tubeWidth = size.width * 0.18f
+                val tubeHeight = size.height * 0.6f
+                val tubeLeft = (size.width - tubeWidth) / 2f
+                val tubeTop = 0f
+                val bulbRadius = tubeWidth * 0.9f
+                val bulbCx = size.width / 2f
+                val bulbCy = tubeTop + tubeHeight + bulbRadius * 0.6f
+
+                // Tube
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.35f),
+                    topLeft = Offset(tubeLeft, tubeTop),
+                    size = Size(tubeWidth, tubeHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(tubeWidth / 2f)
+                )
+
+                // Bulb
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.5f),
+                    radius = bulbRadius,
+                    center = Offset(bulbCx, bulbCy)
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            Text(
+                text = "Bienvenido a Netatmo",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                text = "Tu termostato inteligente, siempre a mano",
+                fontSize = 18.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
             )
         }
     }
 }
 
 @Composable
-private fun OnboardingSlideStats() {
-    val barData = listOf(0.6f, 0.8f, 0.7f, 0.9f, 0.75f, 0.5f, 0.85f)
-    val dayLabels = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
-    val maxBarHeight = 120.dp
-
-    Column(
+private fun SlideControl() {
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF38BDF8), Color(0xFF0284C7))
+                )
+            )
     ) {
-        Text(
-            text = "Estadísticas",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Siempre informado",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Consulta el historial de temperaturas y consumo energético para optimizar tu confort.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.Bottom
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            barData.zip(dayLabels).forEach { (fraction, label) ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(28.dp)
-                            .height(maxBarHeight * fraction)
-                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                            .background(MaterialTheme.colorScheme.primary)
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
+            Text(
+                text = "Control total",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
 
-@Composable
-private fun OnboardingSlideAutomations() {
-    val rules = listOf(
-        Triple("📍", "Al llegar", "21° Confort"),
-        Triple("📅", "Reunión a las 9h", "Precalentar"),
-        Triple("🌙", "Noche", "17° Noche"),
-        Triple("🚗", "Al salir", "15° Eco")
-    )
+            Spacer(Modifier.height(12.dp))
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Automatizaciones",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
+            Text(
+                text = "Ajusta la temperatura de cada zona desde cualquier lugar",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
+            )
 
-        Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(40.dp))
 
-        Text(
-            text = "Automatizaciones que anticipan tu rutina",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
+            Canvas(modifier = Modifier.size(260.dp)) {
+                val diameter = size.width
+                val strokeWidth = 24f
+                val arcInset = strokeWidth / 2f
+                val arcTopLeft = Offset(arcInset, arcInset)
+                val arcSize = Size(diameter - strokeWidth, diameter - strokeWidth)
 
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Combina ubicación, calendario y horarios para que el termostato se adapte solo.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        rules.forEach { (emoji, trigger, action) ->
-            ElevatedCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = emoji, fontSize = 20.sp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = trigger,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = " → ",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = action,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OnboardingSlideScenes() {
-    data class SceneCard(val emoji: String, val name: String, val temp: String, val color: Color)
-
-    val primary = MaterialTheme.colorScheme.primary
-    val tertiary = MaterialTheme.colorScheme.tertiary
-    val secondary = MaterialTheme.colorScheme.secondary
-    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-
-    val scenes = listOf(
-        SceneCard("☀️", "Confort", "21°", primary),
-        SceneCard("🌿", "Eco", "18°", tertiary),
-        SceneCard("🚗", "Ausente", "15°", onSurfaceVariant),
-        SceneCard("🌙", "Noche", "17°", secondary)
-    )
-
-    var selectedScene by remember { mutableStateOf(-1) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Escenarios",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Tus escenas, al instante",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Activa de un toque el modo perfecto para cada momento del día.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            scenes.chunked(2).forEach { rowScenes ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    rowScenes.forEachIndexed { localIdx, scene ->
-                        val globalIdx = scenes.indexOf(scene)
-                        ElevatedCard(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { selectedScene = globalIdx },
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = if (selectedScene == globalIdx)
-                                    scene.color.copy(alpha = 0.15f)
-                                else MaterialTheme.colorScheme.surface
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(text = scene.emoji, fontSize = 28.sp)
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = scene.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = scene.color
-                                )
-                                Text(
-                                    text = scene.temp,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OnboardingSlideSchedules() {
-    data class ScheduleRow(val label: String, val temp: String, val color: Color, val progress: Float)
-
-    val scheduleRows = listOf(
-        ScheduleRow("Noche", "17°", Color(0xFF7C3AED), 0.3f),
-        ScheduleRow("Mañana", "20°", Color(0xFFD97706), 0.5f),
-        ScheduleRow("Eco", "18°", Color(0xFF16A34A), 0.4f),
-        ScheduleRow("Confort", "21°", Color(0xFFEA580C), 0.7f)
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Programaciones",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Tu horario ideal, cada día",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Define franjas de temperatura para cada momento del día. La app calienta antes de que lo necesites.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            scheduleRows.forEach { row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(row.color)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "${row.label} ${row.temp}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.width(100.dp)
-                    )
-                    LinearProgressIndicator(
-                        progress = { row.progress },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = row.color,
-                        trackColor = row.color.copy(alpha = 0.2f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OnboardingSlidePermissions() {
-    data class PermissionItem(
-        val icon: androidx.compose.ui.graphics.vector.ImageVector,
-        val name: String,
-        val description: String
-    )
-
-    val permissions = listOf(
-        PermissionItem(Icons.Default.LocationOn, "Ubicación", "Para la geovalla inteligente"),
-        PermissionItem(Icons.Default.CalendarToday, "Calendario", "Para automatizaciones por eventos"),
-        PermissionItem(Icons.Default.Notifications, "Notificaciones", "Para alertas de temperatura")
-    )
-
-    val switchStates = remember { mutableStateListOf(false, false, false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Permisos",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Permisos necesarios",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Para ofrecerte la mejor experiencia, necesitamos acceso a:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        permissions.forEachIndexed { index, permission ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = permission.icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = permission.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = permission.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = switchStates[index],
-                        onCheckedChange = { switchStates[index] = it }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OnboardingSlideLogin() {
-    val scopes = listOf("read_thermostat", "write_thermostat", "read_presence")
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Conectar cuenta",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Conecta tu cuenta Netatmo",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Autenticación segura con OAuth 2.0 + PKCE. Tus credenciales nunca se almacenan en la app.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Conexión segura",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                Text(
-                    text = "Permisos solicitados:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                // Background full circle stroke
+                drawArc(
+                    color = Color.White.copy(alpha = 0.2f),
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
-                Spacer(Modifier.height(8.dp))
+                // 60% filled arc (216 degrees of 360)
+                drawArc(
+                    color = Color(0xFFBAE6FD),
+                    startAngle = -90f,
+                    sweepAngle = 216f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
 
-                scopes.forEach { scope ->
-                    Row(
-                        modifier = Modifier.padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = scope,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
+                // Center temperature text
+                drawIntoCanvas { canvas ->
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+
+                    val tempPaint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 96f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isFakeBoldText = true
                     }
+                    canvas.nativeCanvas.drawText("21°", cx, cy + 34f, tempPaint)
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun SlideAutomate() {
+    // Implemented by subagent — slide 3
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF818CF8), Color(0xFF4338CA))
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(color = Color.White)
+    }
+}
+
+@Composable
+internal fun SlideStats() {
+    // Implemented by subagent — slide 4
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF34D399), Color(0xFF059669))
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(color = Color.White)
+    }
+}
+
+@Composable
+internal fun SlideStart(onComplete: () -> Unit) {
+    // Implemented by subagent — slide 5
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Button(
+            onClick = onComplete,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 48.dp)
+                .height(56.dp)
+        ) {
+            Text(
+                text = "Empezar",
+                color = Color(0xFF0369A1),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
         }
     }
 }
