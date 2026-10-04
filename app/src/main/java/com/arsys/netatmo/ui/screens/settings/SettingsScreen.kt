@@ -54,7 +54,11 @@ fun SettingsScreen(
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(shareIntent, "Exportar backup"))
+            val chooser = Intent.createChooser(shareIntent, "Exportar backup").apply {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
             viewModel.clearExportedUri()
         }
     }
