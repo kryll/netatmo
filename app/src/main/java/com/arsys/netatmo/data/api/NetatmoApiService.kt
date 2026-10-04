@@ -83,4 +83,7 @@ interface NetatmoApiService {
         @Query("date_end") dateEnd: Long? = null,
         @Query("limit") limit: Int? = null
     ): Response<MeasureResponse>
+
+    @GET("api/getstationsdata")
+    suspend fun getStationsData(): Response<StationsDataResponse>
 }

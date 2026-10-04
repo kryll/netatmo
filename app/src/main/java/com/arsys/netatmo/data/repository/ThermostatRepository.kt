@@ -185,13 +185,21 @@ class ThermostatRepository @Inject constructor(
     }
 
     /**
-     * Best-effort fetch of outdoor temperature from an NAModule1 (outdoor weather module).
-     * Looks for an NAModule1 in the home's module list, then calls getMeasure using the
-     * module's bridge (parent station) as device_id. Returns null if no module is found or
-     * the request fails.
+     * Fetches outdoor temperature from the Weather Station API (getstationsdata).
+     * Looks for an NAModule1 (outdoor sensor) in the station's modules list.
      */
     suspend fun getOutdoorTemperature(homeId: String): Double? {
         return try {
+            // Primary: Weather Station API returns real-time NAModule1 data
+            val stationsResponse = apiService.getStationsData()
+            if (stationsResponse.isSuccessful) {
+                val outdoorTemp = stationsResponse.body()?.body?.devices
+                    ?.flatMap { device -> device.modules ?: emptyList() }
+                    ?.find { it.type == "NAModule1" }
+                    ?.dashboardData?.temperature
+                if (outdoorTemp != null) return outdoorTemp
+            }
+            // Fallback: Energy API + getmeasure (works if NAModule1 is bridged via NAMain)
             val homesResult = getHomesData()
             if (homesResult is ApiResult.Success) {
                 val home = homesResult.data.find { it.id == homeId }
@@ -207,15 +215,17 @@ class ThermostatRepository @Inject constructor(
                         realTime = true
                     )
                     if (response.isSuccessful) {
-                        response.body()?.body
+                        return response.body()?.body
                             ?.lastOrNull()
                             ?.value
                             ?.lastOrNull()
                             ?.firstOrNull()
-                    } else null
-                } else null
-            } else null
+                    }
+                }
+            }
+            null
         } catch (e: Exception) {
+            android.util.Log.e("ThermostatRepo", "getOutdoorTemperature failed", e)
             null
         }
     }

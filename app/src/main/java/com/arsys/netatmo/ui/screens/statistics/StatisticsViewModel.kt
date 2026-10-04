@@ -3,6 +3,7 @@ package com.arsys.netatmo.ui.screens.statistics
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.arsys.netatmo.data.api.NetatmoApiService
 import com.arsys.netatmo.data.local.dao.HomeCacheDao
 import com.arsys.netatmo.data.local.dao.TemperatureHistoryDao
 import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
@@ -58,6 +59,7 @@ class StatisticsViewModel @Inject constructor(
     private val homeCacheDao: HomeCacheDao,
     private val thermostatRepository: ThermostatRepository,
     private val temperatureHistoryDao: TemperatureHistoryDao,
+    private val apiService: NetatmoApiService,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -222,36 +224,78 @@ class StatisticsViewModel @Inject constructor(
             }
             val roomId = _uiState.value.selectedRoomId
 
-            // For monthly comparison periods, load historical data
+            if (days >= 30) {
+                loadStatisticsFromApi(homeId, roomId, days)
+            } else {
+                getTemperatureHistory(homeId, roomId, days)
+                    .catch { e -> _uiState.update { it.copy(isLoading = false, error = e.message) } }
+                    .collect { data ->
+                        val temps = data.map { it.temperature }
+                        val heatingPoints = data.count { it.heatingActive }
+                        val heatingHours = if (data.size > 1)
+                            (heatingPoints * (days * 24.0 / data.size)).toInt()
+                        else 0
+                        _uiState.update {
+                            it.copy(
+                                temperatureData = data,
+                                avgTemp = if (temps.isNotEmpty()) temps.average() else null,
+                                maxTemp = if (temps.isNotEmpty()) temps.max() else null,
+                                minTemp = if (temps.isNotEmpty()) temps.min() else null,
+                                heatingHours = heatingHours,
+                                isLoading = false
+                            )
+                        }
+                    }
+            }
+
             if (days >= 90) {
                 loadMonthlyComparison(homeId, roomId, days)
             }
+        }
+    }
 
-            getTemperatureHistory(homeId, roomId, days)
-                .catch { e -> _uiState.update { it.copy(isLoading = false, error = e.message) } }
-                .collect { data ->
-                    if (data.isEmpty()) {
-                        thermostatRepository.getHomeStatus(homeId)
-                        _uiState.update { it.copy(isLoading = false) }
-                        return@collect
-                    }
-                    val temps = data.map { it.temperature }
-                    val heatingPoints = data.count { it.heatingActive }
-                    val heatingHours = if (data.size > 1)
-                        (heatingPoints * (days * 24.0 / data.size)).toInt()
-                    else 0
-
-                    _uiState.update {
-                        it.copy(
-                            temperatureData = data,
-                            avgTemp = temps.average(),
-                            maxTemp = temps.max(),
-                            minTemp = temps.min(),
-                            heatingHours = heatingHours,
-                            isLoading = false
-                        )
+    private suspend fun loadStatisticsFromApi(homeId: String, roomId: String, days: Int) {
+        try {
+            val scale = when {
+                days <= 30 -> "3hours"
+                days <= 90 -> "1day"
+                else -> "1week"
+            }
+            val dateBegin = (System.currentTimeMillis() / 1000) - (days * 24 * 60 * 60L)
+            val response = apiService.getRoomMeasure(
+                homeId = homeId,
+                roomId = roomId,
+                scale = scale,
+                type = "temperature",
+                dateBegin = dateBegin
+            )
+            if (response.isSuccessful) {
+                val bodies = response.body()?.body ?: emptyList()
+                val data = mutableListOf<TemperatureDataPoint>()
+                for (body in bodies) {
+                    val step = body.stepTime ?: 3600
+                    body.value.forEachIndexed { index, vals ->
+                        val temp = vals.firstOrNull() ?: return@forEachIndexed
+                        val tsMs = (body.beginTime + index.toLong() * step) * 1000L
+                        data.add(TemperatureDataPoint(timestamp = tsMs, temperature = temp, setpoint = null, heatingActive = false))
                     }
                 }
+                val temps = data.map { it.temperature }
+                _uiState.update {
+                    it.copy(
+                        temperatureData = data,
+                        avgTemp = if (temps.isNotEmpty()) temps.average() else null,
+                        maxTemp = if (temps.isNotEmpty()) temps.max() else null,
+                        minTemp = if (temps.isNotEmpty()) temps.min() else null,
+                        heatingHours = null,
+                        isLoading = false
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(isLoading = false, error = "Error ${response.code()}") }
+            }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(isLoading = false, error = e.message) }
         }
     }
 

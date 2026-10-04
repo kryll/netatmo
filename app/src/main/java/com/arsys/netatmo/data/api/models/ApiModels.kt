@@ -135,3 +135,25 @@ data class BasicResponse(
     @SerializedName("status") val status: String,
     @SerializedName("time_server") val timeServer: Long?
 )
+
+// --- Weather Station (getstationsdata) ---
+data class StationsDataResponse(
+    @SerializedName("body") val body: StationsDataBody?
+)
+data class StationsDataBody(
+    @SerializedName("devices") val devices: List<WeatherStation>?
+)
+data class WeatherStation(
+    @SerializedName("_id") val id: String,
+    @SerializedName("type") val type: String?,
+    @SerializedName("dashboard_data") val dashboardData: WeatherDashboard?,
+    @SerializedName("modules") val modules: List<WeatherModule>?
+)
+data class WeatherModule(
+    @SerializedName("_id") val id: String,
+    @SerializedName("type") val type: String?,
+    @SerializedName("dashboard_data") val dashboardData: WeatherDashboard?
+)
+data class WeatherDashboard(
+    @SerializedName("Temperature") val temperature: Double?
+)
