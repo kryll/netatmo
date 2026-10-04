@@ -10,6 +10,7 @@ import com.arsys.netatmo.domain.model.ThermostatState
 import com.arsys.netatmo.domain.usecase.GetThermostatStateUseCase
 import com.arsys.netatmo.domain.usecase.SetModeUseCase
 import com.arsys.netatmo.domain.usecase.SetTemperatureUseCase
+import com.arsys.netatmo.service.BoostManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -31,11 +32,15 @@ class HomeViewModel @Inject constructor(
     private val setTemperature: SetTemperatureUseCase,
     private val setMode: SetModeUseCase,
     private val authRepository: AuthRepository,
-    private val repository: ThermostatRepository
+    private val repository: ThermostatRepository,
+    private val boostManager: BoostManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    val boostState = boostManager.boostState
+    val boostRemainingMinutes = boostManager.remainingMinutes
 
     init {
         viewModelScope.launch {
@@ -105,6 +110,27 @@ class HomeViewModel @Inject constructor(
                 is ApiResult.Error -> { /* silent */ }
                 ApiResult.Loading -> {}
             }
+        }
+    }
+
+    fun startBoost(deltaTemp: Double, durationMinutes: Int) {
+        val homeId = _uiState.value.selectedHomeId ?: return
+        val room = _uiState.value.thermostatState?.rooms?.firstOrNull() ?: return
+        val originalTemp = room.targetTemp ?: room.currentTemp ?: return
+        viewModelScope.launch {
+            boostManager.startBoost(
+                homeId = homeId,
+                roomId = room.id,
+                originalTemp = originalTemp,
+                deltaTemp = deltaTemp,
+                durationMinutes = durationMinutes
+            )
+        }
+    }
+
+    fun stopBoost() {
+        viewModelScope.launch {
+            boostManager.stopBoost()
         }
     }
 

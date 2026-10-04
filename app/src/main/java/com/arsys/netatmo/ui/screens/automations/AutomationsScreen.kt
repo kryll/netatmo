@@ -1,6 +1,8 @@
 package com.arsys.netatmo.ui.screens.automations
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,6 +35,11 @@ fun AutomationsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddMenu by remember { mutableStateOf(false) }
+    var showInactive by remember { mutableStateOf(false) }
+
+    val activeAutomations = uiState.automations.filter { it.enabled }
+    val inactiveAutomations = uiState.automations.filter { !it.enabled }
+    val hasBoth = activeAutomations.isNotEmpty() && inactiveAutomations.isNotEmpty()
 
     Scaffold(
         topBar = {},
@@ -63,6 +70,14 @@ fun AutomationsScreen(
                         onClick = {
                             showAddMenu = false
                             navController.navigate("calendar_automation/-1")
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Automatizacion de horario") },
+                        leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                        onClick = {
+                            showAddMenu = false
+                            navController.navigate("schedule_automation/-1")
                         }
                     )
                 }
@@ -107,51 +122,190 @@ fun AutomationsScreen(
                         EmptyAutomationsCard()
                     }
                 } else {
-                    val byType = uiState.automations.groupBy { it.type }
-
-                    byType.forEach { (type, automations) ->
+                    // "Activas" section label — only when both sections have items
+                    if (hasBoth) {
                         item {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                            Text(
+                                text = "Activas",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .background(automationTypeColor(type), RoundedCornerShape(3.dp))
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = when (type) {
-                                        "GEOFENCE" -> "Geovalla"
-                                        "CALENDAR" -> "Calendario"
-                                        "SCHEDULE" -> "Horario"
-                                        else -> type
+                            )
+                        }
+                    }
+
+                    // Active automations grouped by type
+                    if (activeAutomations.isEmpty()) {
+                        item {
+                            EmptyAutomationsCard()
+                        }
+                    } else {
+                        val byType = activeAutomations.groupBy { it.type }
+                        byType.forEach { (type, automations) ->
+                            item {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(automationTypeColor(type), RoundedCornerShape(3.dp))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = when (type) {
+                                            "GEOFENCE" -> "Geovalla"
+                                            "CALENDAR" -> "Calendario"
+                                            "SCHEDULE" -> "Horario"
+                                            else -> type
+                                        },
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "${automations.size}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+                            items(automations, key = { it.id }) { automation ->
+                                AutomationCard(
+                                    automation = automation,
+                                    onToggle = { viewModel.toggleAutomation(automation.id, it) },
+                                    onEdit = {
+                                        when (automation.type) {
+                                            "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
+                                            "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
+                                            "SCHEDULE" -> navController.navigate("schedule_automation/${automation.id}")
+                                        }
                                     },
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "${automations.size}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    onDelete = { viewModel.deleteAutomation(automation) }
                                 )
                             }
                         }
-                        items(automations, key = { it.id }) { automation ->
-                            AutomationCard(
-                                automation = automation,
-                                onToggle = { viewModel.toggleAutomation(automation.id, it) },
-                                onEdit = {
-                                    when (automation.type) {
-                                        "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
-                                        "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
+                    }
+
+                    // Inactive/collapsed section
+                    if (inactiveAutomations.isNotEmpty()) {
+                        item {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showInactive = !showInactive }
+                                    .padding(top = 8.dp, bottom = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (showInactive) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Inactivas (${inactiveAutomations.size})",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        item {
+                            AnimatedVisibility(visible = showInactive) {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        inactiveAutomations.forEachIndexed { index, automation ->
+                                            var showDeleteDialog by remember { mutableStateOf(false) }
+                                            val typeColor = automationTypeColor(automation.type)
+
+                                            if (showDeleteDialog) {
+                                                AlertDialog(
+                                                    onDismissRequest = { showDeleteDialog = false },
+                                                    title = { Text("Eliminar automatización") },
+                                                    text = { Text("¿Eliminar \"${automation.name}\"?") },
+                                                    confirmButton = {
+                                                        TextButton(onClick = {
+                                                            showDeleteDialog = false
+                                                            viewModel.deleteAutomation(automation)
+                                                        }) {
+                                                            Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                                                        }
+                                                    },
+                                                    dismissButton = {
+                                                        TextButton(onClick = { showDeleteDialog = false }) {
+                                                            Text("Cancelar")
+                                                        }
+                                                    }
+                                                )
+                                            }
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(
+                                                        start = 12.dp,
+                                                        end = 4.dp,
+                                                        top = if (index == 0) 10.dp else 6.dp,
+                                                        bottom = if (index == inactiveAutomations.lastIndex) 10.dp else 6.dp
+                                                    ),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = automationTypeIcon(automation.type),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(24.dp),
+                                                    tint = typeColor.copy(alpha = 0.5f)
+                                                )
+                                                Spacer(modifier = Modifier.width(10.dp))
+                                                Text(
+                                                    text = automation.name,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = TextPrimary.copy(alpha = 0.5f),
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Switch(
+                                                    checked = false,
+                                                    onCheckedChange = {
+                                                        viewModel.toggleAutomation(automation.id, true)
+                                                    },
+                                                    colors = SwitchDefaults.colors(
+                                                        checkedThumbColor = Color.White,
+                                                        checkedTrackColor = typeColor
+                                                    ),
+                                                    modifier = Modifier.padding(horizontal = 2.dp)
+                                                )
+                                                IconButton(
+                                                    onClick = { showDeleteDialog = true },
+                                                    modifier = Modifier.size(36.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Delete,
+                                                        contentDescription = "Eliminar",
+                                                        modifier = Modifier.size(18.dp),
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                                    )
+                                                }
+                                            }
+
+                                            if (index < inactiveAutomations.lastIndex) {
+                                                HorizontalDivider(
+                                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                                )
+                                            }
+                                        }
                                     }
-                                },
-                                onDelete = { viewModel.deleteAutomation(automation) }
-                            )
+                                }
+                            }
                         }
                     }
                 }
