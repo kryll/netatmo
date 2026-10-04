@@ -183,4 +183,40 @@ class ThermostatRepository @Inject constructor(
             emptyList()
         }
     }
+
+    /**
+     * Best-effort fetch of outdoor temperature from an NAModule1 (outdoor weather module).
+     * Looks for an NAModule1 in the home's module list, then calls getMeasure using the
+     * module's bridge (parent station) as device_id. Returns null if no module is found or
+     * the request fails.
+     */
+    suspend fun getOutdoorTemperature(homeId: String): Double? {
+        return try {
+            val homesResult = getHomesData()
+            if (homesResult is ApiResult.Success) {
+                val home = homesResult.data.find { it.id == homeId }
+                val outdoorModule = home?.modules?.find { it.type == "NAModule1" }
+                val bridgeId = outdoorModule?.bridge
+                if (outdoorModule != null && bridgeId != null) {
+                    val response = apiService.getMeasure(
+                        deviceId = bridgeId,
+                        moduleId = outdoorModule.id,
+                        scale = "max",
+                        type = "temperature",
+                        limit = 1,
+                        realTime = true
+                    )
+                    if (response.isSuccessful) {
+                        response.body()?.body
+                            ?.lastOrNull()
+                            ?.value
+                            ?.lastOrNull()
+                            ?.firstOrNull()
+                    } else null
+                } else null
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
 }
