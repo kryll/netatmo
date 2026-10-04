@@ -11,7 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -109,17 +111,34 @@ fun AutomationsScreen(
 
                     byType.forEach { (type, automations) ->
                         item {
-                            Text(
-                                text = when (type) {
-                                    "GEOFENCE" -> "Geovalla"
-                                    "CALENDAR" -> "Calendario"
-                                    "SCHEDULE" -> "Horario"
-                                    else -> type
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(automationTypeColor(type), RoundedCornerShape(3.dp))
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = when (type) {
+                                        "GEOFENCE" -> "Geovalla"
+                                        "CALENDAR" -> "Calendario"
+                                        "SCHEDULE" -> "Horario"
+                                        else -> type
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "${automations.size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
                         }
                         items(automations, key = { it.id }) { automation ->
                             AutomationCard(
@@ -141,6 +160,20 @@ fun AutomationsScreen(
     }
 }
 
+private fun automationTypeColor(type: String): Color = when (type) {
+    "GEOFENCE" -> Color(0xFF0284C7)
+    "CALENDAR" -> Color(0xFF7C3AED)
+    "SCHEDULE" -> Color(0xFF059669)
+    else -> Color(0xFF64748B)
+}
+
+private fun automationTypeIcon(type: String): ImageVector = when (type) {
+    "GEOFENCE" -> Icons.Default.LocationOn
+    "CALENDAR" -> Icons.Default.CalendarToday
+    "SCHEDULE" -> Icons.Default.Schedule
+    else -> Icons.Default.AutoMode
+}
+
 @Composable
 fun AutomationCard(
     automation: AutomationEntity,
@@ -149,6 +182,8 @@ fun AutomationCard(
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val typeColor = automationTypeColor(automation.type)
+    val alpha = if (automation.enabled) 1f else 0.5f
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -168,32 +203,43 @@ fun AutomationCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         onClick = onEdit
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = when (automation.type) {
-                    "GEOFENCE" -> Icons.Default.LocationOn
-                    "CALENDAR" -> Icons.Default.CalendarToday
-                    "SCHEDULE" -> Icons.Default.Schedule
-                    else -> Icons.Default.AutoMode
-                },
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = if (automation.enabled) Accent else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.width(16.dp))
+            // Icon with colored background
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(typeColor.copy(alpha = if (automation.enabled) 0.12f else 0.06f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = automationTypeIcon(automation.type),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = typeColor.copy(alpha = alpha)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = automation.name,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary.copy(alpha = alpha)
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 val subtitle = when (automation.type) {
                     "GEOFENCE" -> "Geovalla · ${automation.mode}"
                     "CALENDAR" -> "Calendario · %.1f°C".format(automation.targetTemperature)
@@ -202,29 +248,43 @@ fun AutomationCard(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
                 )
                 automation.lastTriggeredAt?.let {
-                    Text(
-                        text = "Último: ${java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.getDefault()).format(java.util.Date(it))}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = null,
+                            modifier = Modifier.size(11.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = java.text.SimpleDateFormat("dd/MM · HH:mm", java.util.Locale.getDefault())
+                                .format(java.util.Date(it)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
+
             Switch(
                 checked = automation.enabled,
                 onCheckedChange = onToggle,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = Accent
-                )
+                    checkedTrackColor = typeColor
+                ),
+                modifier = Modifier.padding(horizontal = 2.dp)
             )
-            IconButton(onClick = { showDeleteDialog = true }) {
+            IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(36.dp)) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.error
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
         }
@@ -233,37 +293,40 @@ fun AutomationCard(
 
 @Composable
 fun EmptyAutomationsCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .padding(32.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                Icons.Default.AutoMode,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = Accent
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xFF0284C7).copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.AutoMode,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = Accent
+                )
+            }
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = "Sin automatizaciones",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Pulsa + para crear una automatización por ubicación o calendario",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "Pulsa + para crear una automatización\npor ubicación o calendario",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }
