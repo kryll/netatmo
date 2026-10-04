@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -40,13 +41,37 @@ class GeofenceTransitionService : Service() {
     override fun onBind(intent: Intent?) = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForegroundCompat()
         if (intent != null) {
             serviceScope.launch {
                 handleGeofenceEvent(intent)
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf(startId)
             }
+        } else {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf(startId)
         }
         return START_NOT_STICKY
+    }
+
+    private fun startForegroundCompat() {
+        val notification = NotificationCompat.Builder(this, NetatmoApp.CHANNEL_GEOFENCE)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle("Verificando ubicación")
+            .setContentText("Comprobando automatización de geovalla...")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(FOREGROUND_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(FOREGROUND_NOTIFICATION_ID, notification)
+        }
+    }
+
+    companion object {
+        private const val FOREGROUND_NOTIFICATION_ID = 9001
     }
 
     private suspend fun handleGeofenceEvent(intent: Intent) {

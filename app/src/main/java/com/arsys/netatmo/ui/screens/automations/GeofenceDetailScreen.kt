@@ -73,12 +73,25 @@ fun GeofenceDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
+    val backgroundLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* granted or denied — geofence registered either way, but won't fire in bg without it */ }
+
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) viewModel.useCurrentLocation()
+        if (granted) {
+            viewModel.useCurrentLocation()
+            // On Android 10+, background location must be requested separately after foreground
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val bgGranted = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+                if (!bgGranted) backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
+        }
     }
 
     val notifPermissionLauncher = rememberLauncherForActivityResult(
@@ -91,6 +104,18 @@ fun GeofenceDetailScreen(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
             if (!granted) notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        // Request background location if foreground location already granted
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val fineGranted = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            val bgGranted = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            if (fineGranted && !bgGranted) {
+                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
         }
     }
 

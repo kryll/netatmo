@@ -57,6 +57,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.GeofenceBroadcastReceiver"
+            android:exported="false" />
+
         <service
             android:name=".service.GeofenceTransitionService"
             android:exported="false"

@@ -21,10 +21,12 @@ class GeofenceManager @Inject constructor(
         LocationServices.getGeofencingClient(context)
 
     private val geofencePendingIntent: PendingIntent by lazy {
-        val intent = Intent(context, GeofenceTransitionService::class.java)
-        PendingIntent.getService(
+        val intent = Intent(context, GeofenceBroadcastReceiver::class.java)
+        // Use getBroadcast — BroadcastReceivers are not subject to Android 8+ background
+        // service restrictions, so geofences fire correctly when the app is backgrounded.
+        // FLAG_MUTABLE required: Geofencing API writes trigger data into the PendingIntent.
+        PendingIntent.getBroadcast(
             context, 0, intent,
-            // FLAG_MUTABLE required: Geofencing API writes trigger data into the PendingIntent before delivery
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
     }
