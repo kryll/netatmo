@@ -22,7 +22,7 @@
 
     <!-- Bulb inner accent (sky blue — matches onboarding logo) -->
     <path
-        android:fillColor="#0EA5E9"
+        android:fillColor="#0284C7"
         android:pathData="M51,75 A5,5 0 1,0 61,75 A5,5 0 1,0 51,75 Z" />
 
     <!-- Tick mark 1 -->
