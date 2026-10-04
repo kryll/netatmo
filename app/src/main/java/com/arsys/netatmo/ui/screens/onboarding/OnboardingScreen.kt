@@ -427,7 +427,6 @@ internal fun SlideStats() {
 
 @Composable
 internal fun SlideStart(onComplete: () -> Unit) {
-    // Implemented by subagent — slide 5
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -438,21 +437,62 @@ internal fun SlideStart(onComplete: () -> Unit) {
             ),
         contentAlignment = Alignment.Center
     ) {
-        Button(
-            onClick = onComplete,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-            shape = RoundedCornerShape(24.dp),
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 48.dp)
-                .height(56.dp)
+                .fillMaxSize()
+                .padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .background(color = Color.White, shape = CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Thermostat,
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp),
+                    tint = Color(0xFF0369A1)
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+
             Text(
-                text = "Empezar",
-                color = Color(0xFF0369A1),
+                text = "Todo listo",
+                fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                color = Color.White,
+                textAlign = TextAlign.Center
             )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = "Conecta tu cuenta Netatmo y empieza a controlar tu hogar",
+                fontSize = 17.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center,
+                maxLines = 2
+            )
+
+            Spacer(Modifier.height(48.dp))
+
+            Button(
+                onClick = onComplete,
+                modifier = Modifier.fillMaxWidth(0.75f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                shape = RoundedCornerShape(28.dp)
+            ) {
+                Text(
+                    text = "Comenzar",
+                    color = Color(0xFF0369A1),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
