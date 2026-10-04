@@ -90,84 +90,70 @@ fun HomeScreen(
                     }
                 }
 
-                // Temperature display — indoor + outdoor side by side
+                // Temperature tiles — indoor + outdoor
                 if (avgTemp != null || uiState.outdoorTemperature != null) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         avgTemp?.let { temp ->
-                            Column {
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Text(
-                                        text = "%.1f".format(temp),
-                                        color = TextPrimary,
-                                        fontSize = 48.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        lineHeight = 52.sp
-                                    )
-                                    Text(
-                                        text = "°C",
-                                        color = TextSecondary,
-                                        fontSize = 28.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
-                                    )
-                                }
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(14.dp),
+                                color = Accent.copy(alpha = 0.08f)
+                            ) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
                                         Icons.Default.Home,
                                         contentDescription = null,
-                                        tint = Accent.copy(alpha = 0.5f),
-                                        modifier = Modifier.size(14.dp)
+                                        tint = Accent,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Text(text = "Interior", color = TextSecondary, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "%.1f°C".format(temp),
+                                            color = TextPrimary,
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            lineHeight = 24.sp
+                                        )
+                                        Text(text = "Interior", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                    }
                                 }
                             }
                         }
                         uiState.outdoorTemperature?.let { outTemp ->
-                            if (avgTemp != null) {
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .width(1.dp)
-                                        .height(52.dp)
-                                        .background(Color(0xFFE2E8F0))
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                            }
-                            Column {
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Text(
-                                        text = "%.1f".format(outTemp),
-                                        color = TextSecondary,
-                                        fontSize = 32.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        lineHeight = 36.sp
-                                    )
-                                    Text(
-                                        text = "°C",
-                                        color = TextSecondary,
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        modifier = Modifier.padding(bottom = 4.dp, start = 3.dp)
-                                    )
-                                }
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color(0xFFF59E0B).copy(alpha = 0.08f)
+                            ) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
                                         Icons.Default.WbSunny,
                                         contentDescription = null,
-                                        tint = Color(0xFFF59E0B).copy(alpha = 0.8f),
-                                        modifier = Modifier.size(14.dp)
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Text(text = "Exterior", color = TextSecondary, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "%.1f°C".format(outTemp),
+                                            color = TextPrimary,
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            lineHeight = 24.sp
+                                        )
+                                        Text(text = "Exterior", color = Color(0xFFF59E0B), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                    }
                                 }
                             }
                         }
