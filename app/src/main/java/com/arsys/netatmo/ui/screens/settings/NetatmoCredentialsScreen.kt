@@ -2,8 +2,10 @@ package com.arsys.netatmo.ui.screens.settings
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,14 +14,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+
+private val BrandBlue = Color(0xFF0EA5E9)
+private val BrandBlueDark = Color(0xFF0369A1)
+private val GradientBrush = Brush.verticalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF0369A1)))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,40 +63,66 @@ fun NetatmoCredentialsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Credenciales Netatmo", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-                    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Gradient header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(GradientBrush)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Color.White
+                    )
                 }
-            )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Credenciales Netatmo",
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
-    ) { paddingValues ->
+
+        // Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Info card
             Card(
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(2.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Info, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary)
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = BrandBlue
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("¿Por qué necesito esto?",
+                        Text(
+                            "¿Por qué necesito esto?",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold)
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                     Text(
                         "Para conectar la app a tu cuenta Netatmo necesitas unas credenciales de desarrollador. " +
@@ -97,8 +132,10 @@ fun NetatmoCredentialsScreen(
                     OutlinedButton(
                         onClick = {
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW,
-                                    Uri.parse("https://dev.netatmo.com/apps/createanapp"))
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://dev.netatmo.com/apps/createanapp")
+                                )
                             )
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -110,8 +147,11 @@ fun NetatmoCredentialsScreen(
                 }
             }
 
-            // Steps
-            Card {
+            // Steps card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Pasos", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -123,38 +163,52 @@ fun NetatmoCredentialsScreen(
                         "Pégalos aquí abajo y guarda"
                     ).forEachIndexed { i, step ->
                         Row(verticalAlignment = Alignment.Top) {
-                            Text("${i + 1}. ", style = MaterialTheme.typography.bodySmall,
+                            Text(
+                                "${i + 1}. ",
+                                style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary)
+                                color = BrandBlue
+                            )
                             Text(step, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
             }
 
-            // Current status
+            // Current status card
             if (uiState.hasStoredCredentials) {
                 Card(
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = BrandBlue
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
-                                Text("Credenciales guardadas",
+                                Text(
+                                    "Credenciales guardadas",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium)
-                                Text("Client ID: ${uiState.storedClientIdPreview}",
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    "Client ID: ${uiState.storedClientIdPreview}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                         TextButton(onClick = { showClearDialog = true }) {
@@ -172,43 +226,60 @@ fun NetatmoCredentialsScreen(
                 fontWeight = FontWeight.SemiBold
             )
 
-            OutlinedTextField(
-                value = uiState.clientId,
-                onValueChange = { viewModel.updateClientId(it) },
-                label = { Text("Client ID") },
-                placeholder = { Text("ej: 6ac0998dbbeddcb1450cd4b7") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) }
-            )
+            // Input fields card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = uiState.clientId,
+                        onValueChange = { viewModel.updateClientId(it) },
+                        label = { Text("Client ID") },
+                        placeholder = { Text("ej: 6ac0998dbbeddcb1450cd4b7") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) }
+                    )
 
-            OutlinedTextField(
-                value = uiState.clientSecret,
-                onValueChange = { viewModel.updateClientSecret(it) },
-                label = { Text("Client Secret") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = if (secretVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = { secretVisible = !secretVisible }) {
-                        Icon(
-                            if (secretVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (secretVisible) "Ocultar" else "Mostrar"
-                        )
-                    }
+                    OutlinedTextField(
+                        value = uiState.clientSecret,
+                        onValueChange = { viewModel.updateClientSecret(it) },
+                        label = { Text("Client Secret") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = if (secretVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        trailingIcon = {
+                            IconButton(onClick = { secretVisible = !secretVisible }) {
+                                Icon(
+                                    if (secretVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (secretVisible) "Ocultar" else "Mostrar"
+                                )
+                            }
+                        }
+                    )
                 }
-            )
+            }
 
             uiState.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall)
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
             Button(
                 onClick = { viewModel.save() },
-                modifier = Modifier.fillMaxWidth().height(52.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = BrandBlue)
             ) {
                 Icon(Icons.Default.Save, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

@@ -5,23 +5,31 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.models.Home
 import com.arsys.netatmo.data.model.GitHubRelease
 import com.arsys.netatmo.data.repository.UpdateStatus
+
+private val BrandBlue = Color(0xFF0EA5E9)
+private val BrandGradient = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,22 +91,42 @@ fun SettingsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ajustes", fontWeight = FontWeight.Bold) }
-            )
-        }
-    ) { paddingValues ->
+    Scaffold { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = paddingValues.calculateBottomPadding())
+        ) {
+            // Gradient header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(BrandGradient))
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 20.dp)
+            ) {
+                Text(
+                    text = "Ajustes",
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Hogar seleccionado
             item {
-                Text("Hogar", style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 4.dp))
+                Text(
+                    "Hogar",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BrandBlue,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
 
             if (uiState.isLoadingHomes) {
@@ -120,13 +148,16 @@ fun SettingsScreen(
                 }
                 if (uiState.homes.isEmpty()) {
                     item {
-                        Card(modifier = Modifier.fillMaxWidth()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(2.dp)
+                        ) {
                             Row(
                                 modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Info, contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary)
+                                Icon(Icons.Default.Info, contentDescription = null, tint = BrandBlue)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text("No se encontraron hogares. Verifica tu cuenta Netatmo.")
                             }
@@ -139,12 +170,21 @@ fun SettingsScreen(
 
             // Sync settings
             item {
-                Text("Sincronización", style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 4.dp))
+                Text(
+                    "Sincronización",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BrandBlue,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
 
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
                     Column {
                         SettingRow(
                             icon = Icons.Default.Sync,
@@ -153,7 +193,11 @@ fun SettingsScreen(
                             trailing = {
                                 Switch(
                                     checked = uiState.autoRefresh,
-                                    onCheckedChange = { viewModel.setAutoRefresh(it) }
+                                    onCheckedChange = { viewModel.setAutoRefresh(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = BrandBlue
+                                    )
                                 )
                             }
                         )
@@ -165,7 +209,11 @@ fun SettingsScreen(
                             trailing = {
                                 Switch(
                                     checked = uiState.notificationsEnabled,
-                                    onCheckedChange = { viewModel.setNotifications(it) }
+                                    onCheckedChange = { viewModel.setNotifications(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = BrandBlue
+                                    )
                                 )
                             }
                         )
@@ -177,12 +225,19 @@ fun SettingsScreen(
 
             // Netatmo credentials
             item {
-                Text("Cuenta de desarrollador", style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 4.dp))
+                Text(
+                    "Cuenta de desarrollador",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BrandBlue,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp),
                     onClick = onNavigateToCredentials
                 ) {
                     SettingRow(
@@ -201,12 +256,21 @@ fun SettingsScreen(
 
             // About
             item {
-                Text("Acerca de", style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 4.dp))
+                Text(
+                    "Acerca de",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BrandBlue,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
 
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
                     Column {
                         SettingRow(
                             icon = Icons.Default.Info,
@@ -227,8 +291,13 @@ fun SettingsScreen(
 
             // Updates
             item {
-                Text("Actualización", style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 4.dp))
+                Text(
+                    "Actualización",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BrandBlue,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
 
             item {
@@ -247,6 +316,7 @@ fun SettingsScreen(
                 OutlinedButton(
                     onClick = { showLogoutDialog = true },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
@@ -264,6 +334,7 @@ fun SettingsScreen(
                 }
             }
         }
+        } // end Column
     }
 }
 
@@ -275,9 +346,11 @@ fun HomeItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
         onClick = onSelect,
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+            containerColor = if (isSelected) BrandBlue.copy(alpha = 0.12f)
                              else MaterialTheme.colorScheme.surface
         )
     ) {
@@ -288,8 +361,7 @@ fun HomeItem(
             Icon(
                 Icons.Default.Home,
                 contentDescription = null,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (isSelected) BrandBlue else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -300,8 +372,7 @@ fun HomeItem(
                 }
             }
             if (isSelected) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BrandBlue)
             }
         }
     }
@@ -318,7 +389,7 @@ fun SettingRow(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Icon(icon, contentDescription = null, tint = BrandBlue)
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
@@ -336,7 +407,11 @@ fun UpdateSection(
     onDownloadAndInstall: (com.arsys.netatmo.data.model.GitHubRelease) -> Unit,
     onDismissError: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             when (updateStatus) {
                 is UpdateStatus.Idle -> {
@@ -346,14 +421,16 @@ fun UpdateSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.SystemUpdate, contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = BrandBlue)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text("Buscar actualizaciones",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium)
                         }
-                        TextButton(onClick = onCheckUpdates) { Text("Verificar") }
+                        TextButton(
+                            onClick = onCheckUpdates,
+                            colors = ButtonDefaults.textButtonColors(contentColor = BrandBlue)
+                        ) { Text("Verificar") }
                     }
                 }
 
@@ -362,7 +439,11 @@ fun UpdateSection(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = BrandBlue
+                        )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("Buscando actualizaciones...",
                             style = MaterialTheme.typography.bodyMedium)
@@ -376,8 +457,7 @@ fun UpdateSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BrandBlue)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text("App actualizada",
@@ -388,15 +468,17 @@ fun UpdateSection(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        TextButton(onClick = onCheckUpdates) { Text("Revisar") }
+                        TextButton(
+                            onClick = onCheckUpdates,
+                            colors = ButtonDefaults.textButtonColors(contentColor = BrandBlue)
+                        ) { Text("Revisar") }
                     }
                 }
 
                 is UpdateStatus.UpdateAvailable -> {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.NewReleases, contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.NewReleases, contentDescription = null, tint = BrandBlue)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text("Nueva versión disponible",
@@ -414,7 +496,9 @@ fun UpdateSection(
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = { onDownloadAndInstall(updateStatus.release) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandBlue)
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -426,8 +510,7 @@ fun UpdateSection(
                 is UpdateStatus.Downloading -> {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Downloading, contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.Downloading, contentDescription = null, tint = BrandBlue)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text("Descargando actualización...",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -436,7 +519,8 @@ fun UpdateSection(
                         Spacer(modifier = Modifier.height(8.dp))
                         LinearProgressIndicator(
                             progress = { updateStatus.progress },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            color = BrandBlue
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -449,7 +533,11 @@ fun UpdateSection(
 
                 is UpdateStatus.Installing -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = BrandBlue
+                        )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("Iniciando instalación...",
                             style = MaterialTheme.typography.bodyMedium)
@@ -476,7 +564,10 @@ fun UpdateSection(
                         Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                             TextButton(onClick = onDismissError) { Text("Cerrar") }
                             Spacer(modifier = Modifier.width(8.dp))
-                            TextButton(onClick = onCheckUpdates) { Text("Reintentar") }
+                            TextButton(
+                                onClick = onCheckUpdates,
+                                colors = ButtonDefaults.textButtonColors(contentColor = BrandBlue)
+                            ) { Text("Reintentar") }
                         }
                     }
                 }

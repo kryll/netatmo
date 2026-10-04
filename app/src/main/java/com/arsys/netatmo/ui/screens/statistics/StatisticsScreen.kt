@@ -1,10 +1,12 @@
 package com.arsys.netatmo.ui.screens.statistics
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -12,15 +14,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
-import com.arsys.netatmo.ui.theme.ComfortColor
 import com.arsys.netatmo.ui.theme.WarmColor
+
+private val BrandBlue = Color(0xFF0EA5E9)
+private val BrandBlueDark = Color(0xFF0369A1)
+private val HeaderGradient = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,17 +42,27 @@ fun StatisticsScreen(
         viewModel.loadStatistics(selectedPeriod)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Estadísticas", fontWeight = FontWeight.Bold) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Gradient header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(HeaderGradient))
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+        ) {
+            Text(
+                text = "Estadísticas",
+                color = Color.White,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
             )
         }
-    ) { paddingValues ->
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .background(MaterialTheme.colorScheme.background),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -57,7 +74,11 @@ fun StatisticsScreen(
                             FilterChip(
                                 selected = uiState.selectedRoomId == roomId,
                                 onClick = { viewModel.selectRoom(roomId) },
-                                label = { Text(roomName) }
+                                label = { Text(roomName) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = BrandBlue,
+                                    selectedLabelColor = Color.White
+                                )
                             )
                         }
                     }
@@ -71,7 +92,11 @@ fun StatisticsScreen(
                         FilterChip(
                             selected = selectedPeriod == days,
                             onClick = { selectedPeriod = days },
-                            label = { Text(label) }
+                            label = { Text(label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = BrandBlue,
+                                selectedLabelColor = Color.White
+                            )
                         )
                     }
                 }
@@ -88,7 +113,7 @@ fun StatisticsScreen(
                         title = "Temp. media",
                         value = uiState.avgTemp?.let { "%.1f°C".format(it) } ?: "--",
                         icon = Icons.Default.Thermostat,
-                        color = MaterialTheme.colorScheme.primary
+                        color = BrandBlue
                     )
                     StatCard(
                         modifier = Modifier.weight(1f),
@@ -121,7 +146,11 @@ fun StatisticsScreen(
             // Temperature chart
             if (uiState.temperatureData.isNotEmpty()) {
                 item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 "Temperatura",
@@ -140,7 +169,7 @@ fun StatisticsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 modifier = Modifier.padding(top = 8.dp)
                             ) {
-                                LegendItem(color = MaterialTheme.colorScheme.primary, label = "Temperatura")
+                                LegendItem(color = BrandBlue, label = "Temperatura")
                                 LegendItem(color = WarmColor, label = "Objetivo")
                             }
                         }
@@ -151,7 +180,11 @@ fun StatisticsScreen(
             // Heating chart
             if (uiState.temperatureData.isNotEmpty()) {
                 item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 "Actividad de calefacción",
@@ -171,7 +204,7 @@ fun StatisticsScreen(
             if (uiState.isLoading) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = BrandBlue)
                     }
                 }
             }
@@ -187,7 +220,11 @@ fun StatCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     color: Color
 ) {
-    Card(modifier = modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
         Column(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -195,8 +232,11 @@ fun StatCard(
             Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.height(4.dp))
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(title, style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                title,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -206,7 +246,7 @@ fun TemperatureChart(
     data: List<TemperatureDataPoint>,
     modifier: Modifier = Modifier
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryColor = BrandBlue
     val warmColor = WarmColor
 
     Canvas(modifier = modifier) {
@@ -282,11 +322,7 @@ fun HeatingChart(
 fun LegendItem(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-            modifier = Modifier
-                .size(12.dp)
-                .let { mod ->
-                    mod
-                },
+            modifier = Modifier.size(12.dp),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
