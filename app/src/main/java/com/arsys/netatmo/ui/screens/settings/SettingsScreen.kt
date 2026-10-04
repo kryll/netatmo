@@ -85,26 +85,23 @@ fun SettingsScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { _ ->
         val canInstall = context.packageManager.canRequestPackageInstalls()
-        Log.d("UpdateDebug", "installPermissionLauncher: regresó de ajustes, canRequestPackageInstalls=$canInstall, pendingRelease=${pendingInstallRelease?.tagName}")
+        if (BuildConfig.DEBUG) Log.d("UpdateDebug", "installPermissionLauncher: canRequestPackageInstalls=$canInstall")
         pendingInstallRelease?.let { release ->
             if (canInstall) {
-                Log.d("UpdateDebug", "installPermissionLauncher: permiso concedido, iniciando descarga")
                 viewModel.downloadAndInstall(release)
                 pendingInstallRelease = null
             } else {
-                Log.w("UpdateDebug", "installPermissionLauncher: permiso DENEGADO — el usuario no habilitó la instalación de fuentes desconocidas")
+                if (BuildConfig.DEBUG) Log.w("UpdateDebug", "installPermissionLauncher: permiso DENEGADO")
             }
         }
     }
 
     fun requestInstall(release: GitHubRelease) {
         val canInstall = context.packageManager.canRequestPackageInstalls()
-        Log.d("UpdateDebug", "requestInstall: release=${release.tagName}, canRequestPackageInstalls=$canInstall")
         if (canInstall) {
-            Log.d("UpdateDebug", "requestInstall: permiso OK, llamando downloadAndInstall")
             viewModel.downloadAndInstall(release)
         } else {
-            Log.w("UpdateDebug", "requestInstall: SIN permiso — abriendo ACTION_MANAGE_UNKNOWN_APP_SOURCES para package=${context.packageName}")
+            if (BuildConfig.DEBUG) Log.w("UpdateDebug", "requestInstall: SIN permiso, abriendo ajustes")
             pendingInstallRelease = release
             installPermissionLauncher.launch(
                 Intent(

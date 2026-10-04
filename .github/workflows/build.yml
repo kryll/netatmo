@@ -32,7 +32,7 @@ jobs:
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-          echo "netatmo.clientId=6ac0998dbbeddcb1450cd4b7" >> local.properties
+          echo "netatmo.clientId=${{ secrets.NETATMO_CLIENT_ID }}" >> local.properties
           echo "netatmo.clientSecret=${{ secrets.NETATMO_CLIENT_SECRET }}" >> local.properties
           echo "meteosource.apiKey=${{ secrets.METEOSOURCE_API_KEY }}" >> local.properties
           echo "meteosource.placeId=logrono" >> local.properties

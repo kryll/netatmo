@@ -10,7 +10,6 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -24,6 +23,22 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+    private fun buildOkHttp(
+        logging: HttpLoggingInterceptor,
+        readTimeoutSec: Long = 30
+    ): OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(logging)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(readTimeoutSec, TimeUnit.SECONDS)
+        .build()
+
+    private fun buildRetrofit(baseUrl: String, client: OkHttpClient): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
     @Provides
     @Singleton
     fun provideLoggingInterceptor(): HttpLoggingInterceptor =
@@ -36,11 +51,7 @@ object NetworkModule {
     @Singleton
     @Named("auth")
     fun provideAuthOkHttpClient(logging: HttpLoggingInterceptor): OkHttpClient =
-        OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
+        buildOkHttp(logging)
 
     @Provides
     @Singleton
@@ -50,7 +61,9 @@ object NetworkModule {
         authRepository: AuthRepository
     ): OkHttpClient {
         val authInterceptor = Interceptor { chain ->
-            val token = runBlocking { authRepository.getValidAccessToken() }
+            // Read the non-suspending cache — no blocking on OkHttp's IO thread pool.
+            // Token refresh (when near expiry) is driven proactively from ViewModel/coroutine scope.
+            val token = authRepository.cachedAccessToken
             val request = chain.request().newBuilder()
                 .addHeader("Authorization", "Bearer $token")
                 .build()
@@ -67,60 +80,32 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAuthApiService(@Named("auth") client: OkHttpClient): AuthApiService =
-        Retrofit.Builder()
-            .baseUrl(BuildConfig.NETATMO_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(AuthApiService::class.java)
+        buildRetrofit(BuildConfig.NETATMO_BASE_URL, client).create(AuthApiService::class.java)
 
     @Provides
     @Singleton
     fun provideNetatmoApiService(@Named("api") client: OkHttpClient): NetatmoApiService =
-        Retrofit.Builder()
-            .baseUrl(BuildConfig.NETATMO_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(NetatmoApiService::class.java)
+        buildRetrofit(BuildConfig.NETATMO_BASE_URL, client).create(NetatmoApiService::class.java)
 
     @Provides
     @Singleton
     @Named("github")
     fun provideGitHubOkHttpClient(logging: HttpLoggingInterceptor): OkHttpClient =
-        OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .build()
+        buildOkHttp(logging, readTimeoutSec = 60)
 
     @Provides
     @Singleton
     fun provideGitHubApiService(@Named("github") client: OkHttpClient): GitHubApiService =
-        Retrofit.Builder()
-            .baseUrl("https://api.github.com/")
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(GitHubApiService::class.java)
+        buildRetrofit("https://api.github.com/", client).create(GitHubApiService::class.java)
 
     @Provides
     @Singleton
     @Named("meteosource")
     fun provideMeteosourceOkHttpClient(logging: HttpLoggingInterceptor): OkHttpClient =
-        OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
+        buildOkHttp(logging)
 
     @Provides
     @Singleton
     fun provideMeteosourceApiService(@Named("meteosource") client: OkHttpClient): MeteosourceApiService =
-        Retrofit.Builder()
-            .baseUrl("https://www.meteosource.com/")
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(MeteosourceApiService::class.java)
+        buildRetrofit("https://www.meteosource.com/", client).create(MeteosourceApiService::class.java)
 }

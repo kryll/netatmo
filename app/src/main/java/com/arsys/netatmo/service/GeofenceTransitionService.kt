@@ -1,7 +1,6 @@
 package com.arsys.netatmo.service
 
 import android.Manifest
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
@@ -123,10 +122,8 @@ class GeofenceTransitionService : Service() {
                         errorMessage = errorMsg
                     ))
                     if (success) {
-                        showNotification("Llegando a ${geofenceEntity.name}", "Temperatura ajustada a ${temp}°C")
                         sendAutomationNotification(automation, transitionType = "Entrada", success = true)
                     } else {
-                        showNotification("Llegando a ${geofenceEntity.name}", "Error al ajustar temperatura: $errorMsg")
                         sendAutomationNotification(automation, transitionType = "Entrada", success = false)
                     }
                 }
@@ -147,10 +144,8 @@ class GeofenceTransitionService : Service() {
                         errorMessage = errorMsg
                     ))
                     if (success) {
-                        showNotification("Saliendo de ${geofenceEntity.name}", "Temperatura ajustada a ${temp}°C")
                         sendAutomationNotification(automation, transitionType = "Salida", success = true)
                     } else {
-                        showNotification("Saliendo de ${geofenceEntity.name}", "Error al ajustar temperatura: $errorMsg")
                         sendAutomationNotification(automation, transitionType = "Salida", success = false)
                     }
                 }
@@ -186,39 +181,21 @@ class GeofenceTransitionService : Service() {
             )
         }
 
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(this, NetatmoApp.CHANNEL_AUTOMATIONS)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle(title)
             .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .build()
-
-        NotificationManagerCompat.from(this).notify(notifId, notification)
-    }
-
-    private fun showNotification(title: String, message: String) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-        ) return
-
-        val intent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(this, NetatmoApp.CHANNEL_GEOFENCE)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
 
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(title.hashCode(), notification)
+        NotificationManagerCompat.from(this).notify(notifId, notification)
     }
 }

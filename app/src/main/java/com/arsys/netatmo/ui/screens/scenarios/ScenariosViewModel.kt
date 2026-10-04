@@ -66,21 +66,14 @@ class ScenariosViewModel @Inject constructor(
     fun executeQuickAction(action: String) {
         viewModelScope.launch {
             val homeId = authRepository.selectedHomeId.first() ?: return@launch
-            val mode = when (action) {
-                "comfort" -> ThermostatMode.MANUAL
-                "eco" -> ThermostatMode.SCHEDULE
-                "away" -> ThermostatMode.AWAY
-                "off" -> ThermostatMode.OFF
-                else -> return@launch
+            val (mode, label) = when (action) {
+                "comfort" -> ThermostatMode.MANUAL to "Modo confort activado"
+                "eco"     -> ThermostatMode.SCHEDULE to "Modo eco activado"
+                "away"    -> ThermostatMode.AWAY to "Modo ausente activado"
+                "off"     -> ThermostatMode.OFF to "Calefacción apagada"
+                else      -> return@launch
             }
             thermostatRepository.setHomeMode(homeId, mode.apiValue)
-            val label = when (action) {
-                "comfort" -> "Modo confort activado"
-                "eco" -> "Modo eco activado"
-                "away" -> "Modo ausente activado"
-                "off" -> "Calefacción apagada"
-                else -> "Acción ejecutada"
-            }
             _uiState.update { it.copy(successMessage = label) }
         }
     }

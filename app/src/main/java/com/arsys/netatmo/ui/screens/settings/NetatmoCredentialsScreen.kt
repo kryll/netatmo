@@ -238,7 +238,7 @@ fun NetatmoCredentialsScreen(
                         value = uiState.clientId,
                         onValueChange = { viewModel.updateClientId(it) },
                         label = { Text("Client ID") },
-                        placeholder = { Text("ej: 6ac0998dbbeddcb1450cd4b7") },
+                        placeholder = { Text("ej: tu_client_id") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) }

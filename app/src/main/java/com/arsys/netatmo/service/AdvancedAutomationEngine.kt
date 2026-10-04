@@ -22,7 +22,8 @@ class AdvancedAutomationEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val advancedAutomationRepository: AdvancedAutomationRepository,
     private val thermostatRepository: ThermostatRepository,
-    private val automationRepository: AutomationRepository
+    private val automationRepository: AutomationRepository,
+    private val familyPresenceManager: FamilyPresenceManager
 ) {
     suspend fun evaluateAndExecuteAll() {
         val automations = advancedAutomationRepository.getEnabledAdvancedAutomations()
@@ -69,10 +70,8 @@ class AdvancedAutomationEngine @Inject constructor(
                 val before = condition.optString("before", "23:59")
                 val cal = Calendar.getInstance()
                 val currentMinutes = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
-                val afterParts = after.split(":")
-                val beforeParts = before.split(":")
-                val afterMinutes = afterParts[0].toInt() * 60 + afterParts[1].toInt()
-                val beforeMinutes = beforeParts[0].toInt() * 60 + beforeParts[1].toInt()
+                val afterMinutes = parseTimeToMinutes(after)
+                val beforeMinutes = parseTimeToMinutes(before)
                 if (afterMinutes <= beforeMinutes) {
                     currentMinutes in afterMinutes..beforeMinutes
                 } else {
@@ -94,7 +93,14 @@ class AdvancedAutomationEngine @Inject constructor(
                     else -> true
                 }
             }
-            "presence" -> true
+            "presence" -> {
+                val state = condition.optString("state", "someone_home")
+                val allAway = familyPresenceManager.allMembersAway()
+                when (state) {
+                    "everyone_away" -> allAway
+                    else -> !allAway // "someone_home" and unrecognised states default to at-home check
+                }
+            }
             else -> true
         }
     }
@@ -119,6 +125,12 @@ class AdvancedAutomationEngine @Inject constructor(
             }
         }
         return null
+    }
+
+    private fun parseTimeToMinutes(hhmm: String): Int {
+        val parts = hhmm.split(":")
+        require(parts.size >= 2) { "Invalid time format: $hhmm" }
+        return parts[0].toInt() * 60 + parts[1].toInt()
     }
 
     private fun checkNumericCondition(condition: JSONObject, value: Double): Boolean {

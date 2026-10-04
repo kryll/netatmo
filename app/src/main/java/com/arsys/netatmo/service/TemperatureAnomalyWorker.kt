@@ -11,9 +11,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.arsys.netatmo.NetatmoApp
 import com.arsys.netatmo.data.local.dao.HomeCacheDao
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlin.math.absoluteValue
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 
@@ -30,7 +32,20 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
         private val ANOMALY_THRESHOLD_KEY = floatPreferencesKey("anomaly_threshold")
         private val SELECTED_HOME_ID_KEY = stringPreferencesKey("selected_home_id")
 
-        const val CHANNEL_AUTOMATIONS = "channel_automations"
+        fun schedule(context: Context) {
+            val request = androidx.work.PeriodicWorkRequestBuilder<TemperatureAnomalyWorker>(
+                15, java.util.concurrent.TimeUnit.MINUTES
+            ).setConstraints(
+                androidx.work.Constraints.Builder()
+                    .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                    .build()
+            ).build()
+            androidx.work.WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                "anomaly_check",
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                request
+            )
+        }
     }
 
     override suspend fun doWork(): Result {
@@ -65,11 +80,11 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
                                          .takeUnless { it.isNaN() }
 
             if (currentTemp == null || targetTemp == null) continue
-            if (Math.abs(currentTemp - targetTemp) <= threshold) continue
+            if ((currentTemp - targetTemp).absoluteValue <= threshold) continue
 
             val notifId = (name.hashCode() and 0x7FFFFFFF) % 1000 + 2000
 
-            val notification = NotificationCompat.Builder(ctx, CHANNEL_AUTOMATIONS)
+            val notification = NotificationCompat.Builder(ctx, NetatmoApp.CHANNEL_ANOMALY)
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .setContentTitle("Temperatura anomala")
                 .setContentText("$name: ${"%.1f".format(currentTemp)}°C (objetivo ${"%.1f".format(targetTemp)}°C)")

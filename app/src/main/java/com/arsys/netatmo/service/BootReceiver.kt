@@ -16,6 +16,9 @@ class BootReceiver : BroadcastReceiver() {
     @Inject
     lateinit var geofenceManager: GeofenceManager
 
+    @Inject
+    lateinit var localScheduleManager: LocalScheduleManager
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
@@ -45,5 +48,8 @@ class BootReceiver : BroadcastReceiver() {
             ExistingPeriodicWorkPolicy.UPDATE,
             calendarRequest
         )
+
+        localScheduleManager.scheduleAll()
+        TemperatureAnomalyWorker.schedule(context)
     }
 }

@@ -13,10 +13,4 @@ class Converters {
     @TypeConverter
     fun toStringList(value: String): List<String> =
         gson.fromJson(value, object : TypeToken<List<String>>() {}.type) ?: emptyList()
-
-    @TypeConverter
-    fun fromLong(value: Long?): String? = value?.toString()
-
-    @TypeConverter
-    fun toLong(value: String?): Long? = value?.toLongOrNull()
 }

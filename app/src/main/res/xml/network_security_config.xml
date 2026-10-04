@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration — SEC-005
+    =========================================
+    Cleartext traffic is already blocked via android:usesCleartextTraffic="false" in the manifest.
+
+    Certificate pinning (pin-set entries) MUST be filled in by the developer before shipping:
+
+      1. Obtain the current SPKI SHA-256 fingerprint for each host:
+           echo | openssl s_client -connect api.netatmo.com:443 2>/dev/null \
+             | openssl x509 -pubkey -noout \
+             | openssl pkey -pubin -outform der \
+             | openssl dgst -sha256 -binary | base64
+
+      2. Add at least two pins (current + one backup) per host inside the matching <domain-config>.
+
+      3. Set a realistic <expiration> date and add a pin-rotation calendar entry.
+
+    WARNING: Shipping with the placeholder comment lines below does NOT provide cert pinning.
+             The file is wired into the manifest so the configuration is active; add real pin
+             hashes before a production release.
+-->
+<network-security-config>
+
+    <!-- api.netatmo.com — thermostat data read/write -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">api.netatmo.com</domain>
+        <!--
+        <pin-set expiration="2027-01-01">
+            <pin digest="SHA-256">REPLACE_WITH_CURRENT_SPKI_HASH==</pin>
+            <pin digest="SHA-256">REPLACE_WITH_BACKUP_SPKI_HASH==</pin>
+        </pin-set>
+        -->
+    </domain-config>
+
+    <!-- www.meteosource.com — weather data -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">www.meteosource.com</domain>
+        <!--
+        <pin-set expiration="2027-01-01">
+            <pin digest="SHA-256">REPLACE_WITH_CURRENT_SPKI_HASH==</pin>
+            <pin digest="SHA-256">REPLACE_WITH_BACKUP_SPKI_HASH==</pin>
+        </pin-set>
+        -->
+    </domain-config>
+
+    <!-- api.github.com — update check and APK download.
+         HIGHEST PRIORITY: a MITM here leads to arbitrary code execution via
+         REQUEST_INSTALL_PACKAGES. Pin the intermediate CA if leaf certs rotate frequently. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">api.github.com</domain>
+        <domain includeSubdomains="false">objects.githubusercontent.com</domain>
+        <!--
+        <pin-set expiration="2027-01-01">
+            <pin digest="SHA-256">REPLACE_WITH_CURRENT_SPKI_HASH==</pin>
+            <pin digest="SHA-256">REPLACE_WITH_BACKUP_SPKI_HASH==</pin>
+        </pin-set>
+        -->
+    </domain-config>
+
+</network-security-config>

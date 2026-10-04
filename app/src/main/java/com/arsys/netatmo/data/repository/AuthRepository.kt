@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,6 +49,15 @@ class AuthRepository @Inject constructor(
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
     }
+
+    // Non-suspending cache for use by the OkHttp interceptor — avoids runBlocking on IO threads.
+    private val _cachedToken = AtomicReference<String?>(
+        encryptedPrefs.getString(KEY_ACCESS_TOKEN, null)
+    )
+    private val _refreshMutex = Mutex()
+
+    /** Non-suspending; returns the last known valid token or null. Used by the auth interceptor. */
+    val cachedAccessToken: String? get() = _cachedToken.get()
 
     private val _isLoggedIn = MutableStateFlow(
         encryptedPrefs.getString(KEY_ACCESS_TOKEN, null) != null
@@ -89,6 +101,7 @@ class AuthRepository @Inject constructor(
         emit(encryptedPrefs.getString(KEY_HOME_ID, null))
     }
 
+    /** Suspending; refreshes if needed and updates the cache. Call from a coroutine scope (e.g. ViewModel) before requests when possible. */
     suspend fun getValidAccessToken(): String? {
         val token = encryptedPrefs.getString(KEY_ACCESS_TOKEN, null) ?: return null
         val expiresAt = encryptedPrefs.getLong(KEY_EXPIRES_AT, 0L)
@@ -97,7 +110,15 @@ class AuthRepository @Inject constructor(
         return if (System.currentTimeMillis() < expiresAt - 60_000) {
             token
         } else {
-            refreshTokens(refreshToken)
+            _refreshMutex.withLock {
+                // Re-check inside the lock — another coroutine may have refreshed already.
+                val latestExpiry = encryptedPrefs.getLong(KEY_EXPIRES_AT, 0L)
+                if (System.currentTimeMillis() < latestExpiry - 60_000) {
+                    encryptedPrefs.getString(KEY_ACCESS_TOKEN, null)
+                } else {
+                    refreshTokens(refreshToken)
+                }
+            }
         }
     }
 
@@ -117,9 +138,9 @@ class AuthRepository @Inject constructor(
         encryptedPrefs.edit().remove(KEY_PKCE_VERIFIER).apply()
 
         if (BuildConfig.DEBUG) {
-            AuthDebugLogger.log("loginWithCode() → code=${code.take(8)}...", context)
-            AuthDebugLogger.log("  clientId=${effectiveClientId()}", context)
-            AuthDebugLogger.log("  redirectUri=${BuildConfig.NETATMO_REDIRECT_URI}", context)
+            AuthDebugLogger.log("loginWithCode() → code=${code.take(8)}...")
+            AuthDebugLogger.log("  clientId=${effectiveClientId()}")
+            AuthDebugLogger.log("  redirectUri=${BuildConfig.NETATMO_REDIRECT_URI}")
         }
         return try {
             val response = authApiService.getToken(
@@ -131,32 +152,32 @@ class AuthRepository @Inject constructor(
                 codeVerifier = codeVerifier
             )
             if (BuildConfig.DEBUG) {
-                AuthDebugLogger.log("  HTTP ${response.code()} ${response.message()}", context)
+                AuthDebugLogger.log("  HTTP ${response.code()} ${response.message()}")
             }
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body != null) {
                     if (BuildConfig.DEBUG) {
-                        AuthDebugLogger.log("  ✅ Token OK · scope=${body.scope.joinToString(" ")} · expiresIn=${body.expiresIn}s", context)
+                        AuthDebugLogger.log("  ✅ Token OK · scope=${body.scope.joinToString(" ")} · expiresIn=${body.expiresIn}s")
                     }
                     saveTokens(body.accessToken, body.refreshToken, body.expiresIn)
                     Result.success(Unit)
                 } else {
                     if (BuildConfig.DEBUG) {
-                        AuthDebugLogger.log("  ❌ Body nulo a pesar de 200", context)
+                        AuthDebugLogger.log("  ❌ Body nulo a pesar de 200")
                     }
                     Result.failure(Exception("Respuesta vacía del servidor"))
                 }
             } else {
                 val errBody = response.errorBody()?.string() ?: "(sin cuerpo)"
                 if (BuildConfig.DEBUG) {
-                    AuthDebugLogger.log("  ❌ Error ${response.code()}: $errBody", context)
+                    AuthDebugLogger.log("  ❌ Error ${response.code()}: $errBody")
                 }
                 Result.failure(Exception("Auth error ${response.code()}: $errBody"))
             }
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) {
-                AuthDebugLogger.log("  ❌ Excepción: ${e.javaClass.simpleName}: ${e.message}", context)
+                AuthDebugLogger.log("  ❌ Excepción: ${e.javaClass.simpleName}: ${e.message}")
             }
             Result.failure(e)
         }
@@ -187,6 +208,7 @@ class AuthRepository @Inject constructor(
             .putString(KEY_REFRESH_TOKEN, refreshToken)
             .putLong(KEY_EXPIRES_AT, System.currentTimeMillis() + (expiresIn * 1000L))
             .apply()
+        _cachedToken.set(accessToken)
         _isLoggedIn.value = true
     }
 
@@ -203,6 +225,7 @@ class AuthRepository @Inject constructor(
             .remove(KEY_OAUTH_STATE)
             .remove(KEY_PKCE_VERIFIER)
             .apply()
+        _cachedToken.set(null)
         _isLoggedIn.value = false
     }
 
@@ -230,7 +253,7 @@ class AuthRepository @Inject constructor(
                 "&code_challenge=$codeChallenge" +
                 "&code_challenge_method=S256"
         if (BuildConfig.DEBUG) {
-            AuthDebugLogger.log("getAuthUrl() → $url", context)
+            AuthDebugLogger.log("getAuthUrl() → $url")
         }
         return url
     }

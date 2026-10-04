@@ -5,7 +5,6 @@ import android.provider.CalendarContract
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AutomationRepository
 import com.arsys.netatmo.data.repository.AuthRepository
 import com.arsys.netatmo.data.repository.ThermostatRepository
@@ -39,7 +38,10 @@ class CalendarWorker @AssistedInject constructor(
             upcomingEvents.forEach { eventStart ->
                 val triggerTime = eventStart - (calAuto.minutesBefore * 60 * 1000L)
                 if (triggerTime in (now - 15 * 60 * 1000L)..now) {
-                    thermostatRepository.setTemperature(homeId, "", calAuto.targetTemperature)
+                    val automation = automationRepository.getAutomationById(calAuto.automationId)
+                    val roomId = automation?.roomId ?: ""
+                    if (roomId.isBlank()) return@forEach
+                    thermostatRepository.setTemperature(homeId, roomId, calAuto.targetTemperature)
                 }
             }
         }
