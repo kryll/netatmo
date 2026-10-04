@@ -5,8 +5,9 @@ import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +29,9 @@ import com.arsys.netatmo.MainActivity
 import com.arsys.netatmo.R
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
 
+private val Accent = Color(0xFF0284C7)
+private val TextPrimary = Color(0xFF1E293B)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScenariosScreen(
@@ -38,113 +42,148 @@ fun ScenariosScreen(
     val context = LocalContext.current
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Escenarios", fontWeight = FontWeight.Bold) }
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { navController.navigate("scenario/-1") }
+                onClick = { navController.navigate("scenario/-1") },
+                containerColor = Accent,
+                contentColor = Color.White
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Nuevo escenario")
             }
         }
     ) { paddingValues ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(paddingValues)
         ) {
-            // Quick actions row
-            item {
+            // Header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 20.dp)
+            ) {
                 Text(
-                    "Accesos rápidos",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                QuickActionsRow(onAction = { viewModel.executeQuickAction(it) })
-            }
-
-            item {
-                Text(
-                    "Mis escenarios",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 8.dp)
+                    "Escenarios",
+                    color = TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
+            HorizontalDivider(color = Color(0xFFE2E8F0))
 
-            if (uiState.scenarios.isEmpty()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Quick actions row
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(32.dp).fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("Sin escenarios", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                "Crea escenarios para aplicar múltiples ajustes de temperatura con un toque",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    Text(
+                        "Accesos rápidos",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    QuickActionsRow(onAction = { viewModel.executeQuickAction(it) })
                 }
-            } else {
-                items(uiState.scenarios, key = { it.id }) { scenario ->
-                    ScenarioCard(
-                        scenario = scenario,
-                        isRunning = uiState.runningScenarioId == scenario.id,
-                        onRun = { viewModel.runScenario(scenario) },
-                        onEdit = { navController.navigate("scenario/${scenario.id}") },
-                        onDelete = { viewModel.deleteScenario(scenario) },
-                        onPin = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                val sm = context.getSystemService(ShortcutManager::class.java)
-                                if (sm.isRequestPinShortcutSupported) {
-                                    val intent = Intent(context, MainActivity::class.java).apply {
-                                        action = "com.arsys.netatmo.OPEN_SCENARIOS"
-                                        putExtra("scenario_id", scenario.id)
-                                    }
-                                    val info = ShortcutInfo.Builder(context, "sc_${scenario.id}")
-                                        .setShortLabel(scenario.name)
-                                        .setLongLabel(scenario.name)
-                                        .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
-                                        .setIntent(intent)
-                                        .build()
-                                    sm.requestPinShortcut(info, null)
-                                }
-                            }
-                        }
+
+                item {
+                    Text(
+                        "Mis escenarios",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
-            }
 
-            uiState.successMessage?.let { msg ->
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                if (uiState.scenarios.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(2.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(32.dp)
+                                    .fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = Accent
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "Sin escenarios",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Crea escenarios para aplicar múltiples ajustes de temperatura con un toque",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(uiState.scenarios, key = { it.id }) { scenario ->
+                        ScenarioCard(
+                            scenario = scenario,
+                            isRunning = uiState.runningScenarioId == scenario.id,
+                            onRun = { viewModel.runScenario(scenario) },
+                            onEdit = { navController.navigate("scenario/${scenario.id}") },
+                            onDelete = { viewModel.deleteScenario(scenario) },
+                            onPin = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    val sm = context.getSystemService(ShortcutManager::class.java)
+                                    if (sm.isRequestPinShortcutSupported) {
+                                        val intent = Intent(context, MainActivity::class.java).apply {
+                                            action = "com.arsys.netatmo.OPEN_SCENARIOS"
+                                            putExtra("scenario_id", scenario.id)
+                                        }
+                                        val info = ShortcutInfo.Builder(context, "sc_${scenario.id}")
+                                            .setShortLabel(scenario.name)
+                                            .setLongLabel(scenario.name)
+                                            .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
+                                            .setIntent(intent)
+                                            .build()
+                                        sm.requestPinShortcut(info, null)
+                                    }
+                                }
+                            }
                         )
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp)) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(msg)
+                    }
+                }
+
+                uiState.successMessage?.let { msg ->
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(2.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                            )
+                        ) {
+                            Row(modifier = Modifier.padding(16.dp)) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(msg)
+                            }
                         }
                     }
                 }
@@ -170,7 +209,11 @@ fun QuickActionsRow(onAction: (String) -> Unit) {
                 onClick = { onAction(action) },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(8.dp)
+                contentPadding = PaddingValues(8.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Accent
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Accent)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -208,58 +251,110 @@ fun ScenarioCard(
         )
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (isRunning) Modifier.border(2.dp, Accent, RoundedCornerShape(16.dp))
+                else Modifier
+            ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isRunning)
+                Accent.copy(alpha = 0.06f)
+            else
+                MaterialTheme.colorScheme.surface
+        )
+    ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = try { Color(android.graphics.Color.parseColor(scenario.color)) }
-                        catch (e: Exception) { MaterialTheme.colorScheme.primaryContainer }
+            // Accent strip on the left
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(72.dp)
+                    .background(
+                        Accent,
+                        RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                    )
+            )
+
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = Color.White
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = try {
+                        Color(android.graphics.Color.parseColor(scenario.color))
+                    } catch (e: Exception) {
+                        Accent
+                    }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        scenario.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        "Toca ▶ para aplicar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    scenario.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    "Toca ▶ para aplicar",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (isRunning) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            } else {
-                IconButton(onClick = onRun) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Ejecutar",
-                        tint = MaterialTheme.colorScheme.primary)
+                if (isRunning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Accent
+                    )
+                } else {
+                    IconButton(onClick = onRun) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Ejecutar",
+                            tint = Accent
+                        )
+                    }
                 }
-            }
-            if (onPin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                IconButton(onClick = onPin) {
-                    Icon(Icons.Default.AddToHomeScreen, contentDescription = "Añadir al inicio",
-                        tint = MaterialTheme.colorScheme.secondary)
+                if (onPin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    IconButton(onClick = onPin) {
+                        Icon(
+                            Icons.Default.AddToHomeScreen,
+                            contentDescription = "Añadir al inicio",
+                            tint = Accent
+                        )
+                    }
                 }
-            }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Editar")
-            }
-            IconButton(onClick = { showDeleteDialog = true }) {
-                Icon(Icons.Default.Delete, contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.error)
+                IconButton(onClick = onEdit) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Editar",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Eliminar",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }

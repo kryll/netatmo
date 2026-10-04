@@ -1,20 +1,27 @@
 package com.arsys.netatmo.ui.screens.automations
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.data.local.entities.AutomationEntity
 import com.arsys.netatmo.ui.navigation.Screen
+
+private val Accent = Color(0xFF0284C7)
+private val TextPrimary = Color(0xFF1E293B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,16 +33,14 @@ fun AutomationsScreen(
     var showAddMenu by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text("Automatizaciones", fontWeight = FontWeight.Bold)
-                }
-            )
-        },
+        topBar = {},
         floatingActionButton = {
             Box {
-                FloatingActionButton(onClick = { showAddMenu = true }) {
+                FloatingActionButton(
+                    onClick = { showAddMenu = true },
+                    containerColor = Accent,
+                    contentColor = Color.White
+                ) {
                     Icon(Icons.Default.Add, contentDescription = "Agregar")
                 }
                 DropdownMenu(
@@ -62,46 +67,67 @@ fun AutomationsScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(paddingValues)
         ) {
-            if (uiState.automations.isEmpty() && !uiState.isLoading) {
-                item {
-                    EmptyAutomationsCard()
-                }
-            } else {
-                val byType = uiState.automations.groupBy { it.type }
+            // Header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 20.dp)
+            ) {
+                Text(
+                    text = "Automatizaciones",
+                    color = TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            HorizontalDivider(color = Color(0xFFE2E8F0))
 
-                byType.forEach { (type, automations) ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (uiState.automations.isEmpty() && !uiState.isLoading) {
                     item {
-                        Text(
-                            text = when (type) {
-                                "GEOFENCE" -> "Geovalla"
-                                "CALENDAR" -> "Calendario"
-                                "SCHEDULE" -> "Horario"
-                                else -> type
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
+                        EmptyAutomationsCard()
                     }
-                    items(automations, key = { it.id }) { automation ->
-                        AutomationCard(
-                            automation = automation,
-                            onToggle = { viewModel.toggleAutomation(automation.id, it) },
-                            onEdit = {
-                                when (automation.type) {
-                                    "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
-                                    "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
-                                }
-                            },
-                            onDelete = { viewModel.deleteAutomation(automation) }
-                        )
+                } else {
+                    val byType = uiState.automations.groupBy { it.type }
+
+                    byType.forEach { (type, automations) ->
+                        item {
+                            Text(
+                                text = when (type) {
+                                    "GEOFENCE" -> "Geovalla"
+                                    "CALENDAR" -> "Calendario"
+                                    "SCHEDULE" -> "Horario"
+                                    else -> type
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
+                        items(automations, key = { it.id }) { automation ->
+                            AutomationCard(
+                                automation = automation,
+                                onToggle = { viewModel.toggleAutomation(automation.id, it) },
+                                onEdit = {
+                                    when (automation.type) {
+                                        "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
+                                        "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
+                                    }
+                                },
+                                onDelete = { viewModel.deleteAutomation(automation) }
+                            )
+                        }
                     }
                 }
             }
@@ -136,6 +162,8 @@ fun AutomationCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick = onEdit
     ) {
         Row(
@@ -151,10 +179,7 @@ fun AutomationCard(
                 },
                 contentDescription = null,
                 modifier = Modifier.size(40.dp),
-                tint = if (automation.enabled)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (automation.enabled) Accent else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -178,7 +203,11 @@ fun AutomationCard(
             }
             Switch(
                 checked = automation.enabled,
-                onCheckedChange = onToggle
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Accent
+                )
             )
             IconButton(onClick = { showDeleteDialog = true }) {
                 Icon(
@@ -195,25 +224,31 @@ fun AutomationCard(
 fun EmptyAutomationsCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(
-            modifier = Modifier.padding(32.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(32.dp)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
                 Icons.Default.AutoMode,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = Accent
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Sin automatizaciones",
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
             )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Pulsa + para crear una automatización por ubicación o calendario",
                 style = MaterialTheme.typography.bodyMedium,
