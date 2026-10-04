@@ -212,7 +212,7 @@ fun AdvancedAutomationScreen(
     if (showTriggerSheet) {
         TriggerEditorBottomSheet(
             onDismiss = { showTriggerSheet = false },
-            onAdd = { trigger ->
+            onAdd = { trigger: AutomationTrigger ->
                 viewModel.addTrigger(trigger.toMap())
                 showTriggerSheet = false
             }
@@ -222,7 +222,7 @@ fun AdvancedAutomationScreen(
     if (showConditionSheet) {
         ConditionEditorBottomSheet(
             onDismiss = { showConditionSheet = false },
-            onAdd = { condition ->
+            onAdd = { condition: AutomationCondition ->
                 viewModel.addCondition(condition.toMap())
                 showConditionSheet = false
             }
@@ -232,7 +232,7 @@ fun AdvancedAutomationScreen(
     if (showActionSheet) {
         ActionEditorBottomSheet(
             onDismiss = { showActionSheet = false },
-            onAdd = { action ->
+            onAdd = { action: AutomationAction ->
                 viewModel.addAction(action.toMap())
                 showActionSheet = false
             }
