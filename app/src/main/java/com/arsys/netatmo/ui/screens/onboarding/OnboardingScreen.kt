@@ -52,7 +52,6 @@ fun OnboardingScreen(
             }
         }
 
-        // Page dots — overlaid at bottom center above the button
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -70,7 +69,6 @@ fun OnboardingScreen(
             }
         }
 
-        // Bottom row: Skip + Continue/Start
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -126,7 +124,6 @@ private fun SlideWelcome() {
 
             Spacer(Modifier.height(8.dp))
 
-            // Abstract thermometer canvas illustration
             Canvas(modifier = Modifier.size(80.dp, 40.dp)) {
                 val tubeWidth = size.width * 0.18f
                 val tubeHeight = size.height * 0.6f
@@ -136,7 +133,6 @@ private fun SlideWelcome() {
                 val bulbCx = size.width / 2f
                 val bulbCy = tubeTop + tubeHeight + bulbRadius * 0.6f
 
-                // Tube
                 drawRoundRect(
                     color = Color.White.copy(alpha = 0.35f),
                     topLeft = Offset(tubeLeft, tubeTop),
@@ -144,7 +140,6 @@ private fun SlideWelcome() {
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(tubeWidth / 2f)
                 )
 
-                // Bulb
                 drawCircle(
                     color = Color.White.copy(alpha = 0.5f),
                     radius = bulbRadius,
@@ -212,13 +207,11 @@ private fun SlideControl() {
             Spacer(Modifier.height(40.dp))
 
             Canvas(modifier = Modifier.size(260.dp)) {
-                val diameter = size.width
                 val strokeWidth = 24f
                 val arcInset = strokeWidth / 2f
                 val arcTopLeft = Offset(arcInset, arcInset)
-                val arcSize = Size(diameter - strokeWidth, diameter - strokeWidth)
+                val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
 
-                // Background full circle stroke
                 drawArc(
                     color = Color.White.copy(alpha = 0.2f),
                     startAngle = 0f,
@@ -229,7 +222,6 @@ private fun SlideControl() {
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
-                // 60% filled arc (216 degrees of 360)
                 drawArc(
                     color = Color(0xFFBAE6FD),
                     startAngle = -90f,
@@ -240,18 +232,14 @@ private fun SlideControl() {
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
-                // Center temperature text
                 drawIntoCanvas { canvas ->
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-
                     val tempPaint = android.graphics.Paint().apply {
                         color = android.graphics.Color.WHITE
                         textSize = 96f
                         textAlign = android.graphics.Paint.Align.CENTER
                         isFakeBoldText = true
                     }
-                    canvas.nativeCanvas.drawText("21°", cx, cy + 34f, tempPaint)
+                    canvas.nativeCanvas.drawText("21°", size.width / 2f, size.height / 2f + 34f, tempPaint)
                 }
             }
         }
@@ -398,7 +386,6 @@ internal fun SlideStats() {
                 val maxBarHeightPx = baselineY - 4.dp.toPx()
                 val cornerRadiusPx = 6.dp.toPx()
 
-                // Horizontal baseline
                 drawLine(
                     color = Color.White.copy(alpha = 0.3f),
                     start = Offset(startX, baselineY),
@@ -406,7 +393,6 @@ internal fun SlideStats() {
                     strokeWidth = 1.dp.toPx()
                 )
 
-                // Bars
                 barFractions.forEachIndexed { index, fraction ->
                     val barHeight = maxBarHeightPx * fraction
                     val left = startX + index * (barWidthPx + spacingPx)
