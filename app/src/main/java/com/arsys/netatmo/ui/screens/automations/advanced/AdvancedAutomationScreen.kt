@@ -109,11 +109,11 @@ data class AutomationAction(
     val scenarioId: String = ""
 )
 
-private fun AutomationTrigger.toMap(): Map<String, Any> = buildMap {
-    put("type", type); put("hour", hour); put("minute", minute)
-    put("days", days); put("entity", entity); put("below", below)
-    put("value", value); put("event", event); put("offset", offset); put("action", action)
-}
+private fun AutomationTrigger.toMap(): Map<String, Any> = mapOf(
+    "type" to type, "hour" to hour, "minute" to minute,
+    "days" to days, "entity" to entity, "below" to below,
+    "value" to value, "event" to event, "offset" to offset, "action" to action
+)
 
 private fun Map<String, Any>.toAutoTrigger() = AutomationTrigger(
     type = this["type"] as? String ?: "",
@@ -128,10 +128,10 @@ private fun Map<String, Any>.toAutoTrigger() = AutomationTrigger(
     action = this["action"] as? String ?: "enter"
 )
 
-private fun AutomationCondition.toMap(): Map<String, Any> = buildMap {
-    put("type", type); put("from", from); put("to", to)
-    put("entity", entity); put("below", below); put("value", value)
-}
+private fun AutomationCondition.toMap(): Map<String, Any> = mapOf(
+    "type" to type, "from" to from, "to" to to,
+    "entity" to entity, "below" to below, "value" to value
+)
 
 private fun Map<String, Any>.toAutoCondition() = AutomationCondition(
     type = this["type"] as? String ?: "",
@@ -142,10 +142,10 @@ private fun Map<String, Any>.toAutoCondition() = AutomationCondition(
     value = (this["value"] as? Number)?.toDouble() ?: 0.0
 )
 
-private fun AutomationAction.toMap(): Map<String, Any> = buildMap {
-    put("type", type); put("temperature", temperature); put("mode", mode)
-    put("title", title); put("minutes", minutes); put("scenarioId", scenarioId)
-}
+private fun AutomationAction.toMap(): Map<String, Any> = mapOf(
+    "type" to type, "temperature" to temperature, "mode" to mode,
+    "title" to title, "minutes" to minutes, "scenarioId" to scenarioId
+)
 
 private fun Map<String, Any>.toAutoAction() = AutomationAction(
     type = this["type"] as? String ?: "",
