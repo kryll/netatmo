@@ -260,35 +260,168 @@ private fun SlideControl() {
 
 @Composable
 internal fun SlideAutomate() {
-    // Implemented by subagent — slide 3
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(Color(0xFF818CF8), Color(0xFF4338CA))
+                    colors = listOf(Color(0xFF7C3AED), Color(0xFF4C1D95))
                 )
-            ),
-        contentAlignment = Alignment.Center
+            )
     ) {
-        CircularProgressIndicator(color = Color.White)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Automatiza tu rutina",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = "Geovallas, horarios y escenarios que se adaptan a ti",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(36.dp))
+
+            val automateCards = listOf(
+                Pair(Icons.Default.LocationOn, "Geovallas"),
+                Pair(Icons.Default.Schedule, "Horarios"),
+                Pair(Icons.Default.AutoAwesome, "Escenarios"),
+                Pair(Icons.Default.Bolt, "Acciones")
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                automateCards.chunked(2).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        row.forEach { (icon, label) ->
+                            Card(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color.White.copy(alpha = 0.15f)
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 20.dp, horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = label,
+                                        fontSize = 14.sp,
+                                        color = Color.White,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
 internal fun SlideStats() {
-    // Implemented by subagent — slide 4
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(Color(0xFF34D399), Color(0xFF059669))
+                    colors = listOf(Color(0xFF059669), Color(0xFF064E3B))
                 )
-            ),
-        contentAlignment = Alignment.Center
+            )
     ) {
-        CircularProgressIndicator(color = Color.White)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Ahorra energía",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = "Visualiza el consumo y encuentra formas de reducir tu factura",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(48.dp))
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+            ) {
+                val barFractions = listOf(0.55f, 0.72f, 0.60f, 0.88f, 0.70f)
+                val highlightIndex = 2
+                val barWidthPx = 32.dp.toPx()
+                val spacingPx = 12.dp.toPx()
+                val totalWidth = barFractions.size * barWidthPx + (barFractions.size - 1) * spacingPx
+                val startX = (size.width - totalWidth) / 2f
+                val baselineY = size.height - 4.dp.toPx()
+                val maxBarHeightPx = baselineY - 4.dp.toPx()
+                val cornerRadiusPx = 6.dp.toPx()
+
+                // Horizontal baseline
+                drawLine(
+                    color = Color.White.copy(alpha = 0.3f),
+                    start = Offset(startX, baselineY),
+                    end = Offset(startX + totalWidth, baselineY),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                // Bars
+                barFractions.forEachIndexed { index, fraction ->
+                    val barHeight = maxBarHeightPx * fraction
+                    val left = startX + index * (barWidthPx + spacingPx)
+                    val top = baselineY - barHeight
+                    val isHighlighted = index == highlightIndex
+
+                    drawRoundRect(
+                        color = if (isHighlighted) Color.White else Color.White.copy(alpha = 0.4f),
+                        topLeft = Offset(left, top),
+                        size = Size(barWidthPx, barHeight),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadiusPx)
+                    )
+                }
+            }
+        }
     }
 }
 
