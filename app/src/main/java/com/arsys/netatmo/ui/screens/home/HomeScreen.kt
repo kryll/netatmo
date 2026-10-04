@@ -289,7 +289,7 @@ fun HomeScreen(
                             tint = MaterialTheme.colorScheme.tertiary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(uiState.successMessage)
+                        Text(uiState.successMessage ?: "")
                     }
                 }
             }
