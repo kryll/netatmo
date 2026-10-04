@@ -2,11 +2,14 @@ package com.arsys.netatmo.ui.screens.statistics
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -14,21 +17,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
 import com.arsys.netatmo.ui.theme.WarmColor
+import java.util.Calendar
 
 private val Accent = Color(0xFF0284C7)
 private val TextPrimary = Color(0xFF1E293B)
+private val TextSecondary = Color(0xFF64748B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,11 +44,26 @@ fun StatisticsScreen(
     viewModel: StatisticsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val periods = listOf("24h" to 1, "7 días" to 7, "30 días" to 30)
+    val periods = listOf("24h" to 1, "7 días" to 7, "30 días" to 30, "3 meses" to 90, "6 meses" to 180, "12 meses" to 365)
     var selectedPeriod by remember { mutableStateOf(7) }
+
+    // Price config dialog state
+    var showPriceDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedPeriod, uiState.selectedRoomId) {
         viewModel.loadStatistics(selectedPeriod)
+    }
+
+    if (showPriceDialog) {
+        PriceConfigDialog(
+            currentPrice = uiState.kwhPrice,
+            currentKw = uiState.contractedKw,
+            onConfirm = { price, kw ->
+                viewModel.setPriceConfig(price, kw)
+                showPriceDialog = false
+            },
+            onDismiss = { showPriceDialog = false }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -56,8 +79,19 @@ fun StatisticsScreen(
                 text = "Estadísticas",
                 color = TextPrimary,
                 fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterStart)
             )
+            IconButton(
+                onClick = { viewModel.toggleEditMode() },
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                Icon(
+                    imageVector = if (uiState.isEditMode) Icons.Default.Check else Icons.Default.Edit,
+                    contentDescription = if (uiState.isEditMode) "Terminar edición" else "Editar",
+                    tint = if (uiState.isEditMode) Accent else TextSecondary
+                )
+            }
         }
         HorizontalDivider(color = Color(0xFFE2E8F0))
 
@@ -104,118 +138,114 @@ fun StatisticsScreen(
                 }
             }
 
-            // 24h Temperature History Card
-            item {
-                TemperatureHistory24hCard(
-                    points = uiState.historyPoints,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            // Heating Report Card
-            item {
-                HeatingReportCard(
-                    heatingHoursToday = uiState.totalHeatingHoursToday,
-                    energyToday = uiState.energyKwhToday,
-                    costToday = uiState.estimatedCostToday,
-                    kwhPrice = uiState.kwhPrice,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            // Summary cards (aggregate period)
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // Cards in order
+            items(uiState.cardOrder) { cardKey ->
+                DraggableCardWrapper(
+                    cardKey = cardKey,
+                    cardOrder = uiState.cardOrder,
+                    isEditMode = uiState.isEditMode,
+                    onMove = { from, to -> viewModel.moveCard(from, to) }
                 ) {
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        title = "Temp. media",
-                        value = uiState.avgTemp?.let { "%.1f°C".format(it) } ?: "--",
-                        icon = Icons.Default.Thermostat,
-                        color = Accent
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        title = "Temp. máx.",
-                        value = uiState.maxTemp?.let { "%.1f°C".format(it) } ?: "--",
-                        icon = Icons.Default.ThermostatAuto,
-                        color = WarmColor
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        title = "Temp. mín.",
-                        value = uiState.minTemp?.let { "%.1f°C".format(it) } ?: "--",
-                        icon = Icons.Default.AcUnit,
-                        color = Color(0xFF42A5F5)
-                    )
-                }
-            }
-
-            // Heating hours (aggregate)
-            item {
-                StatCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    title = "Horas de calefacción",
-                    value = "${uiState.heatingHours ?: 0}h",
-                    icon = Icons.Default.Whatshot,
-                    color = WarmColor
-                )
-            }
-
-            // Multi-day temperature chart
-            if (uiState.temperatureData.isNotEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                "Temperatura",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
+                    when (cardKey) {
+                        "24h" -> TemperatureHistory24hCard(
+                            points = uiState.historyPoints,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        "heating" -> HeatingReportCard(
+                            heatingHoursToday = uiState.totalHeatingHoursToday,
+                            energyToday = uiState.energyKwhToday,
+                            costToday = uiState.estimatedCostToday,
+                            kwhPrice = uiState.kwhPrice,
+                            contractedKw = uiState.contractedKw,
+                            onEditPrice = { showPriceDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        "summary" -> Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            StatCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Temp. media",
+                                value = uiState.avgTemp?.let { "%.1f°C".format(it) } ?: "--",
+                                icon = Icons.Default.Thermostat,
+                                color = Accent
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            TemperatureChart(
-                                data = uiState.temperatureData,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
+                            StatCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Temp. máx.",
+                                value = uiState.maxTemp?.let { "%.1f°C".format(it) } ?: "--",
+                                icon = Icons.Default.ThermostatAuto,
+                                color = WarmColor
                             )
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                modifier = Modifier.padding(top = 8.dp)
+                            StatCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Temp. mín.",
+                                value = uiState.minTemp?.let { "%.1f°C".format(it) } ?: "--",
+                                icon = Icons.Default.AcUnit,
+                                color = Color(0xFF42A5F5)
+                            )
+                        }
+                        "monthly" -> MonthlyHeatingCard(
+                            monthlyHeatingHours = uiState.monthlyHeatingHours,
+                            monthlyEnergyKwh = uiState.monthlyEnergyKwh,
+                            monthlyCost = uiState.monthlyCost,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        "comparison" -> if (uiState.monthlyComparison.isNotEmpty()) {
+                            MonthlyComparisonCard(
+                                data = uiState.monthlyComparison,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        "tempChart" -> if (uiState.temperatureData.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
-                                LegendItem(color = Accent, label = "Temperatura")
-                                LegendItem(color = WarmColor, label = "Objetivo")
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        "Temperatura",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    TemperatureChart(
+                                        data = uiState.temperatureData,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(200.dp)
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    ) {
+                                        LegendItem(color = Accent, label = "Temperatura")
+                                        LegendItem(color = WarmColor, label = "Objetivo")
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            }
-
-            // Heating activity chart (multi-day)
-            if (uiState.temperatureData.isNotEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                "Actividad de calefacción",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            HeatingChart(
-                                data = uiState.temperatureData,
-                                modifier = Modifier.fillMaxWidth().height(80.dp)
-                            )
+                        "heatingChart" -> if (uiState.temperatureData.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        "Actividad de calefacción",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HeatingChart(
+                                        data = uiState.temperatureData,
+                                        modifier = Modifier.fillMaxWidth().height(80.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -228,6 +258,222 @@ fun StatisticsScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun DraggableCardWrapper(
+    cardKey: String,
+    cardOrder: List<String>,
+    isEditMode: Boolean,
+    onMove: (Int, Int) -> Unit,
+    content: @Composable () -> Unit
+) {
+    val currentIndex = cardOrder.indexOf(cardKey)
+    var dragOffsetY by remember { mutableStateOf(0f) }
+
+    val modifier = if (isEditMode) {
+        Modifier
+            .fillMaxWidth()
+            .border(1.dp, Accent.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .pointerInput(cardKey, cardOrder) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { dragOffsetY = 0f },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragOffsetY += dragAmount.y
+                        // Approximate card height ~120dp = ~320px
+                        val cardHeightPx = 320f
+                        val steps = (dragOffsetY / cardHeightPx).toInt()
+                        if (steps != 0) {
+                            val targetIndex = (currentIndex + steps).coerceIn(0, cardOrder.size - 1)
+                            if (targetIndex != currentIndex) {
+                                onMove(currentIndex, targetIndex)
+                                dragOffsetY = 0f
+                            }
+                        }
+                    },
+                    onDragEnd = { dragOffsetY = 0f },
+                    onDragCancel = { dragOffsetY = 0f }
+                )
+            }
+    } else {
+        Modifier.fillMaxWidth()
+    }
+
+    if (isEditMode) {
+        Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.DragHandle,
+                contentDescription = "Arrastrar",
+                tint = TextSecondary,
+                modifier = Modifier.padding(start = 4.dp, end = 8.dp)
+            )
+            Box(modifier = Modifier.weight(1f)) { content() }
+        }
+    } else {
+        Box(modifier = modifier) { content() }
+    }
+}
+
+@Composable
+fun PriceConfigDialog(
+    currentPrice: Float,
+    currentKw: Float,
+    onConfirm: (Float, Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var priceText by remember { mutableStateOf(currentPrice.toString()) }
+    var kwText by remember { mutableStateOf(currentKw.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Configuración de precio") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it },
+                    label = { Text("Precio kWh (€)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = kwText,
+                    onValueChange = { kwText = it },
+                    label = { Text("Potencia contratada (kW)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val price = priceText.replace(",", ".").toFloatOrNull() ?: currentPrice
+                val kw = kwText.replace(",", ".").toFloatOrNull() ?: currentKw
+                onConfirm(price, kw)
+            }) { Text("Guardar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
+}
+
+@Composable
+fun MonthlyHeatingCard(
+    monthlyHeatingHours: Float,
+    monthlyEnergyKwh: Float,
+    monthlyCost: Float,
+    modifier: Modifier = Modifier
+) {
+    val cal = Calendar.getInstance()
+    val monthNames = arrayOf("Enero","Febrero","Marzo","Abril","Mayo","Junio",
+        "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre")
+    val monthName = monthNames[cal.get(Calendar.MONTH)]
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Accent, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Resumen mensual — $monthName",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                HeatingStatBox(
+                    value = "%.1fh".format(monthlyHeatingHours),
+                    label = "Horas calef."
+                )
+                HeatingStatBox(
+                    value = "%.1f kWh".format(monthlyEnergyKwh),
+                    label = "Energía"
+                )
+                HeatingStatBox(
+                    value = "%.2f€".format(monthlyCost),
+                    label = "Coste est."
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MonthlyComparisonCard(
+    data: List<MonthlyHeatingData>,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Comparativa mensual",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+            ) {
+                if (data.isEmpty()) return@Canvas
+                val maxHours = data.maxOf { it.heatingHours }.coerceAtLeast(0.1f)
+                val bottomPad = 36f
+                val chartBottom = size.height - bottomPad
+                val chartHeight = chartBottom
+                val barWidth = size.width / data.size
+                val barPad = barWidth * 0.15f
+
+                val barColor = android.graphics.Color.argb(220, 2, 132, 199)
+                val labelPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.argb(200, 100, 116, 139)
+                    textSize = 26f
+                    isAntiAlias = true
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+
+                data.forEachIndexed { i, item ->
+                    val barH = (item.heatingHours / maxHours) * chartHeight
+                    val left = i * barWidth + barPad
+                    val right = (i + 1) * barWidth - barPad
+                    val top = chartBottom - barH
+
+                    drawRect(
+                        color = Accent,
+                        topLeft = Offset(left, top),
+                        size = Size(right - left, barH)
+                    )
+
+                    drawContext.canvas.nativeCanvas.drawText(
+                        item.label,
+                        left + (right - left) / 2f,
+                        size.height - 6f,
+                        labelPaint
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Horas de calefacción por mes",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary
+            )
         }
     }
 }
@@ -263,9 +509,8 @@ fun TemperatureHistory24hCard(
                     .fillMaxWidth()
                     .height(180.dp)
             ) {
-                // Layout constants (in px)
-                val leftPad = 40f   // space for Y-axis labels
-                val bottomPad = 26f // space for X-axis labels
+                val leftPad = 40f
+                val bottomPad = 26f
                 val chartLeft = leftPad
                 val chartRight = size.width
                 val chartTop = 0f
@@ -273,7 +518,6 @@ fun TemperatureHistory24hCard(
                 val chartWidth = chartRight - chartLeft
                 val chartHeight = chartBottom - chartTop
 
-                // Temperature scale: 14°C … 30°C  (range = 16)
                 val tempMin = 14f
                 val tempRange = 16f
 
@@ -285,10 +529,6 @@ fun TemperatureHistory24hCard(
                 fun yOf(temp: Float): Float =
                     chartBottom - (temp - tempMin) / tempRange * chartHeight
 
-                // --- Grid lines ---
-                val gridPaint = android.graphics.Paint().apply {
-                    isAntiAlias = true
-                }
                 listOf(16f, 18f, 20f, 22f, 24f).forEach { gridTemp ->
                     val y = yOf(gridTemp)
                     drawLine(
@@ -299,7 +539,6 @@ fun TemperatureHistory24hCard(
                     )
                 }
 
-                // --- Y-axis labels ---
                 val yLabelPaint = android.graphics.Paint().apply {
                     color = android.graphics.Color.argb(180, 100, 116, 139)
                     textSize = 26f
@@ -315,13 +554,11 @@ fun TemperatureHistory24hCard(
                     )
                 }
 
-                // --- Data lines and circles ---
                 if (points.size >= 2) {
                     val startTs = points.first().timestamp
                     val endTs = points.last().timestamp
                     val durationMs = (endTs - startTs).coerceAtLeast(1L)
 
-                    // Temperature line
                     val tempPath = Path()
                     points.forEachIndexed { index, point ->
                         val x = xOf(point.timestamp, startTs, durationMs)
@@ -330,7 +567,6 @@ fun TemperatureHistory24hCard(
                     }
                     drawPath(tempPath, tempColor, style = Stroke(width = 3f))
 
-                    // Setpoint dashed line
                     val setpointPath = Path()
                     var setpointStarted = false
                     points.forEach { point ->
@@ -356,7 +592,6 @@ fun TemperatureHistory24hCard(
                         )
                     }
 
-                    // Data point circles – subsample for readability
                     val step = maxOf(1, points.size / 30)
                     points.forEachIndexed { index, point ->
                         if (index % step == 0) {
@@ -368,7 +603,6 @@ fun TemperatureHistory24hCard(
                     }
                 }
 
-                // --- X-axis labels ---
                 val xLabelPaint = android.graphics.Paint().apply {
                     color = android.graphics.Color.argb(180, 100, 116, 139)
                     textSize = 26f
@@ -402,12 +636,15 @@ fun TemperatureHistory24hCard(
 // Heating Report Card
 // ---------------------------------------------------------------------------
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HeatingReportCard(
     heatingHoursToday: Float,
     energyToday: Float,
     costToday: Float,
     kwhPrice: Float,
+    contractedKw: Float,
+    onEditPrice: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -440,11 +677,32 @@ fun HeatingReportCard(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Estimación: 1.5 kW · %.2f €/kWh".format(kwhPrice),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Clickable row to open price config
+            Surface(
+                onClick = onEditPrice,
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "%.1f kW · %.2f €/kWh".format(contractedKw, kwhPrice),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Editar precio",
+                        tint = Accent,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -526,7 +784,6 @@ fun TemperatureChart(
 
         fun yOf(temp: Double) = size.height - ((temp.toFloat() - minTemp) / tempRange) * size.height
 
-        // Temperature line
         val path = Path()
         data.forEachIndexed { index, point ->
             val x = xOf(point.timestamp)
@@ -535,7 +792,6 @@ fun TemperatureChart(
         }
         drawPath(path, primaryColor, style = Stroke(width = 3f))
 
-        // Setpoint line
         val setpointPath = Path()
         var started = false
         data.forEach { point ->
@@ -577,7 +833,7 @@ fun HeatingChart(
                 drawRect(
                     color = heatingColor.copy(alpha = 0.7f),
                     topLeft = Offset(x1, 0f),
-                    size = androidx.compose.ui.geometry.Size(x2 - x1, size.height)
+                    size = Size(x2 - x1, size.height)
                 )
             }
         }

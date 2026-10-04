@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.statistics
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arsys.netatmo.data.local.dao.HomeCacheDao
@@ -11,10 +12,14 @@ import com.arsys.netatmo.domain.model.TemperatureDataPoint
 import com.arsys.netatmo.domain.usecase.GetTemperatureHistoryUseCase
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
+
+data class MonthlyHeatingData(val label: String, val heatingHours: Float)
 
 data class StatisticsUiState(
     val temperatureData: List<TemperatureDataPoint> = emptyList(),
@@ -33,7 +38,17 @@ data class StatisticsUiState(
     val totalHeatingHoursWeek: Float = 0f,
     val energyKwhToday: Float = 0f,
     val estimatedCostToday: Float = 0f,
-    val kwhPrice: Float = 0.15f
+    val kwhPrice: Float = 0.15f,
+    val contractedKw: Float = 1.5f,
+    // Edit mode
+    val isEditMode: Boolean = false,
+    val cardOrder: List<String> = listOf("24h", "heating", "summary", "monthly", "comparison", "tempChart", "heatingChart"),
+    // Monthly comparison
+    val monthlyComparison: List<MonthlyHeatingData> = emptyList(),
+    // Monthly summary
+    val monthlyHeatingHours: Float = 0f,
+    val monthlyEnergyKwh: Float = 0f,
+    val monthlyCost: Float = 0f
 )
 
 @HiltViewModel
@@ -42,7 +57,8 @@ class StatisticsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val homeCacheDao: HomeCacheDao,
     private val thermostatRepository: ThermostatRepository,
-    private val temperatureHistoryDao: TemperatureHistoryDao
+    private val temperatureHistoryDao: TemperatureHistoryDao,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val gson = Gson()
@@ -52,6 +68,12 @@ class StatisticsViewModel @Inject constructor(
     private var historyJob: Job? = null
 
     init {
+        // Load persisted price config
+        val prefs = context.getSharedPreferences("statistics_prefs", Context.MODE_PRIVATE)
+        val kwhPrice = prefs.getFloat("kwh_price", 0.15f)
+        val contractedKw = prefs.getFloat("contracted_kw", 1.5f)
+        _uiState.update { it.copy(kwhPrice = kwhPrice, contractedKw = contractedKw) }
+
         // React to room selection changes and reload 24h history automatically
         viewModelScope.launch {
             val homeId = authRepository.selectedHomeId.first() ?: return@launch
@@ -61,6 +83,7 @@ class StatisticsViewModel @Inject constructor(
                 .filter { it.isNotEmpty() }
                 .collect { roomId ->
                     loadHistory24h(homeId, roomId)
+                    loadMonthlySummary(homeId, roomId)
                 }
         }
 
@@ -98,6 +121,30 @@ class StatisticsViewModel @Inject constructor(
         _uiState.update { it.copy(selectedRoomId = roomId) }
     }
 
+    fun toggleEditMode() {
+        _uiState.update { it.copy(isEditMode = !it.isEditMode) }
+    }
+
+    fun moveCard(from: Int, to: Int) {
+        val order = _uiState.value.cardOrder.toMutableList()
+        if (from < 0 || to < 0 || from >= order.size || to >= order.size) return
+        val item = order.removeAt(from)
+        order.add(to, item)
+        _uiState.update { it.copy(cardOrder = order) }
+    }
+
+    fun setPriceConfig(kwhPrice: Float, contractedKw: Float) {
+        val prefs = context.getSharedPreferences("statistics_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putFloat("kwh_price", kwhPrice)
+            .putFloat("contracted_kw", contractedKw)
+            .apply()
+        _uiState.update { it.copy(kwhPrice = kwhPrice, contractedKw = contractedKw) }
+        // Recalculate costs
+        val energy = _uiState.value.totalHeatingHoursToday * contractedKw
+        _uiState.update { it.copy(energyKwhToday = energy, estimatedCostToday = energy * kwhPrice) }
+    }
+
     /** Subscribe to the last-24h TemperatureHistory for [homeId]/[roomId]. */
     private fun loadHistory24h(homeId: String, roomId: String) {
         historyJob?.cancel()
@@ -108,7 +155,8 @@ class StatisticsViewModel @Inject constructor(
                 .collect { entities ->
                     val sorted = entities.sortedBy { it.timestamp }
                     val heatingHoursToday = calculateHeatingHours(sorted)
-                    val energyToday = heatingHoursToday * 1.5f   // 1.5 kW boiler
+                    val kw = _uiState.value.contractedKw
+                    val energyToday = heatingHoursToday * kw
                     val price = _uiState.value.kwhPrice
                     _uiState.update { state ->
                         state.copy(
@@ -118,6 +166,33 @@ class StatisticsViewModel @Inject constructor(
                             estimatedCostToday = energyToday * price
                         )
                     }
+                }
+        }
+    }
+
+    private fun loadMonthlySummary(homeId: String, roomId: String) {
+        viewModelScope.launch {
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val monthStart = cal.timeInMillis
+
+            temperatureHistoryDao.getHistory(homeId, roomId, monthStart)
+                .catch { }
+                .collect { entities ->
+                    val sorted = entities.sortedBy { it.timestamp }
+                    val hours = calculateHeatingHours(sorted)
+                    val kw = _uiState.value.contractedKw
+                    val price = _uiState.value.kwhPrice
+                    val energy = hours * kw
+                    _uiState.update { it.copy(
+                        monthlyHeatingHours = hours,
+                        monthlyEnergyKwh = energy,
+                        monthlyCost = energy * price
+                    ) }
                 }
         }
     }
@@ -147,6 +222,11 @@ class StatisticsViewModel @Inject constructor(
             }
             val roomId = _uiState.value.selectedRoomId
 
+            // For monthly comparison periods, load historical data
+            if (days >= 90) {
+                loadMonthlyComparison(homeId, roomId, days)
+            }
+
             getTemperatureHistory(homeId, roomId, days)
                 .catch { e -> _uiState.update { it.copy(isLoading = false, error = e.message) } }
                 .collect { data ->
@@ -171,6 +251,35 @@ class StatisticsViewModel @Inject constructor(
                             isLoading = false
                         )
                     }
+                }
+        }
+    }
+
+    private fun loadMonthlyComparison(homeId: String, roomId: String, days: Int) {
+        viewModelScope.launch {
+            val from = System.currentTimeMillis() - days.toLong() * 24 * 60 * 60 * 1000
+            temperatureHistoryDao.getHistory(homeId, roomId, from)
+                .catch { }
+                .first()
+                .let { entities ->
+                    val sorted = entities.sortedBy { it.timestamp }
+                    val monthMap = mutableMapOf<String, MutableList<TemperatureHistoryEntity>>()
+                    val monthLabels = mutableMapOf<String, String>()
+                    val monthAbbr = arrayOf("Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic")
+                    sorted.forEach { entity ->
+                        val cal = Calendar.getInstance()
+                        cal.timeInMillis = entity.timestamp
+                        val key = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.MONTH)}"
+                        val label = "${monthAbbr[cal.get(Calendar.MONTH)]} ${cal.get(Calendar.YEAR).toString().takeLast(2)}"
+                        monthMap.getOrPut(key) { mutableListOf() }.add(entity)
+                        monthLabels[key] = label
+                    }
+                    val comparison = monthMap.keys.sorted().map { key ->
+                        val pts = monthMap[key] ?: emptyList()
+                        val hours = calculateHeatingHours(pts)
+                        MonthlyHeatingData(label = monthLabels[key] ?: key, heatingHours = hours)
+                    }
+                    _uiState.update { it.copy(monthlyComparison = comparison) }
                 }
         }
     }
