@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.arsys.netatmo.service.AdvancedAutomationWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -23,6 +24,7 @@ class NetatmoApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        AdvancedAutomationWorker.schedule(this)
     }
 
     private fun createNotificationChannels() {
@@ -71,6 +73,13 @@ class NetatmoApp : Application(), Configuration.Provider {
                     NotificationManager.IMPORTANCE_DEFAULT
                 ).apply { description = "Automatizaciones por temperatura exterior" }
             )
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ADVANCED,
+                    "Automatizaciones avanzadas",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply { description = "Notificaciones de automatizaciones avanzadas" }
+            )
         }
     }
 
@@ -83,5 +92,6 @@ class NetatmoApp : Application(), Configuration.Provider {
         const val CHANNEL_VACATION = "channel_vacation"
         const val CHANNEL_ANOMALY = "channel_anomaly"
         const val CHANNEL_OUTDOOR = "outdoor_temp"
+        const val CHANNEL_ADVANCED = "advanced_automations"
     }
 }

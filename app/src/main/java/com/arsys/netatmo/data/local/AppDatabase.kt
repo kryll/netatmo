@@ -3,9 +3,13 @@ package com.arsys.netatmo.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.arsys.netatmo.data.local.dao.*
+import com.arsys.netatmo.data.local.dao.AdvancedAutomationDao
 import com.arsys.netatmo.data.local.dao.FamilyMemberDao
 import com.arsys.netatmo.data.local.entities.*
+import com.arsys.netatmo.data.local.entities.AdvancedAutomationEntity
 
 @Database(
     entities = [
@@ -17,9 +21,10 @@ import com.arsys.netatmo.data.local.entities.*
         CalendarAutomationEntity::class,
         HomeCacheEntity::class,
         AutomationLogEntity::class,
-        FamilyMemberEntity::class
+        FamilyMemberEntity::class,
+        AdvancedAutomationEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -33,4 +38,27 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun homeCacheDao(): HomeCacheDao
     abstract fun automationLogDao(): AutomationLogDao
     abstract fun familyMemberDao(): FamilyMemberDao
+    abstract fun advancedAutomationDao(): AdvancedAutomationDao
+
+    companion object {
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `advanced_automations` " +
+                    "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`description` TEXT NOT NULL DEFAULT '', " +
+                    "`enabled` INTEGER NOT NULL DEFAULT 1, " +
+                    "`triggersJson` TEXT NOT NULL DEFAULT '[]', " +
+                    "`conditionsJson` TEXT NOT NULL DEFAULT '[]', " +
+                    "`actionsJson` TEXT NOT NULL DEFAULT '[]', " +
+                    "`triggerMode` TEXT NOT NULL DEFAULT 'all', " +
+                    "`mode` TEXT NOT NULL DEFAULT 'single', " +
+                    "`createdAt` INTEGER NOT NULL, " +
+                    "`lastTriggeredAt` INTEGER, " +
+                    "`lastTriggeredResult` TEXT)"
+                )
+            }
+        }
+    }
 }

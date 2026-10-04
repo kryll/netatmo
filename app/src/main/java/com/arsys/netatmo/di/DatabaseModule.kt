@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.arsys.netatmo.data.local.AppDatabase
 import com.arsys.netatmo.data.local.dao.*
+import com.arsys.netatmo.data.local.dao.AdvancedAutomationDao
 import com.arsys.netatmo.data.local.dao.FamilyMemberDao
 import dagger.Module
 import dagger.Provides
@@ -20,7 +21,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "netatmo_db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(AppDatabase.MIGRATION_3_4)
             .build()
 
     @Provides fun provideAutomationDao(db: AppDatabase): AutomationDao = db.automationDao()
@@ -32,4 +33,5 @@ object DatabaseModule {
     @Provides fun provideHomeCacheDao(db: AppDatabase): HomeCacheDao = db.homeCacheDao()
     @Provides fun provideAutomationLogDao(db: AppDatabase): AutomationLogDao = db.automationLogDao()
     @Provides fun provideFamilyMemberDao(db: AppDatabase): FamilyMemberDao = db.familyMemberDao()
+    @Provides fun provideAdvancedAutomationDao(db: AppDatabase): AdvancedAutomationDao = db.advancedAutomationDao()
 }

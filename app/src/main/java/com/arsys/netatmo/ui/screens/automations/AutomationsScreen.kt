@@ -80,6 +80,14 @@ fun AutomationsScreen(
                             navController.navigate("schedule_automation/-1")
                         }
                     )
+                    DropdownMenuItem(
+                        text = { Text("Automatización avanzada") },
+                        leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                        onClick = {
+                            showAddMenu = false
+                            navController.navigate("advanced_automation/-1")
+                        }
+                    )
                 }
             }
         }
@@ -158,6 +166,7 @@ fun AutomationsScreen(
                                             "GEOFENCE" -> "Geovalla"
                                             "CALENDAR" -> "Calendario"
                                             "SCHEDULE" -> "Horario"
+                                            "ADVANCED" -> "Avanzada"
                                             else -> type
                                         },
                                         style = MaterialTheme.typography.labelLarge,
@@ -181,6 +190,7 @@ fun AutomationsScreen(
                                             "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
                                             "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
                                             "SCHEDULE" -> navController.navigate("schedule_automation/${automation.id}")
+                                            "ADVANCED" -> navController.navigate("advanced_automation/${automation.id}")
                                         }
                                     },
                                     onDelete = { viewModel.deleteAutomation(automation) }
@@ -318,6 +328,7 @@ private fun automationTypeColor(type: String): Color = when (type) {
     "GEOFENCE" -> Color(0xFF0284C7)
     "CALENDAR" -> Color(0xFF7C3AED)
     "SCHEDULE" -> Color(0xFF059669)
+    "ADVANCED" -> Color(0xFF7C3AED)
     else -> Color(0xFF64748B)
 }
 
@@ -325,6 +336,7 @@ private fun automationTypeIcon(type: String): ImageVector = when (type) {
     "GEOFENCE" -> Icons.Default.LocationOn
     "CALENDAR" -> Icons.Default.CalendarToday
     "SCHEDULE" -> Icons.Default.Schedule
+    "ADVANCED" -> Icons.Default.AutoAwesome
     else -> Icons.Default.AutoMode
 }
 
@@ -388,6 +400,12 @@ fun AutomationCard(
                 val subtitle = when (automation.type) {
                     "GEOFENCE" -> "Geovalla · ${automation.mode}"
                     "CALENDAR" -> "Calendario · %.1f°C".format(automation.targetTemperature)
+                    "ADVANCED" -> try {
+                        val obj = org.json.JSONObject(automation.triggerData)
+                        val nt = obj.optJSONArray("triggers")?.length() ?: 0
+                        val na = obj.optJSONArray("actions")?.length() ?: 0
+                        "$nt disparador(es), $na acción(es)"
+                    } catch (e: Exception) { "Automatización avanzada" }
                     else -> "%.1f°C · ${automation.mode}".format(automation.targetTemperature)
                 }
                 Text(
