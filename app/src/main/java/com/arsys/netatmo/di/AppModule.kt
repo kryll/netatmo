@@ -1,6 +1,9 @@
 package com.arsys.netatmo.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import com.arsys.netatmo.data.repository.dataStore
 import com.arsys.netatmo.service.GeofenceManager
 import dagger.Module
 import dagger.Provides
@@ -18,4 +21,10 @@ object AppModule {
     fun provideGeofenceManager(
         @ApplicationContext context: Context
     ): GeofenceManager = GeofenceManager(context)
+
+    @Provides
+    @Singleton
+    fun providePreferencesDataStore(
+        @ApplicationContext context: Context
+    ): DataStore<Preferences> = context.dataStore
 }
