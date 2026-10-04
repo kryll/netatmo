@@ -3,6 +3,7 @@ package com.arsys.netatmo.ui.screens.settings
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -46,19 +47,27 @@ fun SettingsScreen(
     val installPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { _ ->
-        // User returned from system settings — retry if permission now granted
+        val canInstall = context.packageManager.canRequestPackageInstalls()
+        Log.d("UpdateDebug", "installPermissionLauncher: regresó de ajustes, canRequestPackageInstalls=$canInstall, pendingRelease=${pendingInstallRelease?.tagName}")
         pendingInstallRelease?.let { release ->
-            if (context.packageManager.canRequestPackageInstalls()) {
+            if (canInstall) {
+                Log.d("UpdateDebug", "installPermissionLauncher: permiso concedido, iniciando descarga")
                 viewModel.downloadAndInstall(release)
                 pendingInstallRelease = null
+            } else {
+                Log.w("UpdateDebug", "installPermissionLauncher: permiso DENEGADO — el usuario no habilitó la instalación de fuentes desconocidas")
             }
         }
     }
 
     fun requestInstall(release: GitHubRelease) {
-        if (context.packageManager.canRequestPackageInstalls()) {
+        val canInstall = context.packageManager.canRequestPackageInstalls()
+        Log.d("UpdateDebug", "requestInstall: release=${release.tagName}, canRequestPackageInstalls=$canInstall")
+        if (canInstall) {
+            Log.d("UpdateDebug", "requestInstall: permiso OK, llamando downloadAndInstall")
             viewModel.downloadAndInstall(release)
         } else {
+            Log.w("UpdateDebug", "requestInstall: SIN permiso — abriendo ACTION_MANAGE_UNKNOWN_APP_SOURCES para package=${context.packageName}")
             pendingInstallRelease = release
             installPermissionLauncher.launch(
                 Intent(
