@@ -43,10 +43,6 @@ class CalendarAutomationViewModel @Inject constructor(
 
     private var editingId: Long = -1L
 
-    init {
-        loadCalendars()
-    }
-
     fun load(automationId: Long) {
         if (automationId == -1L) return
         editingId = automationId
@@ -56,7 +52,7 @@ class CalendarAutomationViewModel @Inject constructor(
         }
     }
 
-    private fun loadCalendars() {
+    fun loadCalendars() {
         viewModelScope.launch {
             val calendars = withContext(Dispatchers.IO) { getDeviceCalendars() }
             _uiState.update { it.copy(calendars = calendars) }
@@ -71,21 +67,25 @@ class CalendarAutomationViewModel @Inject constructor(
             CalendarContract.Calendars.ACCOUNT_NAME,
             CalendarContract.Calendars.CALENDAR_COLOR
         )
-        context.contentResolver.query(
-            CalendarContract.Calendars.CONTENT_URI, projection, null, null, null
-        )?.use { cursor ->
-            while (cursor.moveToNext()) {
-                calendars.add(
-                    CalendarInfo(
-                        id = cursor.getLong(0),
-                        name = cursor.getString(1) ?: "",
-                        accountName = cursor.getString(2) ?: "",
-                        color = cursor.getInt(3)
+        return try {
+            context.contentResolver.query(
+                CalendarContract.Calendars.CONTENT_URI, projection, null, null, null
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    calendars.add(
+                        CalendarInfo(
+                            id = cursor.getLong(0),
+                            name = cursor.getString(1) ?: "",
+                            accountName = cursor.getString(2) ?: "",
+                            color = cursor.getInt(3)
+                        )
                     )
-                )
+                }
             }
+            calendars
+        } catch (e: SecurityException) {
+            emptyList()
         }
-        return calendars
     }
 
     fun updateName(name: String) = _uiState.update { it.copy(name = name) }

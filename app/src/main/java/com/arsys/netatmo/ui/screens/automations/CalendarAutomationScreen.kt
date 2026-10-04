@@ -1,5 +1,9 @@
 package com.arsys.netatmo.ui.screens.automations
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,9 +15,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.ui.components.TemperatureSlider
@@ -29,6 +35,21 @@ fun CalendarAutomationScreen(
     viewModel: CalendarAutomationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    val calendarPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) viewModel.loadCalendars()
+    }
+
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.READ_CALENDAR
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) viewModel.loadCalendars()
+        else calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+    }
 
     LaunchedEffect(automationId) {
         viewModel.load(automationId)
@@ -88,11 +109,25 @@ fun CalendarAutomationScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (uiState.calendars.isEmpty()) {
-                        Text(
-                            "No se encontraron calendarios. Verifica permisos.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Column {
+                            Text(
+                                "No se encontraron calendarios.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Asegúrate de conceder el permiso de calendario cuando se solicite.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(onClick = { calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR) }) {
+                                Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Conceder permiso")
+                            }
+                        }
                     } else {
                         uiState.calendars.forEach { calendar ->
                             Row(
