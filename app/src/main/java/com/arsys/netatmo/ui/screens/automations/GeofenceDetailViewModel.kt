@@ -4,10 +4,12 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.arsys.netatmo.data.api.models.Room
 import com.arsys.netatmo.data.local.entities.AutomationEntity
 import com.arsys.netatmo.data.local.entities.GeofenceEntity
 import com.arsys.netatmo.data.repository.AutomationRepository
 import com.arsys.netatmo.data.repository.AuthRepository
+import com.arsys.netatmo.data.repository.ThermostatRepository
 import com.arsys.netatmo.service.GeofenceManager
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -34,6 +36,8 @@ data class GeofenceDetailUiState(
     val triggerOnExit: Boolean = true,
     val tempOnEnter: Double = 21.0,
     val tempOnExit: Double = 17.0,
+    val rooms: List<Room> = emptyList(),
+    val selectedRoomId: String = "",
     val isSaving: Boolean = false,
     val isLoadingLocation: Boolean = false,
     val saved: Boolean = false,
@@ -45,6 +49,7 @@ class GeofenceDetailViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val automationRepository: AutomationRepository,
     private val authRepository: AuthRepository,
+    private val thermostatRepository: ThermostatRepository,
     private val geofenceManager: GeofenceManager
 ) : ViewModel() {
 
@@ -55,9 +60,14 @@ class GeofenceDetailViewModel @Inject constructor(
     private var existingGeofenceId: String? = null
 
     fun load(automationId: Long) {
-        if (automationId == -1L) return
-        currentAutomationId = automationId
         viewModelScope.launch {
+            val homeId = authRepository.selectedHomeId.first() ?: ""
+            val rooms = thermostatRepository.getRoomsForHome(homeId)
+            _uiState.update { it.copy(rooms = rooms) }
+
+            if (automationId == -1L) return@launch
+
+            currentAutomationId = automationId
             val automation = automationRepository.getAutomationById(automationId) ?: return@launch
             val geofence = automationRepository.getGeofenceByAutomation(automationId)
             existingGeofenceId = geofence?.id
@@ -71,7 +81,8 @@ class GeofenceDetailViewModel @Inject constructor(
                     triggerOnEnter = geofence?.triggerOnEnter ?: true,
                     triggerOnExit = geofence?.triggerOnExit ?: true,
                     tempOnEnter = geofence?.temperatureOnEnter ?: 21.0,
-                    tempOnExit = geofence?.temperatureOnExit ?: 17.0
+                    tempOnExit = geofence?.temperatureOnExit ?: 17.0,
+                    selectedRoomId = automation.roomId
                 )
             }
         }
@@ -86,6 +97,7 @@ class GeofenceDetailViewModel @Inject constructor(
     fun updateTriggerOnExit(value: Boolean) = _uiState.update { it.copy(triggerOnExit = value) }
     fun updateTempOnEnter(temp: Double) = _uiState.update { it.copy(tempOnEnter = temp) }
     fun updateTempOnExit(temp: Double) = _uiState.update { it.copy(tempOnExit = temp) }
+    fun updateRoomId(id: String) = _uiState.update { it.copy(selectedRoomId = id) }
 
     @SuppressLint("MissingPermission")
     fun useCurrentLocation() {
@@ -130,6 +142,10 @@ class GeofenceDetailViewModel @Inject constructor(
             _uiState.update { it.copy(error = "Coordenadas inválidas") }
             return
         }
+        if (state.selectedRoomId.isBlank()) {
+            _uiState.update { it.copy(error = "Selecciona una habitación") }
+            return
+        }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
@@ -140,7 +156,7 @@ class GeofenceDetailViewModel @Inject constructor(
                     name = state.name,
                     type = "GEOFENCE",
                     homeId = homeId,
-                    roomId = "",
+                    roomId = state.selectedRoomId,
                     targetTemperature = state.tempOnEnter,
                     mode = "manual",
                     triggerData = "{}"

@@ -86,6 +86,12 @@ fun AutomationsScreen(
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
+                IconButton(
+                    onClick = { navController.navigate("automation_log") },
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                ) {
+                    Icon(Icons.Default.History, contentDescription = "Registro", tint = Accent)
+                }
             }
             HorizontalDivider(color = Color(0xFFE2E8F0))
 
@@ -188,8 +194,13 @@ fun AutomationCard(
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium
                 )
+                val subtitle = when (automation.type) {
+                    "GEOFENCE" -> "Geovalla · ${automation.mode}"
+                    "CALENDAR" -> "Calendario · %.1f°C".format(automation.targetTemperature)
+                    else -> "%.1f°C · ${automation.mode}".format(automation.targetTemperature)
+                }
                 Text(
-                    text = "Obj: %.1f°C · ${automation.mode}".format(automation.targetTemperature),
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

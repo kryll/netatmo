@@ -122,6 +122,21 @@ interface CalendarAutomationDao {
 }
 
 @Dao
+interface AutomationLogDao {
+    @Query("SELECT * FROM automation_logs ORDER BY timestamp DESC LIMIT 200")
+    fun getRecentLogs(): Flow<List<AutomationLogEntity>>
+
+    @Query("SELECT * FROM automation_logs WHERE automationId = :automationId ORDER BY timestamp DESC LIMIT 50")
+    fun getLogsForAutomation(automationId: Long): Flow<List<AutomationLogEntity>>
+
+    @Insert
+    suspend fun insert(log: AutomationLogEntity)
+
+    @Query("DELETE FROM automation_logs WHERE timestamp < :before")
+    suspend fun deleteOldLogs(before: Long)
+}
+
+@Dao
 interface HomeCacheDao {
     @Query("SELECT * FROM homes_cache")
     fun getAllHomes(): Flow<List<HomeCacheEntity>>

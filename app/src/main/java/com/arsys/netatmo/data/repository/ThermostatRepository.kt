@@ -174,4 +174,13 @@ class ThermostatRepository @Inject constructor(
         fromTimestamp: Long
     ): Flow<List<TemperatureHistoryEntity>> =
         historyDao.getHistory(homeId, roomId, fromTimestamp)
+
+    suspend fun getRoomsForHome(homeId: String): List<Room> {
+        val cache = homeCacheDao.getHome(homeId) ?: return emptyList()
+        return try {
+            gson.fromJson(cache.roomsJson, Array<Room>::class.java).toList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 }

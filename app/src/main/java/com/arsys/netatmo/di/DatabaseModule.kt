@@ -29,4 +29,5 @@ object DatabaseModule {
     @Provides fun provideTemperatureHistoryDao(db: AppDatabase): TemperatureHistoryDao = db.temperatureHistoryDao()
     @Provides fun provideCalendarAutomationDao(db: AppDatabase): CalendarAutomationDao = db.calendarAutomationDao()
     @Provides fun provideHomeCacheDao(db: AppDatabase): HomeCacheDao = db.homeCacheDao()
+    @Provides fun provideAutomationLogDao(db: AppDatabase): AutomationLogDao = db.automationLogDao()
 }

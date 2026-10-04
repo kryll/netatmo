@@ -14,9 +14,10 @@ import com.arsys.netatmo.data.local.entities.*
         ScenarioEntity::class,
         TemperatureHistoryEntity::class,
         CalendarAutomationEntity::class,
-        HomeCacheEntity::class
+        HomeCacheEntity::class,
+        AutomationLogEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -28,4 +29,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun temperatureHistoryDao(): TemperatureHistoryDao
     abstract fun calendarAutomationDao(): CalendarAutomationDao
     abstract fun homeCacheDao(): HomeCacheDao
+    abstract fun automationLogDao(): AutomationLogDao
 }

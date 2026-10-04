@@ -12,7 +12,8 @@ class AutomationRepository @Inject constructor(
     private val geofenceDao: GeofenceDao,
     private val calendarDao: CalendarAutomationDao,
     private val scenarioDao: ScenarioDao,
-    private val scheduleDao: ScheduleDao
+    private val scheduleDao: ScheduleDao,
+    private val automationLogDao: AutomationLogDao
 ) {
     fun getAllAutomations(): Flow<List<AutomationEntity>> = automationDao.getAllAutomations()
 
@@ -34,6 +35,17 @@ class AutomationRepository @Inject constructor(
 
     suspend fun setAutomationEnabled(id: Long, enabled: Boolean) =
         automationDao.setAutomationEnabled(id, enabled)
+
+    suspend fun updateLastTriggered(id: Long, timestamp: Long) =
+        automationDao.updateLastTriggered(id, timestamp)
+
+    // Logs de ejecución
+    fun getRecentLogs(): Flow<List<AutomationLogEntity>> = automationLogDao.getRecentLogs()
+
+    fun getLogsForAutomation(automationId: Long): Flow<List<AutomationLogEntity>> =
+        automationLogDao.getLogsForAutomation(automationId)
+
+    suspend fun logExecution(log: AutomationLogEntity) = automationLogDao.insert(log)
 
     // Geofences
     fun getAllGeofences(): Flow<List<GeofenceEntity>> = geofenceDao.getAllGeofences()

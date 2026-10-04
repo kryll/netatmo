@@ -84,6 +84,17 @@ data class CalendarAutomationEntity(
     val enabled: Boolean = true
 )
 
+@Entity(tableName = "automation_logs")
+data class AutomationLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val automationId: Long,
+    val automationName: String,
+    val triggerType: String, // ENTER, EXIT, CALENDAR, MANUAL
+    val timestamp: Long = System.currentTimeMillis(),
+    val success: Boolean,
+    val errorMessage: String? = null
+)
+
 @Entity(tableName = "homes_cache")
 data class HomeCacheEntity(
     @PrimaryKey val homeId: String,

@@ -20,6 +20,7 @@ import androidx.navigation.navArgument
 import com.arsys.netatmo.ui.screens.auth.AuthScreen
 import com.arsys.netatmo.ui.screens.auth.AuthViewModel
 import com.arsys.netatmo.ui.screens.automations.AutomationsScreen
+import com.arsys.netatmo.ui.screens.automations.AutomationLogScreen
 import com.arsys.netatmo.ui.screens.automations.GeofenceDetailScreen
 import com.arsys.netatmo.ui.screens.automations.CalendarAutomationScreen
 import com.arsys.netatmo.ui.screens.home.HomeScreen
@@ -196,6 +197,9 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             ) { backStackEntry ->
                 val id = backStackEntry.arguments?.getLong("id") ?: -1L
                 CalendarAutomationScreen(automationId = id, navController = navController)
+            }
+            composable("automation_log") {
+                AutomationLogScreen(navController = navController)
             }
             composable(Screen.Statistics.route) {
                 StatisticsScreen()

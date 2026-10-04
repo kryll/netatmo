@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.arsys.netatmo.data.api.models.Room
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -27,6 +28,40 @@ import com.arsys.netatmo.ui.components.TemperatureSlider
 
 private val Accent = Color(0xFF0284C7)
 private val TextPrimary = Color(0xFF1E293B)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RoomDropdown(
+    rooms: List<Room>,
+    selectedRoomId: String,
+    onRoomSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedRoom = rooms.find { it.id == selectedRoomId }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            value = selectedRoom?.name ?: if (rooms.isEmpty()) "Sin habitaciones en caché" else "Selecciona habitación",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Habitación") },
+            leadingIcon = { Icon(Icons.Default.Thermostat, contentDescription = null, tint = Accent) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(),
+            enabled = rooms.isNotEmpty()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            rooms.forEach { room ->
+                DropdownMenuItem(
+                    text = { Text(room.name) },
+                    onClick = { onRoomSelected(room.id); expanded = false }
+                )
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,6 +138,13 @@ fun GeofenceDetailScreen(
                 label = { Text("Nombre de la automatización") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
+            )
+
+            // Habitación
+            RoomDropdown(
+                rooms = uiState.rooms,
+                selectedRoomId = uiState.selectedRoomId,
+                onRoomSelected = { viewModel.updateRoomId(it) }
             )
 
             // Ubicación

@@ -13,7 +13,9 @@ import androidx.core.content.ContextCompat
 import com.arsys.netatmo.MainActivity
 import com.arsys.netatmo.NetatmoApp
 import com.arsys.netatmo.R
+import com.arsys.netatmo.data.local.entities.AutomationLogEntity
 import com.arsys.netatmo.data.repository.AutomationRepository
+import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AuthRepository
 import com.arsys.netatmo.data.repository.ThermostatRepository
 import com.google.android.gms.location.Geofence
@@ -71,20 +73,50 @@ class GeofenceTransitionService : Service() {
 
         if (!automation.enabled) return
 
+        val now = System.currentTimeMillis()
         when (transition) {
             Geofence.GEOFENCE_TRANSITION_ENTER -> {
                 if (geofenceEntity.triggerOnEnter) {
                     val temp = geofenceEntity.temperatureOnEnter ?: return
-                    thermostatRepository.setTemperature(homeId, automation.roomId, temp)
-                    automationRepository.setAutomationEnabled(automation.id, true)
-                    showNotification("Llegando a ${geofenceEntity.name}", "Temperatura ajustada a ${temp}°C")
+                    val result = thermostatRepository.setTemperature(homeId, automation.roomId, temp)
+                    val success = result is ApiResult.Success
+                    val errorMsg = if (result is ApiResult.Error) result.message else null
+                    automationRepository.updateLastTriggered(automation.id, now)
+                    automationRepository.logExecution(AutomationLogEntity(
+                        automationId = automation.id,
+                        automationName = automation.name,
+                        triggerType = "ENTER",
+                        timestamp = now,
+                        success = success,
+                        errorMessage = errorMsg
+                    ))
+                    if (success) {
+                        showNotification("Llegando a ${geofenceEntity.name}", "Temperatura ajustada a ${temp}°C")
+                    } else {
+                        showNotification("Llegando a ${geofenceEntity.name}", "Error al ajustar temperatura: $errorMsg")
+                    }
                 }
             }
             Geofence.GEOFENCE_TRANSITION_EXIT -> {
                 if (geofenceEntity.triggerOnExit) {
                     val temp = geofenceEntity.temperatureOnExit ?: return
-                    thermostatRepository.setTemperature(homeId, automation.roomId, temp)
-                    showNotification("Saliendo de ${geofenceEntity.name}", "Temperatura ajustada a ${temp}°C")
+                    val result = thermostatRepository.setTemperature(homeId, automation.roomId, temp)
+                    val success = result is ApiResult.Success
+                    val errorMsg = if (result is ApiResult.Error) result.message else null
+                    automationRepository.updateLastTriggered(automation.id, now)
+                    automationRepository.logExecution(AutomationLogEntity(
+                        automationId = automation.id,
+                        automationName = automation.name,
+                        triggerType = "EXIT",
+                        timestamp = now,
+                        success = success,
+                        errorMessage = errorMsg
+                    ))
+                    if (success) {
+                        showNotification("Saliendo de ${geofenceEntity.name}", "Temperatura ajustada a ${temp}°C")
+                    } else {
+                        showNotification("Saliendo de ${geofenceEntity.name}", "Error al ajustar temperatura: $errorMsg")
+                    }
                 }
             }
         }
