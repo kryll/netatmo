@@ -3,6 +3,7 @@ package com.arsys.netatmo.di
 import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.AuthApiService
 import com.arsys.netatmo.data.api.GitHubApiService
+import com.arsys.netatmo.data.api.MeteosourceApiService
 import com.arsys.netatmo.data.api.NetatmoApiService
 import com.arsys.netatmo.data.repository.AuthRepository
 import dagger.Module
@@ -102,4 +103,24 @@ object NetworkModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GitHubApiService::class.java)
+
+    @Provides
+    @Singleton
+    @Named("meteosource")
+    fun provideMeteosourceOkHttpClient(logging: HttpLoggingInterceptor): OkHttpClient =
+        OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideMeteosourceApiService(@Named("meteosource") client: OkHttpClient): MeteosourceApiService =
+        Retrofit.Builder()
+            .baseUrl("https://www.meteosource.com/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(MeteosourceApiService::class.java)
 }

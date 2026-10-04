@@ -136,6 +136,17 @@ data class BasicResponse(
     @SerializedName("time_server") val timeServer: Long?
 )
 
+// --- Meteosource Weather Forecast API ---
+data class MeteosourcePointResponse(
+    @SerializedName("current") val current: MeteosourceCurrent?
+)
+
+data class MeteosourceCurrent(
+    @SerializedName("temperature") val temperature: Double?,
+    @SerializedName("summary") val summary: String?,
+    @SerializedName("icon") val icon: String?
+)
+
 // --- Weather Station (getstationsdata) ---
 data class StationsDataResponse(
     @SerializedName("body") val body: StationsDataBody?

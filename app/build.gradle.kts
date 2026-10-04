@@ -35,6 +35,8 @@ android {
         buildConfigField("String", "NETATMO_REDIRECT_URI", "\"com.arsys.netatmo://oauth\"")
         buildConfigField("String", "NETATMO_BASE_URL", "\"https://api.netatmo.com/\"")
         buildConfigField("String", "GITHUB_REPO", "\"kryll/netatmo\"")
+        buildConfigField("String", "METEOSOURCE_API_KEY", "\"${localProps["meteosource.apiKey"] ?: ""}\"")
+        buildConfigField("String", "METEOSOURCE_PLACE_ID", "\"${localProps["meteosource.placeId"] ?: "logrono"}\"")
     }
 
     buildTypes {

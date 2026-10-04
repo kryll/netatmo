@@ -1,5 +1,7 @@
 package com.arsys.netatmo.data.repository
 
+import com.arsys.netatmo.BuildConfig
+import com.arsys.netatmo.data.api.MeteosourceApiService
 import com.arsys.netatmo.data.api.NetatmoApiService
 import com.arsys.netatmo.data.api.models.*
 import com.arsys.netatmo.data.local.dao.HomeCacheDao
@@ -21,6 +23,7 @@ sealed class ApiResult<out T> {
 @Singleton
 class ThermostatRepository @Inject constructor(
     private val apiService: NetatmoApiService,
+    private val meteosourceApiService: MeteosourceApiService,
     private val authRepository: AuthRepository,
     private val homeCacheDao: HomeCacheDao,
     private val historyDao: TemperatureHistoryDao
@@ -185,12 +188,21 @@ class ThermostatRepository @Inject constructor(
     }
 
     /**
-     * Fetches outdoor temperature from the Weather Station API (getstationsdata).
-     * Looks for an NAModule1 (outdoor sensor) in the station's modules list.
+     * Fetches outdoor temperature from Meteosource forecast API.
+     * Falls back to Netatmo Weather Station API (NAModule1) if available.
      */
     suspend fun getOutdoorTemperature(homeId: String): Double? {
         return try {
-            // Primary: Weather Station API returns real-time NAModule1 data
+            // Primary: Meteosource forecast API (configured location)
+            val meteosourceResponse = meteosourceApiService.getCurrentWeather(
+                placeId = BuildConfig.METEOSOURCE_PLACE_ID,
+                apiKey = BuildConfig.METEOSOURCE_API_KEY
+            )
+            if (meteosourceResponse.isSuccessful) {
+                val temp = meteosourceResponse.body()?.current?.temperature
+                if (temp != null) return temp
+            }
+            // Fallback: Netatmo Weather Station API (NAModule1)
             val stationsResponse = apiService.getStationsData()
             if (stationsResponse.isSuccessful) {
                 val outdoorTemp = stationsResponse.body()?.body?.devices
@@ -198,30 +210,6 @@ class ThermostatRepository @Inject constructor(
                     ?.find { it.type == "NAModule1" }
                     ?.dashboardData?.temperature
                 if (outdoorTemp != null) return outdoorTemp
-            }
-            // Fallback: Energy API + getmeasure (works if NAModule1 is bridged via NAMain)
-            val homesResult = getHomesData()
-            if (homesResult is ApiResult.Success) {
-                val home = homesResult.data.find { it.id == homeId }
-                val outdoorModule = home?.modules?.find { it.type == "NAModule1" }
-                val bridgeId = outdoorModule?.bridge
-                if (outdoorModule != null && bridgeId != null) {
-                    val response = apiService.getMeasure(
-                        deviceId = bridgeId,
-                        moduleId = outdoorModule.id,
-                        scale = "max",
-                        type = "temperature",
-                        limit = 1,
-                        realTime = true
-                    )
-                    if (response.isSuccessful) {
-                        return response.body()?.body
-                            ?.lastOrNull()
-                            ?.value
-                            ?.lastOrNull()
-                            ?.firstOrNull()
-                    }
-                }
             }
             null
         } catch (e: Exception) {
