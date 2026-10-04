@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
@@ -108,7 +109,52 @@ data class AutomationAction(
     val scenarioId: String = ""
 )
 
-enum class TriggerMode { ANY, ALL }
+private fun AutomationTrigger.toMap(): Map<String, Any> = buildMap {
+    put("type", type); put("hour", hour); put("minute", minute)
+    put("days", days); put("entity", entity); put("below", below)
+    put("value", value); put("event", event); put("offset", offset); put("action", action)
+}
+
+private fun Map<String, Any>.toAutoTrigger() = AutomationTrigger(
+    type = this["type"] as? String ?: "",
+    hour = (this["hour"] as? Number)?.toInt() ?: 0,
+    minute = (this["minute"] as? Number)?.toInt() ?: 0,
+    days = (this["days"] as? List<*>)?.mapNotNull { (it as? Number)?.toInt() } ?: emptyList(),
+    entity = this["entity"] as? String ?: "",
+    below = this["below"] as? Boolean ?: true,
+    value = (this["value"] as? Number)?.toDouble() ?: 0.0,
+    event = this["event"] as? String ?: "sunset",
+    offset = (this["offset"] as? Number)?.toInt() ?: 0,
+    action = this["action"] as? String ?: "enter"
+)
+
+private fun AutomationCondition.toMap(): Map<String, Any> = buildMap {
+    put("type", type); put("from", from); put("to", to)
+    put("entity", entity); put("below", below); put("value", value)
+}
+
+private fun Map<String, Any>.toAutoCondition() = AutomationCondition(
+    type = this["type"] as? String ?: "",
+    from = this["from"] as? String ?: "",
+    to = this["to"] as? String ?: "",
+    entity = this["entity"] as? String ?: "",
+    below = this["below"] as? Boolean ?: true,
+    value = (this["value"] as? Number)?.toDouble() ?: 0.0
+)
+
+private fun AutomationAction.toMap(): Map<String, Any> = buildMap {
+    put("type", type); put("temperature", temperature); put("mode", mode)
+    put("title", title); put("minutes", minutes); put("scenarioId", scenarioId)
+}
+
+private fun Map<String, Any>.toAutoAction() = AutomationAction(
+    type = this["type"] as? String ?: "",
+    temperature = (this["temperature"] as? Number)?.toDouble() ?: 20.0,
+    mode = this["mode"] as? String ?: "",
+    title = this["title"] as? String ?: "",
+    minutes = (this["minutes"] as? Number)?.toInt() ?: 0,
+    scenarioId = this["scenarioId"] as? String ?: ""
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -167,7 +213,7 @@ fun AdvancedAutomationScreen(
         TriggerEditorBottomSheet(
             onDismiss = { showTriggerSheet = false },
             onAdd = { trigger ->
-                viewModel.addTrigger(trigger)
+                viewModel.addTrigger(trigger.toMap())
                 showTriggerSheet = false
             }
         )
@@ -177,7 +223,7 @@ fun AdvancedAutomationScreen(
         ConditionEditorBottomSheet(
             onDismiss = { showConditionSheet = false },
             onAdd = { condition ->
-                viewModel.addCondition(condition)
+                viewModel.addCondition(condition.toMap())
                 showConditionSheet = false
             }
         )
@@ -187,7 +233,7 @@ fun AdvancedAutomationScreen(
         ActionEditorBottomSheet(
             onDismiss = { showActionSheet = false },
             onAdd = { action ->
-                viewModel.addAction(action)
+                viewModel.addAction(action.toMap())
                 showActionSheet = false
             }
         )
@@ -273,8 +319,8 @@ fun AdvancedAutomationScreen(
             item {
                 SectionHeader(title = "Disparadores", subtitle = "Cuándo se ejecuta")
             }
-            items(uiState.triggers) { trigger ->
-                TriggerChipRow(trigger = trigger, onDelete = { viewModel.removeTrigger(trigger) })
+            itemsIndexed(uiState.triggers) { index, triggerMap ->
+                TriggerChipRow(trigger = triggerMap.toAutoTrigger(), onDelete = { viewModel.removeTrigger(index) })
             }
             item {
                 OutlinedButton(
@@ -299,19 +345,19 @@ fun AdvancedAutomationScreen(
                 ) {
                     Text("Modo:", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
                     FilterChip(
-                        selected = triggerMode == TriggerMode.ANY,
-                        onClick = { triggerMode = TriggerMode.ANY },
+                        selected = triggerMode == "any",
+                        onClick = { triggerMode = "any" },
                         label = { Text("Cualquiera") }
                     )
                     FilterChip(
-                        selected = triggerMode == TriggerMode.ALL,
-                        onClick = { triggerMode = TriggerMode.ALL },
+                        selected = triggerMode == "all",
+                        onClick = { triggerMode = "all" },
                         label = { Text("Todas") }
                     )
                 }
             }
-            items(uiState.conditions) { condition ->
-                ConditionChipRow(condition = condition, onDelete = { viewModel.removeCondition(condition) })
+            itemsIndexed(uiState.conditions) { index, conditionMap ->
+                ConditionChipRow(condition = conditionMap.toAutoCondition(), onDelete = { viewModel.removeCondition(index) })
             }
             item {
                 OutlinedButton(
@@ -328,8 +374,8 @@ fun AdvancedAutomationScreen(
             item {
                 SectionHeader(title = "Acciones", subtitle = "Qué hacer")
             }
-            items(uiState.actions) { action ->
-                ActionChipRow(action = action, onDelete = { viewModel.removeAction(action) })
+            itemsIndexed(uiState.actions) { index, actionMap ->
+                ActionChipRow(action = actionMap.toAutoAction(), onDelete = { viewModel.removeAction(index) })
             }
             item {
                 OutlinedButton(
