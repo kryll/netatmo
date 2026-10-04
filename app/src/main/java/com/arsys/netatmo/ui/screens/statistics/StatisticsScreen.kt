@@ -16,11 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
 import com.arsys.netatmo.ui.theme.WarmColor
 
@@ -101,7 +103,26 @@ fun StatisticsScreen(
                 }
             }
 
-            // Summary cards
+            // 24h Temperature History Card
+            item {
+                TemperatureHistory24hCard(
+                    points = uiState.historyPoints,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Heating Report Card
+            item {
+                HeatingReportCard(
+                    heatingHoursToday = uiState.totalHeatingHoursToday,
+                    energyToday = uiState.energyKwhToday,
+                    costToday = uiState.estimatedCostToday,
+                    kwhPrice = uiState.kwhPrice,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Summary cards (aggregate period)
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -131,7 +152,7 @@ fun StatisticsScreen(
                 }
             }
 
-            // Heating hours
+            // Heating hours (aggregate)
             item {
                 StatCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -142,7 +163,7 @@ fun StatisticsScreen(
                 )
             }
 
-            // Temperature chart
+            // Multi-day temperature chart
             if (uiState.temperatureData.isNotEmpty()) {
                 item {
                     Card(
@@ -163,7 +184,6 @@ fun StatisticsScreen(
                                     .fillMaxWidth()
                                     .height(200.dp)
                             )
-                            // Legend
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 modifier = Modifier.padding(top = 8.dp)
@@ -176,7 +196,7 @@ fun StatisticsScreen(
                 }
             }
 
-            // Heating chart
+            // Heating activity chart (multi-day)
             if (uiState.temperatureData.isNotEmpty()) {
                 item {
                     Card(
@@ -210,6 +230,247 @@ fun StatisticsScreen(
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// 24h Temperature History Card
+// ---------------------------------------------------------------------------
+
+@Composable
+fun TemperatureHistory24hCard(
+    points: List<TemperatureHistoryEntity>,
+    modifier: Modifier = Modifier
+) {
+    val tempColor = Color(0xFF0284C7)
+    val setpointColor = Color(0xFFEF4444).copy(alpha = 0.6f)
+    val gridColor = Color(0xFFE2E8F0)
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Últimas 24 horas",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+            ) {
+                // Layout constants (in px)
+                val leftPad = 40f   // space for Y-axis labels
+                val bottomPad = 26f // space for X-axis labels
+                val chartLeft = leftPad
+                val chartRight = size.width
+                val chartTop = 0f
+                val chartBottom = size.height - bottomPad
+                val chartWidth = chartRight - chartLeft
+                val chartHeight = chartBottom - chartTop
+
+                // Temperature scale: 14°C … 30°C  (range = 16)
+                val tempMin = 14f
+                val tempRange = 16f
+
+                fun xOf(ts: Long, startTs: Long, durationMs: Long): Float {
+                    if (durationMs <= 0L) return chartLeft
+                    return chartLeft + (ts - startTs).toFloat() / durationMs * chartWidth
+                }
+
+                fun yOf(temp: Float): Float =
+                    chartBottom - (temp - tempMin) / tempRange * chartHeight
+
+                // --- Grid lines ---
+                val gridPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                }
+                listOf(16f, 18f, 20f, 22f, 24f).forEach { gridTemp ->
+                    val y = yOf(gridTemp)
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(chartLeft, y),
+                        end = Offset(chartRight, y),
+                        strokeWidth = 1.5f
+                    )
+                }
+
+                // --- Y-axis labels ---
+                val yLabelPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.argb(180, 100, 116, 139)
+                    textSize = 26f
+                    isAntiAlias = true
+                    textAlign = android.graphics.Paint.Align.RIGHT
+                }
+                listOf("14°" to 14f, "20°" to 20f, "28°" to 28f).forEach { (label, temp) ->
+                    drawContext.canvas.nativeCanvas.drawText(
+                        label,
+                        chartLeft - 6f,
+                        yOf(temp) + 9f,
+                        yLabelPaint
+                    )
+                }
+
+                // --- Data lines and circles ---
+                if (points.size >= 2) {
+                    val startTs = points.first().timestamp
+                    val endTs = points.last().timestamp
+                    val durationMs = (endTs - startTs).coerceAtLeast(1L)
+
+                    // Temperature line
+                    val tempPath = Path()
+                    points.forEachIndexed { index, point ->
+                        val x = xOf(point.timestamp, startTs, durationMs)
+                        val y = yOf(point.temperature.toFloat())
+                        if (index == 0) tempPath.moveTo(x, y) else tempPath.lineTo(x, y)
+                    }
+                    drawPath(tempPath, tempColor, style = Stroke(width = 3f))
+
+                    // Setpoint dashed line
+                    val setpointPath = Path()
+                    var setpointStarted = false
+                    points.forEach { point ->
+                        point.setpoint?.let { sp ->
+                            val x = xOf(point.timestamp, startTs, durationMs)
+                            val y = yOf(sp.toFloat())
+                            if (!setpointStarted) {
+                                setpointPath.moveTo(x, y)
+                                setpointStarted = true
+                            } else {
+                                setpointPath.lineTo(x, y)
+                            }
+                        }
+                    }
+                    if (setpointStarted) {
+                        drawPath(
+                            setpointPath,
+                            setpointColor,
+                            style = Stroke(
+                                width = 2f,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f))
+                            )
+                        )
+                    }
+
+                    // Data point circles – subsample for readability
+                    val step = maxOf(1, points.size / 30)
+                    points.forEachIndexed { index, point ->
+                        if (index % step == 0) {
+                            val x = xOf(point.timestamp, startTs, durationMs)
+                            val y = yOf(point.temperature.toFloat())
+                            drawCircle(tempColor, radius = 4.5f, center = Offset(x, y))
+                            drawCircle(Color.White, radius = 2f, center = Offset(x, y))
+                        }
+                    }
+                }
+
+                // --- X-axis labels ---
+                val xLabelPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.argb(180, 100, 116, 139)
+                    textSize = 26f
+                    isAntiAlias = true
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+                listOf("0h", "6h", "12h", "18h", "24h").forEachIndexed { index, label ->
+                    val x = chartLeft + index.toFloat() / 4f * chartWidth
+                    drawContext.canvas.nativeCanvas.drawText(
+                        label,
+                        x,
+                        size.height - 4f,
+                        xLabelPaint
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(top = 4.dp)
+            ) {
+                LegendItem(color = Color(0xFF0284C7), label = "Temperatura")
+                LegendItem(color = Color(0xFFEF4444).copy(alpha = 0.6f), label = "Objetivo")
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Heating Report Card
+// ---------------------------------------------------------------------------
+
+@Composable
+fun HeatingReportCard(
+    heatingHoursToday: Float,
+    energyToday: Float,
+    costToday: Float,
+    kwhPrice: Float,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Informe de calefacción",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                HeatingStatBox(
+                    value = "%.1fh".format(heatingHoursToday),
+                    label = "Hoy"
+                )
+                HeatingStatBox(
+                    value = "%.1f kWh".format(energyToday),
+                    label = "Energía"
+                )
+                HeatingStatBox(
+                    value = "%.2f€".format(costToday),
+                    label = "Coste est."
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Estimación: 1.5 kW · %.2f €/kWh".format(kwhPrice),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeatingStatBox(
+    value: String,
+    label: String
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = WarmColor
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Existing reusable composables
+// ---------------------------------------------------------------------------
 
 @Composable
 fun StatCard(
@@ -284,8 +545,13 @@ fun TemperatureChart(
                 else setpointPath.lineTo(x, y)
             }
         }
-        if (started) drawPath(setpointPath, warmColor, style = Stroke(width = 2f, pathEffect =
-            androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 5f))))
+        if (started) drawPath(
+            setpointPath, warmColor,
+            style = Stroke(
+                width = 2f,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 5f))
+            )
+        )
     }
 }
 

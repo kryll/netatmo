@@ -60,6 +60,10 @@ class NetatmoApp : Application(), Configuration.Provider {
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply { description = "Alerta cuando la batería de un dispositivo está baja" }
             )
+
+            manager.createNotificationChannel(NotificationChannel(CHANNEL_BOOST, "Modo Turbo", NotificationManager.IMPORTANCE_LOW).apply { description = "Notificaciones del modo turbo" })
+            manager.createNotificationChannel(NotificationChannel(CHANNEL_VACATION, "Modo Vacaciones", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Estado del modo vacaciones" })
+            manager.createNotificationChannel(NotificationChannel(CHANNEL_ANOMALY, "Alertas de temperatura", NotificationManager.IMPORTANCE_HIGH).apply { description = "Alerta cuando la temperatura se desvía del objetivo" })
         }
     }
 
@@ -68,5 +72,8 @@ class NetatmoApp : Application(), Configuration.Provider {
         const val CHANNEL_GEOFENCE = "channel_geofence"
         const val CHANNEL_CALENDAR = "channel_calendar"
         const val CHANNEL_BATTERY = "channel_battery"
+        const val CHANNEL_BOOST = "channel_boost"
+        const val CHANNEL_VACATION = "channel_vacation"
+        const val CHANNEL_ANOMALY = "channel_anomaly"
     }
 }

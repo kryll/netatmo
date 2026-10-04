@@ -32,6 +32,9 @@ import com.arsys.netatmo.ui.screens.settings.SettingsScreen
 import com.arsys.netatmo.ui.screens.onboarding.OnboardingScreen
 import com.arsys.netatmo.ui.screens.onboarding.OnboardingViewModel
 import com.arsys.netatmo.ui.screens.statistics.StatisticsScreen
+import com.arsys.netatmo.ui.screens.automations.ScheduleAutomationScreen
+import com.arsys.netatmo.ui.screens.settings.VacationModeScreen
+import com.arsys.netatmo.ui.screens.settings.FamilyManagementScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home : Screen("home", "Inicio", Icons.Default.Home)
@@ -46,6 +49,9 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object ScheduleDetail : Screen("schedule/{id}", "Programación", Icons.Default.Schedule)
     object NetatmoCredentials : Screen("netatmo_credentials", "Credenciales", Icons.Default.Key)
     object Onboarding : Screen("onboarding", "Bienvenido", Icons.Default.StarOutline)
+    object ScheduleAutomation : Screen("schedule_automation/{id}", "Horario", Icons.Default.Schedule)
+    object VacationMode : Screen("vacation_mode", "Vacaciones", Icons.Default.BeachAccess)
+    object FamilyManagement : Screen("family_management", "Familia", Icons.Default.Group)
 }
 
 val bottomNavItems = listOf(
@@ -223,12 +229,20 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                     },
                     onNavigateToCredentials = {
                         navController.navigate(Screen.NetatmoCredentials.route)
-                    }
+                    },
+                    onNavigateToFamily = { navController.navigate("family_management") },
+                    onNavigateToVacation = { navController.navigate("vacation_mode") }
                 )
             }
             composable(Screen.NetatmoCredentials.route) {
                 NetatmoCredentialsScreen(navController = navController)
             }
+            composable("schedule_automation/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })) { backStackEntry ->
+                val id = backStackEntry.arguments?.getLong("id") ?: -1L
+                ScheduleAutomationScreen(automationId = id, navController = navController)
+            }
+            composable("vacation_mode") { VacationModeScreen(navController = navController) }
+            composable("family_management") { FamilyManagementScreen(navController = navController) }
             composable(
                 route = Screen.ScheduleDetail.route,
                 arguments = listOf(

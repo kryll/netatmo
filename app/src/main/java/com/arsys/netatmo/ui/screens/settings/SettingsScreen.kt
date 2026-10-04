@@ -36,12 +36,33 @@ private val TextPrimary = Color(0xFF1E293B)
 fun SettingsScreen(
     onLogout: () -> Unit,
     onNavigateToCredentials: () -> Unit = {},
+    onNavigateToFamily: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
     var pendingInstallRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+
+    // Launch share intent when backup export succeeds
+    val exportedUri = uiState.exportedUri
+    LaunchedEffect(exportedUri) {
+        exportedUri?.let { uri ->
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "Exportar backup"))
+            viewModel.clearExportedUri()
+        }
+    }
+
+    val importFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.importBackup(context, it) }
+    }
 
     val installPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -226,6 +247,150 @@ fun SettingsScreen(
                                 )
                             }
                         )
+                        HorizontalDivider()
+                        // Anomaly threshold slider
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = Accent
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Umbral de alerta de temperatura",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        "${"%.1f".format(uiState.anomalyThreshold)}°C de diferencia",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Slider(
+                                value = uiState.anomalyThreshold,
+                                onValueChange = { viewModel.setAnomalyThreshold(it) },
+                                valueRange = 0.5f..5.0f,
+                                steps = 8,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Accent,
+                                    activeTrackColor = Accent
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            // Familia
+            item {
+                Text(
+                    "Familia",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Accent,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    onClick = onNavigateToFamily
+                ) {
+                    SettingRow(
+                        icon = Icons.Default.Group,
+                        title = "Miembros de familia",
+                        subtitle = "Geovalla familiar",
+                        trailing = {
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    )
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            // Backup y restauración
+            item {
+                Text(
+                    "Backup y restauración",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Accent,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.exportBackup(context) },
+                                modifier = Modifier.weight(1f),
+                                enabled = !uiState.isExporting && !uiState.isImporting
+                            ) {
+                                Icon(
+                                    Icons.Default.Upload,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Exportar")
+                            }
+                            OutlinedButton(
+                                onClick = { importFilePicker.launch("application/json") },
+                                modifier = Modifier.weight(1f),
+                                enabled = !uiState.isExporting && !uiState.isImporting
+                            ) {
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Importar")
+                            }
+                        }
+                        if (uiState.isExporting || uiState.isImporting) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = Accent
+                            )
+                        }
+                        uiState.backupResult?.let { result ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = result,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

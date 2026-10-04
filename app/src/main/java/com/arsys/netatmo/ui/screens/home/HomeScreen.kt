@@ -30,6 +30,7 @@ private val Accent = Color(0xFF0284C7)
 private val BgSurface = Color(0xFFF4F6F9)
 private val TextPrimary = Color(0xFF1E293B)
 private val TextSecondary = Color(0xFF64748B)
+private val BoostColor = Color(0xFFEF4444)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +39,10 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val boostState by viewModel.boostState.collectAsState()
+    val remainingMinutes by viewModel.boostRemainingMinutes.collectAsState()
     var selectedRoom by remember { mutableStateOf<String?>(null) }
+    var showBoostDialog by remember { mutableStateOf(false) }
 
     // Compute a representative current temperature for the header
     val avgTemp = uiState.thermostatState?.rooms
@@ -113,6 +117,46 @@ fun HomeScreen(
                                 .size(28.dp)
                                 .padding(bottom = 4.dp)
                         )
+                    }
+                }
+
+                // Boost active indicator
+                if (boostState != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Surface(
+                            color = BoostColor.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Whatshot,
+                                    contentDescription = null,
+                                    tint = BoostColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "TURBO: ${remainingMinutes}min",
+                                    color = BoostColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                        TextButton(
+                            onClick = { viewModel.stopBoost() },
+                            colors = ButtonDefaults.textButtonColors(contentColor = BoostColor)
+                        ) {
+                            Text("Desactivar")
+                        }
                     }
                 }
             }
@@ -264,7 +308,24 @@ fun HomeScreen(
                                 }
                             }
                         }
+
+                        // Bottom padding so the FAB does not overlap last item
+                        item { Spacer(modifier = Modifier.height(80.dp)) }
                     }
+                }
+            }
+
+            // Boost FAB — only when thermostat is loaded and no boost is active
+            if (uiState.thermostatState != null && boostState == null) {
+                FloatingActionButton(
+                    onClick = { showBoostDialog = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
+                    containerColor = BoostColor,
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Default.Whatshot, contentDescription = "Modo Turbo")
                 }
             }
 
@@ -303,6 +364,113 @@ fun HomeScreen(
             }
         }
     }
+
+    // Boost dialog
+    if (showBoostDialog) {
+        BoostDialog(
+            onDismiss = { showBoostDialog = false },
+            onConfirm = { delta, duration ->
+                viewModel.startBoost(delta, duration)
+                showBoostDialog = false
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BoostDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (deltaTemp: Double, durationMinutes: Int) -> Unit
+) {
+    val deltaOptions = listOf(1.0 to "+1°C", 2.0 to "+2°C", 3.0 to "+3°C", 5.0 to "+5°C")
+    val durationOptions = listOf(30 to "30 min", 60 to "60 min", 90 to "90 min", 120 to "120 min")
+    var selectedDelta by remember { mutableStateOf(2.0) }
+    var selectedDuration by remember { mutableStateOf(60) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Whatshot,
+                    contentDescription = null,
+                    tint = BoostColor,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Modo Turbo",
+                    fontWeight = FontWeight.Bold,
+                    color = BoostColor
+                )
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    "Aumento temporal de temperatura",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    "Incremento:",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    deltaOptions.forEach { (delta, label) ->
+                        FilterChip(
+                            selected = selectedDelta == delta,
+                            onClick = { selectedDelta = delta },
+                            label = { Text(label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = BoostColor,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Duracion:",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    durationOptions.forEach { (minutes, label) ->
+                        FilterChip(
+                            selected = selectedDuration == minutes,
+                            onClick = { selectedDuration = minutes },
+                            label = { Text(label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = BoostColor,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(selectedDelta, selectedDuration) },
+                colors = ButtonDefaults.buttonColors(containerColor = BoostColor)
+            ) {
+                Text("Activar", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

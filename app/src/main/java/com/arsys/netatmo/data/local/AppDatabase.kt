@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.arsys.netatmo.data.local.dao.*
+import com.arsys.netatmo.data.local.dao.FamilyMemberDao
 import com.arsys.netatmo.data.local.entities.*
 
 @Database(
@@ -15,9 +16,10 @@ import com.arsys.netatmo.data.local.entities.*
         TemperatureHistoryEntity::class,
         CalendarAutomationEntity::class,
         HomeCacheEntity::class,
-        AutomationLogEntity::class
+        AutomationLogEntity::class,
+        FamilyMemberEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -30,4 +32,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun calendarAutomationDao(): CalendarAutomationDao
     abstract fun homeCacheDao(): HomeCacheDao
     abstract fun automationLogDao(): AutomationLogDao
+    abstract fun familyMemberDao(): FamilyMemberDao
 }

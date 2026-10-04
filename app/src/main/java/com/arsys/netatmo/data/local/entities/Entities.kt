@@ -105,3 +105,11 @@ data class HomeCacheEntity(
     val modulesJson: String,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "family_members")
+data class FamilyMemberEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val isHome: Boolean = true,
+    val addedAt: Long = System.currentTimeMillis()
+)

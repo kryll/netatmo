@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.arsys.netatmo.data.local.AppDatabase
 import com.arsys.netatmo.data.local.dao.*
+import com.arsys.netatmo.data.local.dao.FamilyMemberDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -30,4 +31,5 @@ object DatabaseModule {
     @Provides fun provideCalendarAutomationDao(db: AppDatabase): CalendarAutomationDao = db.calendarAutomationDao()
     @Provides fun provideHomeCacheDao(db: AppDatabase): HomeCacheDao = db.homeCacheDao()
     @Provides fun provideAutomationLogDao(db: AppDatabase): AutomationLogDao = db.automationLogDao()
+    @Provides fun provideFamilyMemberDao(db: AppDatabase): FamilyMemberDao = db.familyMemberDao()
 }
