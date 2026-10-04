@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.arsys.netatmo.service.OutdoorTempWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -23,6 +24,7 @@ class NetatmoApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        OutdoorTempWorker.schedule(this)
     }
 
     private fun createNotificationChannels() {
@@ -64,6 +66,13 @@ class NetatmoApp : Application(), Configuration.Provider {
             manager.createNotificationChannel(NotificationChannel(CHANNEL_BOOST, "Modo Turbo", NotificationManager.IMPORTANCE_LOW).apply { description = "Notificaciones del modo turbo" })
             manager.createNotificationChannel(NotificationChannel(CHANNEL_VACATION, "Modo Vacaciones", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "Estado del modo vacaciones" })
             manager.createNotificationChannel(NotificationChannel(CHANNEL_ANOMALY, "Alertas de temperatura", NotificationManager.IMPORTANCE_HIGH).apply { description = "Alerta cuando la temperatura se desvía del objetivo" })
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_OUTDOOR,
+                    "Temperatura exterior",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply { description = "Automatizaciones por temperatura exterior" }
+            )
         }
     }
 
@@ -75,5 +84,6 @@ class NetatmoApp : Application(), Configuration.Provider {
         const val CHANNEL_BOOST = "channel_boost"
         const val CHANNEL_VACATION = "channel_vacation"
         const val CHANNEL_ANOMALY = "channel_anomaly"
+        const val CHANNEL_OUTDOOR = "outdoor_temp"
     }
 }

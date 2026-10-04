@@ -120,6 +120,27 @@ fun HomeScreen(
                     }
                 }
 
+                // Outdoor temperature row
+                uiState.outdoorTemperature?.let { outTemp ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Thermostat,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = Color(0xFF64748B)
+                        )
+                        Text(
+                            text = "Exterior: ${"%.1f".format(outTemp)}°C",
+                            color = Color(0xFF64748B),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
                 // Boost active indicator
                 if (boostState != null) {
                     Spacer(modifier = Modifier.height(10.dp))

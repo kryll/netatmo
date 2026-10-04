@@ -23,7 +23,8 @@ data class HomeUiState(
     val error: String? = null,
     val selectedHomeId: String? = null,
     val isSettingTemp: Boolean = false,
-    val successMessage: String? = null
+    val successMessage: String? = null,
+    val outdoorTemperature: Double? = null
 )
 
 @HiltViewModel
@@ -58,6 +59,9 @@ class HomeViewModel @Inject constructor(
             when (val result = getThermostatState(id)) {
                 is ApiResult.Success -> {
                     _uiState.update { it.copy(isLoading = false, thermostatState = result.data) }
+                    // Best-effort: fetch outdoor temperature from NAModule1 if available
+                    val outdoorTemp = repository.getOutdoorTemperature(id)
+                    _uiState.update { it.copy(outdoorTemperature = outdoorTemp) }
                 }
                 is ApiResult.Error -> {
                     _uiState.update { it.copy(isLoading = false, error = result.message) }

@@ -23,6 +23,7 @@ import com.arsys.netatmo.ui.screens.automations.AutomationsScreen
 import com.arsys.netatmo.ui.screens.automations.AutomationLogScreen
 import com.arsys.netatmo.ui.screens.automations.GeofenceDetailScreen
 import com.arsys.netatmo.ui.screens.automations.CalendarAutomationScreen
+import com.arsys.netatmo.ui.screens.automations.OutdoorTempAutomationScreen
 import com.arsys.netatmo.ui.screens.home.HomeScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenariosScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenarioDetailScreen
@@ -52,6 +53,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object ScheduleAutomation : Screen("schedule_automation/{id}", "Horario", Icons.Default.Schedule)
     object VacationMode : Screen("vacation_mode", "Vacaciones", Icons.Default.BeachAccess)
     object FamilyManagement : Screen("family_management", "Familia", Icons.Default.Group)
+    object OutdoorTempAutomation : Screen("outdoor_temp_automation/{automationId}", "Temperatura exterior", Icons.Default.WbSunny)
 }
 
 val bottomNavItems = listOf(
@@ -243,6 +245,10 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             }
             composable("vacation_mode") { VacationModeScreen(navController = navController) }
             composable("family_management") { FamilyManagementScreen(navController = navController) }
+            composable("outdoor_temp_automation/{automationId}") { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("automationId")?.toLongOrNull() ?: -1L
+                OutdoorTempAutomationScreen(automationId = id, navController = navController)
+            }
             composable(
                 route = Screen.ScheduleDetail.route,
                 arguments = listOf(
