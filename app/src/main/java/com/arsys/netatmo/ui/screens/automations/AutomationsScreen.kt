@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -214,21 +213,12 @@ fun AutomationCard(
                 .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon with colored background
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(typeColor.copy(alpha = if (automation.enabled) 0.12f else 0.06f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = automationTypeIcon(automation.type),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = typeColor.copy(alpha = alpha)
-                )
-            }
+            Icon(
+                imageVector = automationTypeIcon(automation.type),
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = typeColor.copy(alpha = alpha)
+            )
 
             Spacer(modifier = Modifier.width(14.dp))
 
