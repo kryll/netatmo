@@ -20,7 +20,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -32,9 +31,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.util.AuthDebugLogger
 
-private val BrandBlue = Color(0xFF0EA5E9)
-private val BrandBlueDark = Color(0xFF0369A1)
-private val BrandGradient = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
+private val Accent = Color(0xFF0284C7)
+private val BgSurface = Color(0xFFF4F6F9)
+private val TextPrimary = Color(0xFF1E293B)
+private val TextSecondary = Color(0xFF64748B)
 
 @Composable
 fun AuthScreen(
@@ -54,21 +54,21 @@ fun AuthScreen(
         if (isLoggedIn) onLoginSuccess()
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(modifier = Modifier.fillMaxSize().background(BgSurface)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top gradient hero section
+            // Hero section
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(BrandGradient))
+                    .background(Color.White)
                     .statusBarsPadding()
                     .padding(horizontal = 24.dp)
-                    .padding(top = 48.dp, bottom = 48.dp),
+                    .padding(top = 48.dp, bottom = 40.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -79,14 +79,14 @@ fun AuthScreen(
                     Surface(
                         modifier = Modifier.size(100.dp),
                         shape = RoundedCornerShape(24.dp),
-                        color = Color.White.copy(alpha = 0.2f)
+                        color = Accent.copy(alpha = 0.1f)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Air,
                                 contentDescription = null,
                                 modifier = Modifier.size(60.dp),
-                                tint = Color.White
+                                tint = Accent
                             )
                         }
                     }
@@ -95,14 +95,14 @@ fun AuthScreen(
                         text = "Netatmo Smart",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = TextPrimary,
                         textAlign = TextAlign.Center
                     )
 
                     Text(
                         text = "Control inteligente de tu termostato",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = TextSecondary,
                         textAlign = TextAlign.Center
                     )
 
@@ -124,20 +124,20 @@ fun AuthScreen(
                             Surface(
                                 modifier = Modifier.size(8.dp),
                                 shape = RoundedCornerShape(4.dp),
-                                color = Color.White
+                                color = Accent
                             ) {}
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 text = feature,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.9f)
+                                color = TextSecondary
                             )
                         }
                     }
                 }
             }
 
-            // Bottom white card section
+            // Form section
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
@@ -226,7 +226,7 @@ fun AuthScreen(
                             .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         enabled = !isLoading && credentialsConfigured,
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandBlue)
+                        colors = ButtonDefaults.buttonColors(containerColor = Accent)
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(

@@ -14,7 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -26,9 +25,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 
-private val BrandBlue = Color(0xFF0EA5E9)
-private val BrandBlueDark = Color(0xFF0369A1)
-private val GradientBrush = Brush.verticalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF0369A1)))
+private val Accent = Color(0xFF0284C7)
+private val TextPrimary = Color(0xFF1E293B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,11 +62,11 @@ fun NetatmoCredentialsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Gradient header
+        // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(GradientBrush)
+                .background(Color.White)
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 20.dp)
         ) {
@@ -80,18 +78,19 @@ fun NetatmoCredentialsScreen(
                     Icon(
                         Icons.Default.ArrowBack,
                         contentDescription = "Volver",
-                        tint = Color.White
+                        tint = Accent
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     "Credenciales Netatmo",
-                    color = Color.White,
+                    color = TextPrimary,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
+        HorizontalDivider(color = Color(0xFFE2E8F0))
 
         // Content
         Column(
@@ -115,7 +114,7 @@ fun NetatmoCredentialsScreen(
                         Icon(
                             Icons.Default.Info,
                             contentDescription = null,
-                            tint = BrandBlue
+                            tint = Accent
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -167,7 +166,7 @@ fun NetatmoCredentialsScreen(
                                 "${i + 1}. ",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold,
-                                color = BrandBlue
+                                color = Accent
                             )
                             Text(step, style = MaterialTheme.typography.bodySmall)
                         }
@@ -195,7 +194,7 @@ fun NetatmoCredentialsScreen(
                             Icon(
                                 Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = BrandBlue
+                                tint = Accent
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
@@ -279,7 +278,7 @@ fun NetatmoCredentialsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandBlue)
+                colors = ButtonDefaults.buttonColors(containerColor = Accent)
             ) {
                 Icon(Icons.Default.Save, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

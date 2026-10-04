@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.automations
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -9,11 +10,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.ui.components.TemperatureSlider
+
+private val Accent = Color(0xFF0284C7)
+private val TextPrimary = Color(0xFF1E293B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,28 +38,32 @@ fun CalendarAutomationScreen(
         if (uiState.saved) navController.popBackStack()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        if (automationId == -1L) "Nueva automatización de calendario"
-                        else "Editar automatización",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-                    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { navController.popBackStack() }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Accent)
                 }
-            )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (automationId == -1L) "Nueva automatización de calendario"
+                    else "Editar automatización",
+                    color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold
+                )
+            }
         }
-    ) { paddingValues ->
+        HorizontalDivider(color = Color(0xFFE2E8F0))
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)

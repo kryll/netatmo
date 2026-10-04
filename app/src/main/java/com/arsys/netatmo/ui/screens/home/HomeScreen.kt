@@ -13,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,9 +26,10 @@ import com.arsys.netatmo.domain.model.ThermostatMode
 import com.arsys.netatmo.ui.components.TemperatureSlider
 import com.arsys.netatmo.ui.theme.*
 
-private val NetatmoPrimary = Color(0xFF0EA5E9)
-private val NetatmoPrimaryDark = Color(0xFF0369A1)
-private val NetatmoGradient = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
+private val Accent = Color(0xFF0284C7)
+private val BgSurface = Color(0xFFF4F6F9)
+private val TextPrimary = Color(0xFF1E293B)
+private val TextSecondary = Color(0xFF64748B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,11 +47,11 @@ fun HomeScreen(
         ?.average()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Gradient header
+        // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(NetatmoGradient))
+                .background(Color.White)
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 20.dp)
         ) {
@@ -64,14 +64,14 @@ fun HomeScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = uiState.thermostatState?.homeName ?: "Netatmo Smart",
-                            color = Color.White,
+                            color = TextPrimary,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
                         uiState.thermostatState?.let {
                             Text(
                                 text = "${it.rooms.size} habitación(es)",
-                                color = Color.White.copy(alpha = 0.8f),
+                                color = TextSecondary,
                                 fontSize = 13.sp
                             )
                         }
@@ -81,7 +81,7 @@ fun HomeScreen(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Actualizar",
-                            tint = Color.White
+                            tint = Accent
                         )
                     }
                 }
@@ -92,14 +92,14 @@ fun HomeScreen(
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
                             text = "%.1f".format(temp),
-                            color = Color.White,
+                            color = TextPrimary,
                             fontSize = 48.sp,
                             fontWeight = FontWeight.Bold,
                             lineHeight = 52.sp
                         )
                         Text(
                             text = "°C",
-                            color = Color.White.copy(alpha = 0.85f),
+                            color = TextSecondary,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(bottom = 6.dp, start = 4.dp)
@@ -108,7 +108,7 @@ fun HomeScreen(
                         Icon(
                             Icons.Default.Home,
                             contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.6f),
+                            tint = Accent.copy(alpha = 0.5f),
                             modifier = Modifier
                                 .size(28.dp)
                                 .padding(bottom = 4.dp)
@@ -117,6 +117,7 @@ fun HomeScreen(
                 }
             }
         }
+        HorizontalDivider(color = Color(0xFFE2E8F0))
 
         // Content area
         Box(modifier = Modifier.fillMaxSize()) {
@@ -124,7 +125,7 @@ fun HomeScreen(
                 uiState.isLoading -> {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
-                        color = NetatmoPrimary
+                        color = Accent
                     )
                 }
                 uiState.thermostatState == null && uiState.error == null -> {
@@ -138,7 +139,7 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(96.dp)
                                 .background(
-                                    Brush.verticalGradient(NetatmoGradient),
+                                    Accent.copy(alpha = 0.1f),
                                     shape = CircleShape
                                 ),
                             contentAlignment = Alignment.Center
@@ -147,7 +148,7 @@ fun HomeScreen(
                                 Icons.Default.Home,
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
-                                tint = Color.White
+                                tint = Accent
                             )
                         }
                         Spacer(modifier = Modifier.height(20.dp))
@@ -325,7 +326,7 @@ fun RoomCard(
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected)
-                NetatmoPrimary.copy(alpha = 0.08f)
+                Accent.copy(alpha = 0.08f)
             else
                 MaterialTheme.colorScheme.surface
         )
@@ -364,7 +365,7 @@ fun RoomCard(
                     Text(
                         text = room.mode.displayName,
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (isSelected) NetatmoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isSelected) Accent else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -381,14 +382,14 @@ fun RoomCard(
                             Icons.Default.ThermostatAuto,
                             contentDescription = null,
                             modifier = Modifier.size(12.dp),
-                            tint = NetatmoPrimary
+                            tint = Accent
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Text(
                             text = room.targetTemp?.let { "%.1f°".format(it) } ?: "--",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = NetatmoPrimary
+                            color = Accent
                         )
                     }
                 }
@@ -397,13 +398,13 @@ fun RoomCard(
             // Expanded controls
             AnimatedVisibility(visible = isSelected) {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
-                    HorizontalDivider(color = NetatmoPrimary.copy(alpha = 0.2f))
+                    HorizontalDivider(color = Accent.copy(alpha = 0.15f))
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
                         "Temperatura objetivo",
                         style = MaterialTheme.typography.labelLarge,
-                        color = NetatmoPrimaryDark
+                        color = Accent
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -417,8 +418,8 @@ fun RoomCard(
                             onClick = { tempValue = (tempValue - 0.5).coerceAtLeast(7.0) },
                             modifier = Modifier.size(48.dp),
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = NetatmoPrimary.copy(alpha = 0.12f),
-                                contentColor = NetatmoPrimary
+                                containerColor = Accent.copy(alpha = 0.12f),
+                                contentColor = Accent
                             )
                         ) {
                             Icon(Icons.Default.Remove, contentDescription = "-0.5C")
@@ -427,15 +428,15 @@ fun RoomCard(
                             text = "%.1f°C".format(tempValue),
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
-                            color = NetatmoPrimary,
+                            color = Accent,
                             modifier = Modifier.padding(horizontal = 24.dp)
                         )
                         FilledTonalIconButton(
                             onClick = { tempValue = (tempValue + 0.5).coerceAtMost(30.0) },
                             modifier = Modifier.size(48.dp),
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = NetatmoPrimary.copy(alpha = 0.12f),
-                                contentColor = NetatmoPrimary
+                                containerColor = Accent.copy(alpha = 0.12f),
+                                contentColor = Accent
                             )
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "+0.5C")
@@ -458,7 +459,7 @@ fun RoomCard(
                                 onClick = { duration = mins },
                                 label = { Text(label) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = NetatmoPrimary,
+                                    selectedContainerColor = Accent,
                                     selectedLabelColor = Color.White
                                 )
                             )
@@ -472,7 +473,7 @@ fun RoomCard(
                         enabled = !isSetting,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = NetatmoPrimary
+                            containerColor = Accent
                         )
                     ) {
                         if (isSetting) {
@@ -494,7 +495,7 @@ fun RoomCard(
                     Text(
                         "Modo",
                         style = MaterialTheme.typography.labelLarge,
-                        color = NetatmoPrimaryDark
+                        color = Accent
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
@@ -508,7 +509,7 @@ fun RoomCard(
                                 label = { Text(mode.displayName, fontSize = 11.sp) },
                                 modifier = Modifier.weight(1f),
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = NetatmoPrimary,
+                                    selectedContainerColor = Accent,
                                     selectedLabelColor = Color.White
                                 )
                             )
@@ -562,7 +563,7 @@ fun ModuleCard(module: ModuleState) {
                 modifier = Modifier
                     .size(44.dp)
                     .background(
-                        if (module.reachable) NetatmoPrimary.copy(alpha = 0.12f)
+                        if (module.reachable) Accent.copy(alpha = 0.12f)
                         else MaterialTheme.colorScheme.errorContainer,
                         shape = RoundedCornerShape(12.dp)
                     ),
@@ -579,7 +580,7 @@ fun ModuleCard(module: ModuleState) {
                     },
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = if (module.reachable) NetatmoPrimary
+                    tint = if (module.reachable) Accent
                            else MaterialTheme.colorScheme.error
                 )
             }
@@ -600,7 +601,7 @@ fun ModuleCard(module: ModuleState) {
                 Text(
                     text = if (module.reachable) "Conectado" else "Sin conexion",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (module.reachable) NetatmoPrimary
+                    color = if (module.reachable) Accent
                             else MaterialTheme.colorScheme.error
                 )
             }
@@ -608,7 +609,7 @@ fun ModuleCard(module: ModuleState) {
                 Icon(
                     Icons.Default.ElectricalServices,
                     contentDescription = "Enchufado",
-                    tint = NetatmoPrimary.copy(alpha = 0.7f)
+                    tint = Accent.copy(alpha = 0.7f)
                 )
             } else {
                 batteryPct?.let { pct ->
@@ -623,7 +624,7 @@ fun ModuleCard(module: ModuleState) {
                             contentDescription = null,
                             tint = when {
                                 pct > 50 -> ComfortColor
-                                pct > 25 -> Color(0xFFFF9800)
+                                pct > 25 -> Color(0xFFD97706)
                                 else -> MaterialTheme.colorScheme.error
                             }
                         )
@@ -659,7 +660,7 @@ fun ScheduleCard(
                         imageVector = if (schedule.isActive) Icons.Default.RadioButtonChecked
                                       else Icons.Default.RadioButtonUnchecked,
                         contentDescription = null,
-                        tint = if (schedule.isActive) NetatmoPrimary
+                        tint = if (schedule.isActive) Accent
                                else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
@@ -673,7 +674,7 @@ fun ScheduleCard(
                     if (!schedule.isActive) {
                         TextButton(
                             onClick = { onSwitchSchedule(schedule.id) },
-                            colors = ButtonDefaults.textButtonColors(contentColor = NetatmoPrimary)
+                            colors = ButtonDefaults.textButtonColors(contentColor = Accent)
                         ) {
                             Text("Activar")
                         }
@@ -681,7 +682,7 @@ fun ScheduleCard(
                         Text(
                             "Activa",
                             style = MaterialTheme.typography.labelSmall,
-                            color = NetatmoPrimary,
+                            color = Accent,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -700,12 +701,12 @@ fun ScheduleCard(
             }
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 8.dp),
-                color = NetatmoPrimary.copy(alpha = 0.15f)
+                color = Accent.copy(alpha = 0.15f)
             )
             TextButton(
                 onClick = onNewSchedule,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.textButtonColors(contentColor = NetatmoPrimary)
+                colors = ButtonDefaults.textButtonColors(contentColor = Accent)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

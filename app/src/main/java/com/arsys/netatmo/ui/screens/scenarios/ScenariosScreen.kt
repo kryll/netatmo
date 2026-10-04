@@ -18,7 +18,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -30,9 +29,8 @@ import com.arsys.netatmo.MainActivity
 import com.arsys.netatmo.R
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
 
-private val BrandPrimary = Color(0xFF0EA5E9)
-private val BrandPrimaryDark = Color(0xFF0369A1)
-private val BrandGradient = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
+private val Accent = Color(0xFF0284C7)
+private val TextPrimary = Color(0xFF1E293B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +45,7 @@ fun ScenariosScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { navController.navigate("scenario/-1") },
-                containerColor = BrandPrimary,
+                containerColor = Accent,
                 contentColor = Color.White
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Nuevo escenario")
@@ -59,21 +57,22 @@ fun ScenariosScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Gradient header
+            // Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(BrandGradient))
+                    .background(Color.White)
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 20.dp)
             ) {
                 Text(
                     "Escenarios",
-                    color = Color.White,
+                    color = TextPrimary,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
+            HorizontalDivider(color = Color(0xFFE2E8F0))
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -120,7 +119,7 @@ fun ScenariosScreen(
                                     Icons.Default.AutoAwesome,
                                     contentDescription = null,
                                     modifier = Modifier.size(64.dp),
-                                    tint = BrandPrimary
+                                    tint = Accent
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
@@ -212,9 +211,9 @@ fun QuickActionsRow(onAction: (String) -> Unit) {
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(8.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = BrandPrimary
+                    contentColor = Accent
                 ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BrandPrimary)
+                border = androidx.compose.foundation.BorderStroke(1.dp, Accent)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -256,14 +255,14 @@ fun ScenarioCard(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (isRunning) Modifier.border(2.dp, BrandPrimary, RoundedCornerShape(16.dp))
+                if (isRunning) Modifier.border(2.dp, Accent, RoundedCornerShape(16.dp))
                 else Modifier
             ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(2.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isRunning)
-                BrandPrimary.copy(alpha = 0.06f)
+                Accent.copy(alpha = 0.06f)
             else
                 MaterialTheme.colorScheme.surface
         )
@@ -272,13 +271,13 @@ fun ScenarioCard(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Gradient accent strip on the left
+            // Accent strip on the left
             Box(
                 modifier = Modifier
                     .width(4.dp)
                     .height(72.dp)
                     .background(
-                        Brush.verticalGradient(BrandGradient),
+                        Accent,
                         RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                     )
             )
@@ -295,7 +294,7 @@ fun ScenarioCard(
                     color = try {
                         Color(android.graphics.Color.parseColor(scenario.color))
                     } catch (e: Exception) {
-                        BrandPrimary
+                        Accent
                     }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -322,14 +321,14 @@ fun ScenarioCard(
                 if (isRunning) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = BrandPrimary
+                        color = Accent
                     )
                 } else {
                     IconButton(onClick = onRun) {
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = "Ejecutar",
-                            tint = BrandPrimary
+                            tint = Accent
                         )
                     }
                 }
@@ -338,7 +337,7 @@ fun ScenarioCard(
                         Icon(
                             Icons.Default.AddToHomeScreen,
                             contentDescription = "Añadir al inicio",
-                            tint = BrandPrimaryDark
+                            tint = Accent
                         )
                     }
                 }

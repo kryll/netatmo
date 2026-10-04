@@ -8,25 +8,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF0EA5E9),
+    primary = Color(0xFF0284C7),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFF0369A1),
-    onPrimaryContainer = Color.White,
-    secondary = Color(0xFF38BDF8),
+    primaryContainer = Color(0xFFE0F2FE),
+    onPrimaryContainer = Color(0xFF0C4A6E),
+    secondary = Color(0xFF64748B),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFBAE6FD),
-    onSecondaryContainer = Color(0xFF0C4A6E),
-    tertiary = Color(0xFF006B54),
+    secondaryContainer = Color(0xFFE2E8F0),
+    onSecondaryContainer = Color(0xFF1E293B),
+    tertiary = Color(0xFF16A34A),
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFF89F8D5),
-    onTertiaryContainer = Color(0xFF002117),
-    error = Color(0xFFBA1A1A),
-    background = Color(0xFFF8FAFC),
-    onBackground = Color(0xFF181C1F),
+    tertiaryContainer = Color(0xFFDCFCE7),
+    onTertiaryContainer = Color(0xFF14532D),
+    error = Color(0xFFDC2626),
+    background = Color(0xFFF4F6F9),
+    onBackground = Color(0xFF1E293B),
     surface = Color.White,
-    onSurface = Color(0xFF181C1F),
-    surfaceVariant = Color(0xFFDDE3EA),
-    onSurfaceVariant = Color(0xFF41484D)
+    onSurface = Color(0xFF1E293B),
+    surfaceVariant = Color(0xFFF1F5F9),
+    onSurfaceVariant = Color(0xFF64748B)
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -73,8 +73,8 @@ fun NetatmoTheme(
     )
 }
 
-val WarmColor = Color(0xFFFF6B35)
-val CoolColor = Color(0xFF00B4D8)
-val ComfortColor = Color(0xFF4CAF50)
-val AwayColor = Color(0xFF9E9E9E)
-val FrostColor = Color(0xFF90CAF9)
+val WarmColor = Color(0xFFEA580C)
+val CoolColor = Color(0xFF0284C7)
+val ComfortColor = Color(0xFF16A34A)
+val AwayColor = Color(0xFF64748B)
+val FrostColor = Color(0xFF7DD3FC)

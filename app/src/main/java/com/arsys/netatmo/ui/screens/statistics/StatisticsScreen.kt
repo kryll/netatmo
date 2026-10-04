@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -25,9 +24,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
 import com.arsys.netatmo.ui.theme.WarmColor
 
-private val BrandBlue = Color(0xFF0EA5E9)
-private val BrandBlueDark = Color(0xFF0369A1)
-private val HeaderGradient = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
+private val Accent = Color(0xFF0284C7)
+private val TextPrimary = Color(0xFF1E293B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,21 +41,22 @@ fun StatisticsScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Gradient header
+        // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(HeaderGradient))
+                .background(Color.White)
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 20.dp)
         ) {
             Text(
                 text = "Estadísticas",
-                color = Color.White,
+                color = TextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
         }
+        HorizontalDivider(color = Color(0xFFE2E8F0))
 
         LazyColumn(
             modifier = Modifier
@@ -76,7 +75,7 @@ fun StatisticsScreen(
                                 onClick = { viewModel.selectRoom(roomId) },
                                 label = { Text(roomName) },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = BrandBlue,
+                                    selectedContainerColor = Accent,
                                     selectedLabelColor = Color.White
                                 )
                             )
@@ -94,7 +93,7 @@ fun StatisticsScreen(
                             onClick = { selectedPeriod = days },
                             label = { Text(label) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = BrandBlue,
+                                selectedContainerColor = Accent,
                                 selectedLabelColor = Color.White
                             )
                         )
@@ -113,7 +112,7 @@ fun StatisticsScreen(
                         title = "Temp. media",
                         value = uiState.avgTemp?.let { "%.1f°C".format(it) } ?: "--",
                         icon = Icons.Default.Thermostat,
-                        color = BrandBlue
+                        color = Accent
                     )
                     StatCard(
                         modifier = Modifier.weight(1f),
@@ -169,7 +168,7 @@ fun StatisticsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 modifier = Modifier.padding(top = 8.dp)
                             ) {
-                                LegendItem(color = BrandBlue, label = "Temperatura")
+                                LegendItem(color = Accent, label = "Temperatura")
                                 LegendItem(color = WarmColor, label = "Objetivo")
                             }
                         }
@@ -204,7 +203,7 @@ fun StatisticsScreen(
             if (uiState.isLoading) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = BrandBlue)
+                        CircularProgressIndicator(color = Accent)
                     }
                 }
             }
@@ -246,7 +245,7 @@ fun TemperatureChart(
     data: List<TemperatureDataPoint>,
     modifier: Modifier = Modifier
 ) {
-    val primaryColor = BrandBlue
+    val primaryColor = Accent
     val warmColor = WarmColor
 
     Canvas(modifier = modifier) {

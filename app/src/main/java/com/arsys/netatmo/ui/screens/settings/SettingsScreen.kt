@@ -17,7 +17,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -29,8 +28,8 @@ import com.arsys.netatmo.data.api.models.Home
 import com.arsys.netatmo.data.model.GitHubRelease
 import com.arsys.netatmo.data.repository.UpdateStatus
 
-private val BrandBlue = Color(0xFF0EA5E9)
-private val BrandGradient = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
+private val Accent = Color(0xFF0284C7)
+private val TextPrimary = Color(0xFF1E293B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,21 +105,22 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(bottom = paddingValues.calculateBottomPadding())
         ) {
-            // Gradient header
+            // Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(BrandGradient))
+                    .background(Color.White)
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 20.dp)
             ) {
                 Text(
                     text = "Ajustes",
-                    color = Color.White,
+                    color = TextPrimary,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
+            HorizontalDivider(color = Color(0xFFE2E8F0))
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -133,7 +133,7 @@ fun SettingsScreen(
                     "Hogar",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = BrandBlue,
+                    color = Accent,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
@@ -166,7 +166,7 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Info, contentDescription = null, tint = BrandBlue)
+                                Icon(Icons.Default.Info, contentDescription = null, tint = Accent)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text("No se encontraron hogares. Verifica tu cuenta Netatmo.")
                             }
@@ -183,7 +183,7 @@ fun SettingsScreen(
                     "Sincronización",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = BrandBlue,
+                    color = Accent,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
@@ -205,7 +205,7 @@ fun SettingsScreen(
                                     onCheckedChange = { viewModel.setAutoRefresh(it) },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color.White,
-                                        checkedTrackColor = BrandBlue
+                                        checkedTrackColor = Accent
                                     )
                                 )
                             }
@@ -221,7 +221,7 @@ fun SettingsScreen(
                                     onCheckedChange = { viewModel.setNotifications(it) },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color.White,
-                                        checkedTrackColor = BrandBlue
+                                        checkedTrackColor = Accent
                                     )
                                 )
                             }
@@ -238,7 +238,7 @@ fun SettingsScreen(
                     "Cuenta de desarrollador",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = BrandBlue,
+                    color = Accent,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
@@ -269,7 +269,7 @@ fun SettingsScreen(
                     "Acerca de",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = BrandBlue,
+                    color = Accent,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
@@ -304,7 +304,7 @@ fun SettingsScreen(
                     "Actualización",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = BrandBlue,
+                    color = Accent,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
@@ -359,7 +359,7 @@ fun HomeItem(
         elevation = CardDefaults.cardElevation(2.dp),
         onClick = onSelect,
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) BrandBlue.copy(alpha = 0.12f)
+            containerColor = if (isSelected) Accent.copy(alpha = 0.12f)
                              else MaterialTheme.colorScheme.surface
         )
     ) {
@@ -370,7 +370,7 @@ fun HomeItem(
             Icon(
                 Icons.Default.Home,
                 contentDescription = null,
-                tint = if (isSelected) BrandBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (isSelected) Accent else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -381,7 +381,7 @@ fun HomeItem(
                 }
             }
             if (isSelected) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BrandBlue)
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Accent)
             }
         }
     }
@@ -398,7 +398,7 @@ fun SettingRow(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = BrandBlue)
+        Icon(icon, contentDescription = null, tint = Accent)
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
@@ -430,7 +430,7 @@ fun UpdateSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = BrandBlue)
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Accent)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text("Buscar actualizaciones",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -438,7 +438,7 @@ fun UpdateSection(
                         }
                         TextButton(
                             onClick = onCheckUpdates,
-                            colors = ButtonDefaults.textButtonColors(contentColor = BrandBlue)
+                            colors = ButtonDefaults.textButtonColors(contentColor = Accent)
                         ) { Text("Verificar") }
                     }
                 }
@@ -451,7 +451,7 @@ fun UpdateSection(
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
-                            color = BrandBlue
+                            color = Accent
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("Buscando actualizaciones...",
@@ -466,7 +466,7 @@ fun UpdateSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BrandBlue)
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Accent)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text("App actualizada",
@@ -479,7 +479,7 @@ fun UpdateSection(
                         }
                         TextButton(
                             onClick = onCheckUpdates,
-                            colors = ButtonDefaults.textButtonColors(contentColor = BrandBlue)
+                            colors = ButtonDefaults.textButtonColors(contentColor = Accent)
                         ) { Text("Revisar") }
                     }
                 }
@@ -487,7 +487,7 @@ fun UpdateSection(
                 is UpdateStatus.UpdateAvailable -> {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.NewReleases, contentDescription = null, tint = BrandBlue)
+                            Icon(Icons.Default.NewReleases, contentDescription = null, tint = Accent)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text("Nueva versión disponible",
@@ -507,7 +507,7 @@ fun UpdateSection(
                             onClick = { onDownloadAndInstall(updateStatus.release) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandBlue)
+                            colors = ButtonDefaults.buttonColors(containerColor = Accent)
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -519,7 +519,7 @@ fun UpdateSection(
                 is UpdateStatus.Downloading -> {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Downloading, contentDescription = null, tint = BrandBlue)
+                            Icon(Icons.Default.Downloading, contentDescription = null, tint = Accent)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text("Descargando actualización...",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -529,7 +529,7 @@ fun UpdateSection(
                         LinearProgressIndicator(
                             progress = { updateStatus.progress },
                             modifier = Modifier.fillMaxWidth(),
-                            color = BrandBlue
+                            color = Accent
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -545,7 +545,7 @@ fun UpdateSection(
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
-                            color = BrandBlue
+                            color = Accent
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("Iniciando instalación...",
@@ -575,7 +575,7 @@ fun UpdateSection(
                             Spacer(modifier = Modifier.width(8.dp))
                             TextButton(
                                 onClick = onCheckUpdates,
-                                colors = ButtonDefaults.textButtonColors(contentColor = BrandBlue)
+                                colors = ButtonDefaults.textButtonColors(contentColor = Accent)
                             ) { Text("Reintentar") }
                         }
                     }

@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -21,7 +20,8 @@ import androidx.navigation.NavController
 import com.arsys.netatmo.data.local.entities.AutomationEntity
 import com.arsys.netatmo.ui.navigation.Screen
 
-private val BrandGradient = listOf(Color(0xFF0EA5E9), Color(0xFF0369A1))
+private val Accent = Color(0xFF0284C7)
+private val TextPrimary = Color(0xFF1E293B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +38,7 @@ fun AutomationsScreen(
             Box {
                 FloatingActionButton(
                     onClick = { showAddMenu = true },
-                    containerColor = Color(0xFF0EA5E9),
+                    containerColor = Accent,
                     contentColor = Color.White
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Agregar")
@@ -72,21 +72,22 @@ fun AutomationsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Gradient header
+            // Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(BrandGradient))
+                    .background(Color.White)
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 20.dp)
             ) {
                 Text(
                     text = "Automatizaciones",
-                    color = Color.White,
+                    color = TextPrimary,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
+            HorizontalDivider(color = Color(0xFFE2E8F0))
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -178,7 +179,7 @@ fun AutomationCard(
                 },
                 contentDescription = null,
                 modifier = Modifier.size(40.dp),
-                tint = if (automation.enabled) Color(0xFF0EA5E9) else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (automation.enabled) Accent else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -205,7 +206,7 @@ fun AutomationCard(
                 onCheckedChange = onToggle,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = Color(0xFF0EA5E9)
+                    checkedTrackColor = Accent
                 )
             )
             IconButton(onClick = { showDeleteDialog = true }) {
@@ -239,7 +240,7 @@ fun EmptyAutomationsCard() {
                 Icons.Default.AutoMode,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
-                tint = Color(0xFF0EA5E9)
+                tint = Accent
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(

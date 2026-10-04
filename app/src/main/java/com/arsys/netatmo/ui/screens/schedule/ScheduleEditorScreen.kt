@@ -28,7 +28,10 @@ import com.arsys.netatmo.data.api.models.Room
 
 // ─── Design constants ─────────────────────────────────────────────────────────
 
-private val NetatmoOrange = Color(0xFFFF7900)
+private val Accent = Color(0xFF0284C7)
+private val BgSurface = Color(0xFFF4F6F9)
+private val TextPrimary = Color(0xFF1E293B)
+private val TextSecondary = Color(0xFF64748B)
 
 private val ZONE_COLORS = listOf(
     Color(0xFF1A6BB5),  // 0 Blue  – Noche
@@ -77,17 +80,17 @@ fun ScheduleEditorScreen(
         uiState.slots.filter { it.dayOfWeek == uiState.selectedDay }.sortedBy { it.minuteOfDay }
     }
 
-    Scaffold(containerColor = Color(0xFFF2F2F7)) { scaffoldPadding ->
+    Scaffold(containerColor = BgSurface) { scaffoldPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(scaffoldPadding)
         ) {
-            // ── Orange header ─────────────────────────────────────────────────
+            // ── Header ───────────────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(NetatmoOrange)
+                    .background(Color.White)
             ) {
                 Column {
                     // Title bar
@@ -100,7 +103,7 @@ fun ScheduleEditorScreen(
                     ) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Volver",
-                                tint = Color.White)
+                                tint = Accent)
                         }
                         Column(
                             modifier = Modifier.weight(1f),
@@ -108,13 +111,13 @@ fun ScheduleEditorScreen(
                         ) {
                             Text(
                                 text = "Programación",
-                                color = Color.White,
+                                color = TextPrimary,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = uiState.name,
-                                color = Color.White.copy(alpha = 0.85f),
+                                color = TextSecondary,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.clickable { showNameDialog = true }
                             )
@@ -122,7 +125,7 @@ fun ScheduleEditorScreen(
                         // Zones manager
                         IconButton(onClick = { showZoneManager = true }) {
                             Icon(Icons.Default.Tune, contentDescription = "Gestionar zonas",
-                                tint = Color.White)
+                                tint = Accent)
                         }
                         // Save
                         if (uiState.isSaving) {
@@ -130,13 +133,13 @@ fun ScheduleEditorScreen(
                                 modifier = Modifier
                                     .size(20.dp)
                                     .padding(end = 4.dp),
-                                color = Color.White,
+                                color = Accent,
                                 strokeWidth = 2.dp
                             )
                         } else {
                             IconButton(onClick = { viewModel.save() }) {
                                 Icon(Icons.Default.Check, contentDescription = "Guardar",
-                                    tint = Color.White)
+                                    tint = Accent)
                             }
                         }
                     }
@@ -157,20 +160,21 @@ fun ScheduleEditorScreen(
                                     .size(40.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (selected) Color.White
-                                        else Color.White.copy(alpha = 0.25f)
+                                        if (selected) Accent
+                                        else Color(0xFFF1F5F9)
                                     )
                                     .clickable { viewModel.selectDay(index) }
                             ) {
                                 Text(
                                     text = label,
-                                    color = if (selected) NetatmoOrange else Color.White,
+                                    color = if (selected) Color.White else TextSecondary,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 14.sp
                                 )
                             }
                         }
                     }
+                    HorizontalDivider(color = Color(0xFFE2E8F0))
                 }
             }
 
@@ -218,12 +222,12 @@ fun ScheduleEditorScreen(
                             .padding(horizontal = 24.dp, vertical = 18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = NetatmoOrange,
+                        Icon(Icons.Default.Add, contentDescription = null, tint = Accent,
                             modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = "Añadir franja horaria",
-                            color = NetatmoOrange,
+                            color = Accent,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
@@ -615,7 +619,7 @@ private fun AddSlotDialog(
                     text = "%02d:%02d".format(hour, minute),
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
-                    color = NetatmoOrange,
+                    color = Accent,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -629,8 +633,8 @@ private fun AddSlotDialog(
                         valueRange = 0f..23f,
                         steps = 22,
                         colors = SliderDefaults.colors(
-                            activeTrackColor = NetatmoOrange,
-                            thumbColor = NetatmoOrange
+                            activeTrackColor = Accent,
+                            thumbColor = Accent
                         )
                     )
                 }
@@ -644,8 +648,8 @@ private fun AddSlotDialog(
                         valueRange = 0f..11f,
                         steps = 10,
                         colors = SliderDefaults.colors(
-                            activeTrackColor = NetatmoOrange,
-                            thumbColor = NetatmoOrange
+                            activeTrackColor = Accent,
+                            thumbColor = Accent
                         )
                     )
                 }
@@ -703,7 +707,7 @@ private fun AddSlotDialog(
         confirmButton = {
             Button(
                 onClick = { onAdd(hour * 60 + minute, selectedZoneId) },
-                colors = ButtonDefaults.buttonColors(containerColor = NetatmoOrange)
+                colors = ButtonDefaults.buttonColors(containerColor = Accent)
             ) { Text("Añadir") }
         },
         dismissButton = {
