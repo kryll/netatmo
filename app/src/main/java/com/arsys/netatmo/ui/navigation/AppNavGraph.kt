@@ -232,8 +232,7 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                     onNavigateToCredentials = {
                         navController.navigate(Screen.NetatmoCredentials.route)
                     },
-                    onNavigateToFamily = { navController.navigate("family_management") },
-                    onNavigateToVacation = { navController.navigate("vacation_mode") }
+                    onNavigateToFamily = { navController.navigate("family_management") }
                 )
             }
             composable(Screen.NetatmoCredentials.route) {

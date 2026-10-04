@@ -31,7 +31,6 @@ fun OutdoorTempAutomationScreen(
     navController: NavController,
     viewModel: OutdoorTempAutomationViewModel = hiltViewModel()
 ) {
-    val outdoorTemp by viewModel.outdoorTemp.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
 
     var name by remember { mutableStateOf("Temperatura exterior") }
@@ -42,15 +41,11 @@ fun OutdoorTempAutomationScreen(
     var enabled by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(automationId) {
-        viewModel.load(automationId)
-    }
-
     LaunchedEffect(uiState) {
         uiState?.let {
             name = it.name
             condition = it.condition
-            threshold = it.threshold
+            threshold = it.thresholdTemp
             targetTemp = it.targetTemp
             mode = it.mode
             enabled = it.enabled
@@ -142,7 +137,7 @@ fun OutdoorTempAutomationScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Current outdoor temperature card
-            if (outdoorTemp != null) {
+            if (uiState.outdoorTemp != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -175,7 +170,7 @@ fun OutdoorTempAutomationScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "%.1f°C".format(outdoorTemp),
+                                text = "%.1f°C".format(uiState.outdoorTemp),
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
