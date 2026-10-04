@@ -851,74 +851,132 @@ fun ScheduleCard(
     onEditSchedule: (String) -> Unit = {},
     onNewSchedule: () -> Unit = {}
 ) {
+    val activeSchedule = schedules.firstOrNull { it.isActive }
+    val otherSchedules = schedules.filter { !it.isActive }
+    var expanded by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            schedules.forEach { schedule ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            // Header row: active schedule name + badge + edit + expand chevron
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.RadioButtonChecked,
+                    contentDescription = null,
+                    tint = Accent,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = activeSchedule?.name ?: "Sin programacion activa",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Accent.copy(alpha = 0.12f)
                 ) {
-                    Icon(
-                        imageVector = if (schedule.isActive) Icons.Default.RadioButtonChecked
-                                      else Icons.Default.RadioButtonUnchecked,
-                        contentDescription = null,
-                        tint = if (schedule.isActive) Accent
-                               else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = schedule.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (schedule.isActive) FontWeight.SemiBold else FontWeight.Normal,
-                        modifier = Modifier.weight(1f)
+                        text = "Activa",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Accent,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
-                    if (!schedule.isActive) {
-                        TextButton(
-                            onClick = { onSwitchSchedule(schedule.id) },
-                            colors = ButtonDefaults.textButtonColors(contentColor = Accent)
-                        ) {
-                            Text("Activar")
-                        }
-                    } else {
-                        Text(
-                            "Activa",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Accent,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                }
+                if (activeSchedule != null) {
                     IconButton(
-                        onClick = { onEditSchedule(schedule.id) },
+                        onClick = { onEditSchedule(activeSchedule.id) },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
                             Icons.Default.Edit,
-                            contentDescription = "Editar programacion",
+                            contentDescription = "Editar programacion activa",
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+                IconButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Contraer" else "Expandir",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                color = Accent.copy(alpha = 0.15f)
-            )
-            TextButton(
-                onClick = onNewSchedule,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.textButtonColors(contentColor = Accent)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Nueva programacion")
+
+            // Dropdown with other schedules
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    if (otherSchedules.isNotEmpty()) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = Accent.copy(alpha = 0.15f)
+                        )
+                        otherSchedules.forEach { schedule ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = schedule.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(
+                                    onClick = { onSwitchSchedule(schedule.id) },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = Accent)
+                                ) {
+                                    Text("Activar", style = MaterialTheme.typography.labelMedium)
+                                }
+                                IconButton(
+                                    onClick = { onEditSchedule(schedule.id) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Editar programacion",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = Accent.copy(alpha = 0.15f)
+                    )
+                    TextButton(
+                        onClick = onNewSchedule,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.textButtonColors(contentColor = Accent)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("+ Nueva programacion")
+                    }
+                }
             }
         }
     }
