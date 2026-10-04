@@ -23,7 +23,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.data.local.entities.AutomationEntity
 import com.arsys.netatmo.ui.navigation.Screen
-import org.json.JSONObject
 
 private val Accent = Color(0xFF0284C7)
 private val TextPrimary = Color(0xFF1E293B)
@@ -79,14 +78,6 @@ fun AutomationsScreen(
                         onClick = {
                             showAddMenu = false
                             navController.navigate("schedule_automation/-1")
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Temperatura exterior") },
-                        leadingIcon = { Icon(Icons.Default.WbSunny, contentDescription = null) },
-                        onClick = {
-                            showAddMenu = false
-                            navController.navigate("outdoor_temp_automation/-1")
                         }
                     )
                 }
@@ -167,7 +158,6 @@ fun AutomationsScreen(
                                             "GEOFENCE" -> "Geovalla"
                                             "CALENDAR" -> "Calendario"
                                             "SCHEDULE" -> "Horario"
-                                            "OUTDOOR_TEMP" -> "Temp. Exterior"
                                             else -> type
                                         },
                                         style = MaterialTheme.typography.labelLarge,
@@ -191,7 +181,6 @@ fun AutomationsScreen(
                                             "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
                                             "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
                                             "SCHEDULE" -> navController.navigate("schedule_automation/${automation.id}")
-                                            "OUTDOOR_TEMP" -> navController.navigate("outdoor_temp_automation/${automation.id}")
                                         }
                                     },
                                     onDelete = { viewModel.deleteAutomation(automation) }
@@ -329,7 +318,6 @@ private fun automationTypeColor(type: String): Color = when (type) {
     "GEOFENCE" -> Color(0xFF0284C7)
     "CALENDAR" -> Color(0xFF7C3AED)
     "SCHEDULE" -> Color(0xFF059669)
-    "OUTDOOR_TEMP" -> Color(0xFFEA580C)
     else -> Color(0xFF64748B)
 }
 
@@ -337,7 +325,6 @@ private fun automationTypeIcon(type: String): ImageVector = when (type) {
     "GEOFENCE" -> Icons.Default.LocationOn
     "CALENDAR" -> Icons.Default.CalendarToday
     "SCHEDULE" -> Icons.Default.Schedule
-    "OUTDOOR_TEMP" -> Icons.Default.WbSunny
     else -> Icons.Default.AutoMode
 }
 
@@ -401,17 +388,6 @@ fun AutomationCard(
                 val subtitle = when (automation.type) {
                     "GEOFENCE" -> "Geovalla · ${automation.mode}"
                     "CALENDAR" -> "Calendario · %.1f°C".format(automation.targetTemperature)
-                    "OUTDOOR_TEMP" -> run {
-                        try {
-                            val json = JSONObject(automation.triggerData ?: "")
-                            val condition = json.getString("condition")
-                            val thresholdTemp = json.getDouble("thresholdTemp")
-                            val cond = if (condition == "below") "bajo" else "sobre"
-                            "Ext. $cond %.1f°C → %.1f°C".format(thresholdTemp, automation.targetTemperature)
-                        } catch (e: Exception) {
-                            "Temperatura exterior"
-                        }
-                    }
                     else -> "%.1f°C · ${automation.mode}".format(automation.targetTemperature)
                 }
                 Text(
