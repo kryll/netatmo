@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.arsys.netatmo.service.OutdoorTempWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -24,7 +23,6 @@ class NetatmoApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
-        OutdoorTempWorker.schedule(this)
     }
 
     private fun createNotificationChannels() {
