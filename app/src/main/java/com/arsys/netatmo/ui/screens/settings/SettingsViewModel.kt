@@ -34,7 +34,8 @@ data class SettingsUiState(
     val isImporting: Boolean = false,
     val backupResult: String? = null,
     val anomalyThreshold: Float = 3.0f,
-    val exportedUri: Uri? = null
+    val exportedUri: Uri? = null,
+    val exportError: String? = null
 )
 
 @HiltViewModel
@@ -147,7 +148,7 @@ class SettingsViewModel @Inject constructor(
 
     fun exportBackup(context: Context) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isExporting = true, backupResult = null) }
+            _uiState.update { it.copy(isExporting = true, backupResult = null, exportError = null) }
             val uri = backupManager.export(context)
             if (uri != null) {
                 _uiState.update {
@@ -159,10 +160,18 @@ class SettingsViewModel @Inject constructor(
                 }
             } else {
                 _uiState.update {
-                    it.copy(isExporting = false, backupResult = "Error al exportar el backup")
+                    it.copy(
+                        isExporting = false,
+                        backupResult = "Error al exportar el backup",
+                        exportError = "No se pudo generar el archivo de backup. Revisa los permisos o el almacenamiento."
+                    )
                 }
             }
         }
+    }
+
+    fun clearExportError() {
+        _uiState.update { it.copy(exportError = null) }
     }
 
     fun importBackup(context: Context, uri: Uri) {

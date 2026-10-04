@@ -2,6 +2,7 @@ package com.arsys.netatmo.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.core.content.FileProvider
 import com.arsys.netatmo.data.local.dao.ScenarioDao
 import com.arsys.netatmo.data.local.entities.AutomationEntity
@@ -43,6 +44,7 @@ class BackupManager @Inject constructor(
 
             FileProvider.getUriForFile(context, "com.arsys.netatmo.provider", file)
         } catch (e: Exception) {
+            Log.e("BackupManager", "Export failed", e)
             null
         }
     }

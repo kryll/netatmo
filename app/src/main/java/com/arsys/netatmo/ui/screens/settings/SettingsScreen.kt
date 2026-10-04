@@ -43,6 +43,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
     var pendingInstallRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Launch share intent when backup export succeeds
     val exportedUri = uiState.exportedUri
@@ -55,6 +56,18 @@ fun SettingsScreen(
             }
             context.startActivity(Intent.createChooser(shareIntent, "Exportar backup"))
             viewModel.clearExportedUri()
+        }
+    }
+
+    // Show Snackbar when export fails
+    val exportError = uiState.exportError
+    LaunchedEffect(exportError) {
+        exportError?.let { error ->
+            snackbarHostState.showSnackbar(
+                message = error,
+                duration = SnackbarDuration.Long
+            )
+            viewModel.clearExportError()
         }
     }
 
@@ -120,7 +133,9 @@ fun SettingsScreen(
         )
     }
 
-    Scaffold { paddingValues ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
