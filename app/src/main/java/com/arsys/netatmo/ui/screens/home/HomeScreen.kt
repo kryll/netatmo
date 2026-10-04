@@ -268,15 +268,11 @@ fun HomeScreen(
             }
 
             // Success snackbar
-            AnimatedVisibility(
-                visible = uiState.successMessage != null,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-            ) {
+            if (uiState.successMessage != null) {
                 Card(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(4.dp),
                     colors = CardDefaults.cardColors(
@@ -293,7 +289,7 @@ fun HomeScreen(
                             tint = MaterialTheme.colorScheme.tertiary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(uiState.successMessage ?: "")
+                        Text(uiState.successMessage)
                     }
                 }
             }
