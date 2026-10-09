@@ -1,6 +1,7 @@
 package com.arsys.netatmo.ui.screens.home
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,6 +33,7 @@ private val BgSurface = Color(0xFFF4F6F9)
 private val TextPrimary = Color(0xFF1E293B)
 private val TextSecondary = Color(0xFF64748B)
 private val BoostColor = Color(0xFFEF4444)
+private val BoilerColor = Color(0xFFEA580C)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +52,12 @@ fun HomeScreen(
         ?.mapNotNull { it.currentTemp }
         ?.takeIf { it.isNotEmpty() }
         ?.average()
+
+    // Boiler is on when the relay module reports boilerStatus=true, or any room is actively heating
+    val isBoilerOn = uiState.thermostatState?.let { state ->
+        state.modules.any { it.boilerStatus == true } ||
+        state.rooms.any { it.heatingActive }
+    } ?: false
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Header
@@ -157,6 +166,18 @@ fun HomeScreen(
                                 }
                             }
                         }
+                    }
+                }
+
+                // Boiler active indicator
+                AnimatedVisibility(
+                    visible = isBoilerOn,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        BoilerActiveChip()
                     }
                 }
 
@@ -978,6 +999,43 @@ fun ScheduleCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BoilerActiveChip() {
+    val pulse = rememberInfiniteTransition(label = "boiler_pulse")
+    val scale by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "boiler_icon_scale"
+    )
+    Surface(
+        color = BoilerColor.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Default.Whatshot,
+                contentDescription = null,
+                tint = BoilerColor,
+                modifier = Modifier.size(18.dp).scale(scale)
+            )
+            Text(
+                text = "Caldera encendida",
+                color = BoilerColor,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp
+            )
         }
     }
 }
