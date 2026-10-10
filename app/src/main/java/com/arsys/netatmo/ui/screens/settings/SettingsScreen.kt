@@ -306,6 +306,101 @@ fun SettingsScreen(
 
                 item { Spacer(modifier = Modifier.height(4.dp)) }
 
+                // ── Calidad del Aire y Caldera ─────────────────────────
+                item { SettingSectionHeader("Sensores y caldera") }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 2.dp, bottomEnd = 2.dp),
+                            color = SurfaceContainerLow,
+                            onClick = onNavigateToAirQuality
+                        ) {
+                            SettingRow(
+                                icon = Icons.Default.Air,
+                                title = "Calidad del Aire",
+                                subtitle = "CO₂, humedad, ruido y presión",
+                                trailing = {
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            )
+                        }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(2.dp),
+                            color = SurfaceContainerLow,
+                            onClick = onNavigateToBoilerStatus
+                        ) {
+                            SettingRow(
+                                icon = Icons.Default.LocalFireDepartment,
+                                title = "Estado de la caldera",
+                                subtitle = "Temperatura, presión y diagnóstico hidráulico",
+                                trailing = {
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                // ── Mantenimiento e instalación ────────────────────────
+                item { SettingSectionHeader("Mantenimiento e instalación") }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 2.dp, bottomEnd = 2.dp),
+                            color = SurfaceContainerLow,
+                            onClick = onNavigateToMaintenance
+                        ) {
+                            SettingRow(
+                                icon = Icons.Default.Assignment,
+                                title = "Historial de mantenimiento",
+                                subtitle = "Revisiones, certificados y registros",
+                                trailing = {
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            )
+                        }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(2.dp),
+                            color = SurfaceContainerLow,
+                            onClick = onNavigateToDevicePairing
+                        ) {
+                            SettingRow(
+                                icon = Icons.Default.Devices,
+                                title = "Vincular dispositivo",
+                                subtitle = "Añadir termostato, válvulas o módulos",
+                                trailing = {
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            )
+                        }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp, topStart = 2.dp, topEnd = 2.dp),
+                            color = SurfaceContainerLow,
+                            onClick = onNavigateToPurge
+                        ) {
+                            SettingRow(
+                                icon = Icons.Default.WaterDrop,
+                                title = "Purga del sistema",
+                                subtitle = "Purga de radiadores y calibración de válvulas",
+                                trailing = {
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(4.dp)) }
+
                 // ── Familia ────────────────────────────────────────────
                 item { SettingSectionHeader("Familia") }
 
