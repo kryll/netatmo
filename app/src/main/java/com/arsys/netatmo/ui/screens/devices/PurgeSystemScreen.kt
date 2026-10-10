@@ -77,7 +77,7 @@ private val RADIATOR_PURGE_STEPS = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PurgeSystemScreen(onBack: () -> Unit) {
+fun PurgeSystemScreen(onBack: () -> Unit, onNavigateToCalibration: () -> Unit = {}) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
@@ -114,7 +114,7 @@ fun PurgeSystemScreen(onBack: () -> Unit) {
                 containerColor   = SurfaceContLow,
                 contentColor     = Primary
             ) {
-                listOf("Purga de Aire", "Purga de Radiador").forEachIndexed { i, label ->
+                listOf("Purga de Aire", "Purga de Radiador", "Calibración").forEachIndexed { i, label ->
                     Tab(
                         selected = selectedTab == i,
                         onClick  = { selectedTab = i },
@@ -140,6 +140,7 @@ fun PurgeSystemScreen(onBack: () -> Unit) {
                     tabLabel    = "Purga de Radiador",
                     showTimer   = true
                 )
+                2 -> CalibrationLaunchTab(onNavigateToCalibration = onNavigateToCalibration)
             }
         }
     }
@@ -511,5 +512,46 @@ private fun ChecklistItem(text: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Tertiary, modifier = Modifier.size(16.dp))
         Text(text, color = OnSurface, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun CalibrationLaunchTab(onNavigateToCalibration: () -> Unit) {
+    androidx.compose.foundation.layout.Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(16.dp))
+        Icon(Icons.Filled.Tune, contentDescription = null, tint = Primary, modifier = Modifier.size(56.dp))
+        androidx.compose.foundation.layout.Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Calibración de Válvulas",
+                color = OnSurface,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp
+            )
+            Text(
+                "Calibra las válvulas termostáticas de cada radiador para garantizar un control preciso de la temperatura por zona.",
+                color = OnSurfaceVar,
+                fontSize = 13.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+        Button(
+            onClick = onNavigateToCalibration,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Primary, contentColor = Color(0xFF003351)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Iniciar calibración", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        }
     }
 }

@@ -298,7 +298,10 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                 DevicePairingScreen(onBack = { navController.popBackStack() })
             }
             composable(Screen.PurgeSystem.route) {
-                PurgeSystemScreen(onBack = { navController.popBackStack() })
+                PurgeSystemScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToCalibration = { navController.navigate(Screen.ValveCalibration.route) }
+                )
             }
             composable(Screen.ValveCalibration.route) {
                 ValveCalibrationScreen(onBack = { navController.popBackStack() })

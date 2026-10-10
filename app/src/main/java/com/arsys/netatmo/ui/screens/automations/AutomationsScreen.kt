@@ -307,6 +307,16 @@ fun AutomationsScreen(
                                 navController.navigate("advanced_automation/-1")
                             }
                         )
+                        FabMenuItem(
+                            label = "Vacaciones",
+                            icon = Icons.Default.BeachAccess,
+                            containerColor = Color(0xFF0369A1),
+                            contentColor = Color.White,
+                            onClick = {
+                                fabExpanded = false
+                                navController.navigate("vacation_mode")
+                            }
+                        )
                     }
                 }
 
