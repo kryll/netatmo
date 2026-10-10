@@ -19,7 +19,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -33,22 +32,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.R
+import com.arsys.netatmo.ui.theme.OutlineVariant
+import com.arsys.netatmo.ui.theme.SurfaceContainer
+import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
+import com.arsys.netatmo.ui.theme.WarmColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.sqrt
 
-// Design tokens
-private val Accent = Color(0xFF0284C7)
-private val Warm = Color(0xFFEA580C)
-private val Green = Color(0xFF16A34A)
-private val Violet = Color(0xFF7C3AED)
-private val Warn = Color(0xFFD97706)
-private val BgSurface = Color(0xFFF4F6F9)
-private val TextPrimary = Color(0xFF1E293B)
-private val TextSecondary = Color(0xFF64748B)
+// Design tokens — Stitch dark palette
+private val Background       = Color(0xFF101419)
+private val Primary          = Color(0xFF93CCFF)
+private val PrimaryContainer = Color(0xFF3198DC)
+private val Secondary        = Color(0xFFFFB599)   // warm / heating
+private val SecondaryActive  = Color(0xFFF66018)   // active orange
+private val Tertiary         = Color(0xFF62DF7D)   // eco / comfort green
+private val TertiaryContainer = Color(0xFF1CA64D)
+private val OnSurface        = Color(0xFFE0E2EA)
+private val OnSurfaceVariant = Color(0xFFBFC7D2)
+private val Warm             = WarmColor            // 0xFFEA580C orange accent
 
 private data class AutoFlow(val whenLabel: String, val thenLabel: String, val color: Color)
-private data class SceneItem(val emoji: String, val label: String, val temp: String, val color: Color, val bg: Color)
+private data class SceneItem(val icon: String, val label: String, val temp: String, val color: Color, val bgColor: Color)
 private data class ScheduleBlock(val dayCol: Int, val startRow: Int, val endRow: Int, val color: Color)
 
 @Composable
@@ -67,7 +72,7 @@ fun OnboardingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgSurface)
+            .background(Background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             HorizontalPager(
@@ -94,12 +99,14 @@ fun OnboardingScreen(
                 }
             }
 
+            // Navigation bar
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Page indicator: active = primary pill 22×6dp, inactive = outlineVariant 6dp circle
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -110,7 +117,7 @@ fun OnboardingScreen(
                             modifier = Modifier
                                 .size(if (selected) 22.dp else 6.dp, 6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(if (selected) Accent else Color(0xFFCBD5E1))
+                                .background(if (selected) Primary else OutlineVariant)
                         )
                     }
                 }
@@ -129,7 +136,10 @@ fun OnboardingScreen(
                                 },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                                border = BorderStroke(1.dp, OutlineVariant),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = OnSurfaceVariant
+                                )
                             ) {
                                 Text("Atrás")
                             }
@@ -140,13 +150,16 @@ fun OnboardingScreen(
                             },
                             modifier = Modifier.weight(if (currentPage > 0) 2f else 1f),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryContainer,
+                                contentColor = OnSurface
+                            )
                         ) {
                             Text(
                                 text = when (currentPage) {
-                                    0 -> "Empezar"
+                                    0              -> "Empezar"
                                     totalPages - 2 -> "Continuar"
-                                    else -> "Siguiente"
+                                    else           -> "Siguiente"
                                 },
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -158,6 +171,7 @@ fun OnboardingScreen(
             }
         }
 
+        // Skip button
         if (!isLastPage) {
             TextButton(
                 onClick = { viewModel.markOnboardingCompleted(); onSkip() },
@@ -165,11 +179,15 @@ fun OnboardingScreen(
                     .align(Alignment.TopEnd)
                     .padding(top = 8.dp, end = 8.dp)
             ) {
-                Text("Saltar", color = TextSecondary, fontSize = 14.sp)
+                Text("Saltar", color = OnSurfaceVariant, fontSize = 14.sp)
             }
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Shared slide container
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun SlideContainer(
@@ -199,9 +217,9 @@ private fun SlideContainer(
 
         Text(
             text = title,
-            fontSize = 26.sp,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary,
+            color = OnSurface,
             textAlign = TextAlign.Center
         )
 
@@ -209,8 +227,8 @@ private fun SlideContainer(
 
         Text(
             text = subtitle,
-            fontSize = 15.sp,
-            color = TextSecondary,
+            style = MaterialTheme.typography.bodyMedium,
+            color = OnSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
@@ -219,6 +237,10 @@ private fun SlideContainer(
         visual()
     }
 }
+
+// ---------------------------------------------------------------------------
+// Page 0 — Welcome
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun Slide0Welcome() {
@@ -229,21 +251,28 @@ private fun Slide0Welcome() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        androidx.compose.foundation.Image(
-            painter = painterResource(R.drawable.ic_app_logo),
-            contentDescription = null,
-            modifier = Modifier
-                .size(120.dp)
-                .clip(RoundedCornerShape(28.dp))
-        )
+        // Logo in circular surfaceContainerHigh
+        Surface(
+            modifier = Modifier.size(120.dp),
+            shape = CircleShape,
+            color = SurfaceContainerHigh
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(R.drawable.ic_app_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(80.dp)
+                )
+            }
+        }
 
         Spacer(Modifier.height(36.dp))
 
         Text(
             text = "Netatmo Smart",
-            fontSize = 32.sp,
+            style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary,
+            color = OnSurface,
             textAlign = TextAlign.Center
         )
 
@@ -251,18 +280,22 @@ private fun Slide0Welcome() {
 
         Text(
             text = "Tu hogar, a la temperatura perfecta",
-            fontSize = 18.sp,
-            color = TextSecondary,
+            style = MaterialTheme.typography.bodyLarge,
+            color = OnSurfaceVariant,
             textAlign = TextAlign.Center
         )
     }
 }
 
+// ---------------------------------------------------------------------------
+// Page 1 — Thermostat dial
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun Slide1Thermostat() {
     SlideContainer(
         eyebrowText = "Control",
-        eyebrowColor = Accent,
+        eyebrowColor = Primary,
         title = "Temperatura perfecta",
         subtitle = "Ajusta cada zona desde cualquier lugar"
     ) {
@@ -277,8 +310,9 @@ private fun Slide1Thermostat() {
             val cx = size.width / 2f
             val cy = size.height / 2f
 
+            // Track — dark outlineVariant
             drawArc(
-                color = Color(0xFFE2E8F0),
+                color = Color(0xFF3F4850),
                 startAngle = startAngle,
                 sweepAngle = totalSweep,
                 useCenter = false,
@@ -286,9 +320,9 @@ private fun Slide1Thermostat() {
                 size = arcSize,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
-
+            // Fill — primary
             drawArc(
-                color = Accent,
+                color = Primary,
                 startAngle = startAngle,
                 sweepAngle = fillSweep,
                 useCenter = false,
@@ -299,7 +333,7 @@ private fun Slide1Thermostat() {
 
             drawIntoCanvas { canvas ->
                 val tempPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#1E293B")
+                    color = android.graphics.Color.parseColor("#E0E2EA")
                     textSize = 80f
                     textAlign = android.graphics.Paint.Align.CENTER
                     isFakeBoldText = true
@@ -307,7 +341,7 @@ private fun Slide1Thermostat() {
                 canvas.nativeCanvas.drawText("21°", cx, cy + 28f, tempPaint)
 
                 val subPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#64748B")
+                    color = android.graphics.Color.parseColor("#BFC7D2")
                     textSize = 26f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
@@ -317,11 +351,15 @@ private fun Slide1Thermostat() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Page 2 — Geofence
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun Slide2Geofence() {
     SlideContainer(
         eyebrowText = "Geovalla",
-        eyebrowColor = Green,
+        eyebrowColor = Tertiary,
         title = "Llega y enciende",
         subtitle = "Tu termostato te detecta y prepara el hogar"
     ) {
@@ -329,26 +367,28 @@ private fun Slide2Geofence() {
             val cx = size.width / 2f
             val cy = size.height / 2f
 
+            // Geofence rings (tertiary)
             listOf(0.42f, 0.62f, 0.80f).forEach { fraction ->
                 drawCircle(
-                    color = Green.copy(alpha = 0.14f),
+                    color = Tertiary.copy(alpha = 0.18f),
                     radius = size.width * fraction / 2f,
                     center = Offset(cx, cy),
                     style = Stroke(width = 1.5f)
                 )
             }
-
+            // Home zone
             drawCircle(
-                color = Green.copy(alpha = 0.18f),
+                color = Tertiary.copy(alpha = 0.12f),
                 radius = size.width * 0.18f,
                 center = Offset(cx, cy)
             )
-
+            // Phone dot (primary)
             val phoneCx = cx + size.width * 0.28f
             val phoneCy = cy - size.height * 0.24f
-            drawCircle(color = Accent, radius = 14f, center = Offset(phoneCx, phoneCy))
-            drawCircle(color = Color.White, radius = 6f, center = Offset(phoneCx, phoneCy))
+            drawCircle(color = Primary, radius = 14f, center = Offset(phoneCx, phoneCy))
+            drawCircle(color = Background, radius = 6f, center = Offset(phoneCx, phoneCy))
 
+            // Dashed line to home
             val dx = cx - phoneCx
             val dy = cy - phoneCy
             val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
@@ -360,7 +400,7 @@ private fun Slide2Geofence() {
             while (t < dist - 20f) {
                 val end = minOf(t + dashLen, dist - 20f)
                 drawLine(
-                    color = Accent.copy(alpha = 0.55f),
+                    color = Primary.copy(alpha = 0.55f),
                     start = Offset(phoneCx + ux * t, phoneCy + uy * t),
                     end = Offset(phoneCx + ux * end, phoneCy + uy * end),
                     strokeWidth = 2f
@@ -379,11 +419,15 @@ private fun Slide2Geofence() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Page 3 — Stats / bar chart
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun Slide3Stats() {
     SlideContainer(
         eyebrowText = "Calendario · Estadísticas",
-        eyebrowColor = Warn,
+        eyebrowColor = Secondary,
         title = "Ahorra energía",
         subtitle = "Visualiza el consumo y reduce tu factura"
     ) {
@@ -408,7 +452,8 @@ private fun Slide3Stats() {
                 val left = i * totalBarW + barPad
                 val top = barZone - barH
                 drawRoundRect(
-                    color = if (i == highlightIndex) Warn else Color(0xFFBAE6FD),
+                    color = if (i == highlightIndex) SecondaryActive
+                            else Primary.copy(alpha = 0.35f),
                     topLeft = Offset(left, top),
                     size = Size(barW, barH),
                     cornerRadius = CornerRadius(cornerR)
@@ -417,7 +462,7 @@ private fun Slide3Stats() {
 
             drawIntoCanvas { canvas ->
                 val paint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#64748B")
+                    color = android.graphics.Color.parseColor("#BFC7D2")
                     textSize = 22f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
@@ -430,18 +475,22 @@ private fun Slide3Stats() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Page 4 — Automations
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun Slide4Automations() {
     val flows = listOf(
-        AutoFlow("Llego a casa", "21°C Confort", Accent),
+        AutoFlow("Llego a casa",  "21°C Confort",  Primary),
         AutoFlow("Reunión en casa", "Precalentar", Warm),
-        AutoFlow("23:00", "17°C Noche", Violet),
-        AutoFlow("Salgo de casa", "15°C Eco", Green)
+        AutoFlow("23:00",         "17°C Noche",    Secondary),
+        AutoFlow("Salgo de casa", "15°C Eco",      Tertiary)
     )
 
     SlideContainer(
         eyebrowText = "Automatizaciones",
-        eyebrowColor = Violet,
+        eyebrowColor = Secondary,
         title = "Que funcione solo",
         subtitle = "Escenarios que se adaptan a tu vida"
     ) {
@@ -456,12 +505,23 @@ private fun Slide4Automations() {
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFE2E8F0))
+                            .background(SurfaceContainerHigh)
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
                         Column {
-                            Text("CUANDO", fontSize = 9.sp, color = TextSecondary, fontWeight = FontWeight.SemiBold)
-                            Text(flow.whenLabel, fontSize = 13.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
+                            Text(
+                                "CUANDO",
+                                fontSize = 9.sp,
+                                color = OnSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.8.sp
+                            )
+                            Text(
+                                flow.whenLabel,
+                                fontSize = 13.sp,
+                                color = OnSurface,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
 
@@ -476,12 +536,23 @@ private fun Slide4Automations() {
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(flow.color.copy(alpha = 0.10f))
+                            .background(flow.color.copy(alpha = 0.12f))
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
                         Column {
-                            Text("ENTONCES", fontSize = 9.sp, color = flow.color, fontWeight = FontWeight.SemiBold)
-                            Text(flow.thenLabel, fontSize = 13.sp, color = flow.color, fontWeight = FontWeight.Medium)
+                            Text(
+                                "ENTONCES",
+                                fontSize = 9.sp,
+                                color = flow.color,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.8.sp
+                            )
+                            Text(
+                                flow.thenLabel,
+                                fontSize = 13.sp,
+                                color = flow.color,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                 }
@@ -490,13 +561,17 @@ private fun Slide4Automations() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Page 5 — Scenes
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun Slide5Scenes() {
     val scenes = listOf(
-        SceneItem("☀️", "Confort", "21°", Warm, Color(0xFFFFF7ED)),
-        SceneItem("🌿", "Eco", "18°", Green, Color(0xFFF0FDF4)),
-        SceneItem("🚗", "Ausente", "15°", Accent, Color(0xFFF0F9FF)),
-        SceneItem("🌙", "Noche", "17°", Violet, Color(0xFFF5F3FF))
+        SceneItem("☀️", "Confort",  "21°", Warm,     Warm.copy(alpha = 0.10f)),
+        SceneItem("🌿", "Eco",      "18°", Tertiary, Tertiary.copy(alpha = 0.10f)),
+        SceneItem("🚗", "Ausente",  "15°", Primary,  Primary.copy(alpha = 0.10f)),
+        SceneItem("🌙", "Noche",    "17°", Secondary, Secondary.copy(alpha = 0.10f))
     )
     var selected by remember { mutableStateOf(0) }
 
@@ -515,16 +590,16 @@ private fun Slide5Scenes() {
                     row.forEachIndexed { colIdx, scene ->
                         val globalIdx = rowIdx * 2 + colIdx
                         val isSelected = selected == globalIdx
-                        Card(
+                        Surface(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { selected = globalIdx },
                             shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = scene.bg),
-                            border = if (isSelected) BorderStroke(2.dp, scene.color) else null,
-                            elevation = CardDefaults.cardElevation(
-                                defaultElevation = if (isSelected) 4.dp else 0.dp
-                            )
+                            color = if (isSelected) scene.bgColor else SurfaceContainer,
+                            border = if (isSelected)
+                                BorderStroke(2.dp, scene.color)
+                            else
+                                BorderStroke(1.dp, OutlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -532,7 +607,7 @@ private fun Slide5Scenes() {
                                     .padding(16.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(scene.emoji, fontSize = 28.sp)
+                                Text(scene.icon, fontSize = 28.sp)
                                 Spacer(Modifier.height(6.dp))
                                 Text(
                                     scene.label,
@@ -544,7 +619,7 @@ private fun Slide5Scenes() {
                                     scene.temp,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                                    color = OnSurface
                                 )
                             }
                         }
@@ -555,22 +630,30 @@ private fun Slide5Scenes() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Page 6 — Weekly schedule grid
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun Slide6Schedules() {
-    val amber = Color(0xFFF59E0B)
+    val nightColor   = Secondary.copy(alpha = 0.85f)
+    val morningColor = Color(0xFFFFB44C)
+    val ecoColor     = Tertiary
+    val comfortColor = Warm
+
     val blocks = listOf(
-        ScheduleBlock(0, 0, 2, Violet), ScheduleBlock(0, 2, 4, amber), ScheduleBlock(0, 4, 6, Warm),
-        ScheduleBlock(1, 0, 2, Violet), ScheduleBlock(1, 2, 4, amber), ScheduleBlock(1, 4, 6, Green),
-        ScheduleBlock(2, 0, 2, Violet), ScheduleBlock(2, 2, 5, Warm),  ScheduleBlock(2, 5, 6, Violet),
-        ScheduleBlock(3, 0, 2, Violet), ScheduleBlock(3, 2, 4, amber), ScheduleBlock(3, 4, 6, Warm),
-        ScheduleBlock(4, 0, 1, Violet), ScheduleBlock(4, 1, 4, amber), ScheduleBlock(4, 4, 6, Warm),
-        ScheduleBlock(5, 0, 2, Violet), ScheduleBlock(5, 2, 6, Green),
-        ScheduleBlock(6, 0, 2, Violet), ScheduleBlock(6, 2, 6, Green)
+        ScheduleBlock(0, 0, 2, nightColor),   ScheduleBlock(0, 2, 4, morningColor), ScheduleBlock(0, 4, 6, comfortColor),
+        ScheduleBlock(1, 0, 2, nightColor),   ScheduleBlock(1, 2, 4, morningColor), ScheduleBlock(1, 4, 6, ecoColor),
+        ScheduleBlock(2, 0, 2, nightColor),   ScheduleBlock(2, 2, 5, comfortColor), ScheduleBlock(2, 5, 6, nightColor),
+        ScheduleBlock(3, 0, 2, nightColor),   ScheduleBlock(3, 2, 4, morningColor), ScheduleBlock(3, 4, 6, comfortColor),
+        ScheduleBlock(4, 0, 1, nightColor),   ScheduleBlock(4, 1, 4, morningColor), ScheduleBlock(4, 4, 6, comfortColor),
+        ScheduleBlock(5, 0, 2, nightColor),   ScheduleBlock(5, 2, 6, ecoColor),
+        ScheduleBlock(6, 0, 2, nightColor),   ScheduleBlock(6, 2, 6, ecoColor)
     )
 
     SlideContainer(
         eyebrowText = "Programaciones",
-        eyebrowColor = Accent,
+        eyebrowColor = Primary,
         title = "Siempre en horario",
         subtitle = "Configura la semana y olvídate del resto"
     ) {
@@ -583,21 +666,22 @@ private fun Slide6Schedules() {
             val rows = 6
             val cellW = size.width / cols
             val cellH = size.height / rows
+            val gridColor = Color(0xFF3F4850)
 
             for (c in 0..cols) {
-                drawLine(Color(0xFFE2E8F0), Offset(c * cellW, 0f), Offset(c * cellW, size.height), 1f)
+                drawLine(gridColor, Offset(c * cellW, 0f), Offset(c * cellW, size.height), 1f)
             }
             for (r in 0..rows) {
-                drawLine(Color(0xFFE2E8F0), Offset(0f, r * cellH), Offset(size.width, r * cellH), 1f)
+                drawLine(gridColor, Offset(0f, r * cellH), Offset(size.width, r * cellH), 1f)
             }
 
             blocks.forEach { b ->
                 val left = b.dayCol * cellW + 2f
-                val top = b.startRow * cellH + 2f
-                val bW = cellW - 4f
-                val bH = (b.endRow - b.startRow) * cellH - 4f
+                val top  = b.startRow * cellH + 2f
+                val bW   = cellW - 4f
+                val bH   = (b.endRow - b.startRow) * cellH - 4f
                 drawRoundRect(
-                    color = b.color.copy(alpha = 0.78f),
+                    color = b.color.copy(alpha = 0.82f),
                     topLeft = Offset(left, top),
                     size = Size(bW, bH),
                     cornerRadius = CornerRadius(4f)
@@ -612,7 +696,12 @@ private fun Slide6Schedules() {
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf(Violet to "Noche", amber to "Mañana", Green to "Eco", Warm to "Confort").forEach { (c, l) ->
+            listOf(
+                Secondary           to "Noche",
+                Color(0xFFFFB44C)   to "Mañana",
+                Tertiary            to "Eco",
+                Warm                to "Confort"
+            ).forEach { (c, l) ->
                 Row(
                     modifier = Modifier.padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -624,55 +713,82 @@ private fun Slide6Schedules() {
                             .background(c)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text(l, fontSize = 11.sp, color = TextSecondary)
+                    Text(l, fontSize = 11.sp, color = OnSurfaceVariant)
                 }
             }
         }
     }
 }
 
+// ---------------------------------------------------------------------------
+// Page 7 — Permissions
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun Slide7Permissions() {
     val items = listOf(
-        Triple(Icons.Default.LocationOn, "Ubicación en segundo plano", Accent),
-        Triple(Icons.Default.DateRange, "Calendario", Warn),
-        Triple(Icons.Default.Notifications, "Notificaciones", Green)
+        Triple(Icons.Default.LocationOn,   "Ubicación en segundo plano", Primary),
+        Triple(Icons.Default.DateRange,    "Calendario",                 Secondary),
+        Triple(Icons.Default.Notifications,"Notificaciones",             Tertiary)
     )
 
     SlideContainer(
         eyebrowText = "Casi listo",
-        eyebrowColor = Accent,
+        eyebrowColor = Primary,
         title = "Permisos necesarios",
         subtitle = "Para que todo funcione correctamente"
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items.forEach { (icon, label, color) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White)
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = SurfaceContainerHigh,
+                    border = BorderStroke(1.dp, OutlineVariant)
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(color.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(color.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                icon,
+                                contentDescription = null,
+                                tint = color,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = OnSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = OnSurfaceVariant
+                        )
                     }
-                    Spacer(Modifier.width(12.dp))
-                    Text(label, fontSize = 15.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.weight(1f))
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary)
                 }
             }
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Page 8 — Login
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun Slide8Login(
@@ -698,21 +814,28 @@ private fun Slide8Login(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        androidx.compose.foundation.Image(
-            painter = painterResource(R.drawable.ic_app_logo),
-            contentDescription = null,
-            modifier = Modifier
-                .size(72.dp)
-                .clip(RoundedCornerShape(18.dp))
-        )
+        // Logo in surfaceContainerHigh rounded
+        Surface(
+            modifier = Modifier.size(72.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = SurfaceContainerHigh
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(R.drawable.ic_app_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
 
         Spacer(Modifier.height(20.dp))
 
         Text(
             text = "Conecta tu cuenta Netatmo",
-            fontSize = 22.sp,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary,
+            color = OnSurface,
             textAlign = TextAlign.Center
         )
 
@@ -720,18 +843,19 @@ private fun Slide8Login(
 
         Text(
             text = "Necesitamos acceso a tu cuenta para controlar tu termostato",
-            fontSize = 14.sp,
-            color = TextSecondary,
+            style = MaterialTheme.typography.bodyMedium,
+            color = OnSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
         Spacer(Modifier.height(24.dp))
 
-        Card(
+        // OAuth card
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            shape = RoundedCornerShape(16.dp),
+            color = SurfaceContainer,
+            border = BorderStroke(1.dp, OutlineVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -739,13 +863,13 @@ private fun Slide8Login(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF0369A1)),
+                            .background(PrimaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Cloud,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = OnSurface,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -753,19 +877,27 @@ private fun Slide8Login(
                     Column {
                         Text(
                             "dev.netatmo.com",
-                            fontSize = 13.sp,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
+                            color = OnSurface
                         )
-                        Text("OAuth 2.0", fontSize = 11.sp, color = TextSecondary)
+                        Text(
+                            "OAuth 2.0",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurfaceVariant
+                        )
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0xFFF1F5F9))
+                HorizontalDivider(color = OutlineVariant)
                 Spacer(Modifier.height(12.dp))
 
-                Text("Permisos solicitados:", fontSize = 12.sp, color = TextSecondary)
+                Text(
+                    "Permisos solicitados:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurfaceVariant
+                )
                 Spacer(Modifier.height(8.dp))
 
                 scopes.forEach { scope ->
@@ -777,14 +909,13 @@ private fun Slide8Login(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(Accent)
+                                .background(Primary)
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             scope,
-                            fontSize = 12.sp,
-                            color = TextPrimary,
-                            fontFamily = FontFamily.Monospace
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = OnSurface
                         )
                     }
                 }
@@ -793,26 +924,29 @@ private fun Slide8Login(
 
         Spacer(Modifier.height(14.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Green.copy(alpha = 0.08f))
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // Secure connection badge
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            color = Tertiary.copy(alpha = 0.10f)
         ) {
-            Icon(
-                Icons.Default.Lock,
-                contentDescription = null,
-                tint = Green,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "Conexión segura. No almacenamos tu contraseña.",
-                fontSize = 12.sp,
-                color = Green
-            )
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = Tertiary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Conexión segura. No almacenamos tu contraseña.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Tertiary
+                )
+            }
         }
 
         Spacer(Modifier.height(24.dp))
@@ -820,9 +954,14 @@ private fun Slide8Login(
         if (authDone) {
             Button(
                 onClick = onComplete,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Green)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TertiaryContainer,
+                    contentColor = OnSurface
+                )
             ) {
                 Icon(
                     Icons.Default.CheckCircle,
@@ -830,24 +969,37 @@ private fun Slide8Login(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Entrar a la app", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text(
+                    "Entrar a la app",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         } else {
             Button(
                 onClick = { loading = true },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryContainer,
+                    contentColor = OnSurface
+                ),
                 enabled = !loading
             ) {
                 if (loading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = Color.White,
+                        color = OnSurface,
                         strokeWidth = 2.dp
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Conectando...", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text(
+                        "Conectando...",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 } else {
                     Icon(
                         Icons.Default.Cloud,
@@ -855,7 +1007,11 @@ private fun Slide8Login(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Conectar con Netatmo", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text(
+                        "Conectar con Netatmo",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
