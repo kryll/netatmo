@@ -81,6 +81,49 @@ fun MaintenanceHistoryScreen(
     viewModel: MaintenanceViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showAddSheet by remember { mutableStateOf(false) }
+
+    if (showAddSheet) {
+        AddMaintenanceSheet(
+            onDismiss = { showAddSheet = false },
+            onConfirm = { form ->
+                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale("es", "ES"))
+                val visitMs = try { sdf.parse(form.visitDate)?.time } catch (e: Exception) { null }
+                    ?: System.currentTimeMillis()
+                viewModel.addRecord(
+                    type = form.type,
+                    description = form.description,
+                    techName = form.techName,
+                    certRef = form.certRef,
+                    visitDate = visitMs,
+                    visitTimeRange = form.visitTimeRange.ifBlank { null },
+                    modelo = form.modelo.ifBlank { null },
+                    numSerie = form.numSerie.ifBlank { null },
+                    version = form.version.ifBlank { null },
+                    combustible = form.combustible.ifBlank { null },
+                    rendimiento = form.rendimiento.toFloatOrNull(),
+                    co = form.co.toFloatOrNull(),
+                    coCorrected = form.coCorrected.toFloatOrNull(),
+                    coAmbiente = form.coAmbiente.toFloatOrNull(),
+                    co2 = form.co2.toFloatOrNull(),
+                    o2 = form.o2.toFloatOrNull(),
+                    o2Ref = form.o2Ref.toFloatOrNull(),
+                    temperaturaHumos = form.temperaturaHumos.toFloatOrNull(),
+                    temperaturaAmbiente = form.temperaturaAmbiente.toFloatOrNull(),
+                    temperaturaACS = form.temperaturaACS.toFloatOrNull(),
+                    temperaturaAguaFria = form.temperaturaAguaFria.toFloatOrNull(),
+                    caudalAgua = form.caudalAgua.toFloatOrNull(),
+                    potenciaACS = form.potenciaACS.toFloatOrNull(),
+                    presionDinamica = form.presionDinamica.toFloatOrNull(),
+                    presionEstatica = form.presionEstatica.toFloatOrNull(),
+                    tiro = form.tiro.toFloatOrNull(),
+                    lambda = form.lambda.toFloatOrNull(),
+                    perdidasChimenea = form.perdidasChimenea.toFloatOrNull()
+                )
+                showAddSheet = false
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -131,7 +174,16 @@ fun MaintenanceHistoryScreen(
                 BreadcrumbSubHeader()
             }
         },
-        containerColor = BgColor
+        containerColor = BgColor,
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAddSheet = true },
+                containerColor = BluePrimary,
+                contentColor = Color(0xFF001D31)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Añadir registro")
+            }
+        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -650,13 +702,18 @@ private fun MaintenanceRecordCard(
                             }
                         }
 
-                        // Telemetry chips for certified/SAT cards
-                        if (isMostRecentCertified && hasCertificate) {
+                        // Combustion analysis data (when present)
+                        if (record.rendimiento != null || record.co != null || record.temperaturaHumos != null) {
+                            CombustionAnalysisStrip(record)
+                        }
+
+                        // Telemetry chips for certified/SAT cards without combustion data
+                        if (isMostRecentCertified && hasCertificate && record.rendimiento == null) {
                             TelemetryChipStrip()
                         }
 
                         // Delta metric box for purge-type cards
-                        if (isPurge) {
+                        if (isPurge && record.presionDinamica == null) {
                             DeltaMetricBox()
                         }
                     }
@@ -721,6 +778,69 @@ private fun MaintenanceRecordCard(
                     .background(BgColor.copy(alpha = 0.15f))
             )
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Combustion Analysis Strip (for boiler revision records)
+// ---------------------------------------------------------------------------
+@Composable
+private fun CombustionAnalysisStrip(record: MaintenanceRecordEntity) {
+    val greenColor = GreenTertiary
+    val amberColor = Color(0xFFF59E0B)
+    val redColor = ErrorColor
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Efficiency + CO row
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            record.rendimiento?.let { eff ->
+                val c = if (eff >= 95f) greenColor else if (eff >= 88f) amberColor else redColor
+                CombustionChip("η ${eff.format1()}%", c)
+            }
+            record.co?.let { co ->
+                val c = if (co < 50f) greenColor else if (co < 100f) amberColor else redColor
+                CombustionChip("CO ${co.format0()} ppm", c)
+            }
+            record.temperaturaHumos?.let {
+                CombustionChip("T.Hum ${it.format1()}°C", TextSecondary)
+            }
+            record.o2?.let {
+                CombustionChip("O₂ ${it.format1()}%", TextSecondary)
+            }
+        }
+        // Pressures + flow row
+        val hasPressure = record.presionDinamica != null || record.presionEstatica != null || record.caudalAgua != null
+        if (hasPressure) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                record.presionDinamica?.let { CombustionChip("P.Din ${it.format1()} mbar", TextSecondary) }
+                record.presionEstatica?.let { CombustionChip("P.Est ${it.format1()} mbar", TextSecondary) }
+                record.caudalAgua?.let { CombustionChip("${it.format0()} l/min", TextSecondary) }
+            }
+        }
+        // Model + serial
+        val hasEquip = !record.modelo.isNullOrBlank() || !record.numSerie.isNullOrBlank()
+        if (hasEquip) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                record.modelo?.let { CombustionChip(it, BluePrimary) }
+                record.numSerie?.let { CombustionChip("SN: $it", TextSecondary) }
+            }
+        }
+    }
+}
+
+private fun Float.format1() = "%.1f".format(this)
+private fun Float.format0() = "%.0f".format(this)
+
+@Composable
+private fun CombustionChip(label: String, color: Color) {
+    Surface(color = SurfaceContHighest, shape = RoundedCornerShape(6.dp)) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            color = color,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -846,17 +966,80 @@ private fun BottomCtaSection() {
 // ---------------------------------------------------------------------------
 //  Add Maintenance Bottom Sheet (kept for ViewModel compatibility)
 // ---------------------------------------------------------------------------
+data class BoilerRevisionForm(
+    val type: MaintenanceType,
+    val description: String,
+    val techName: String,
+    val certRef: String,
+    val visitDate: String,       // dd/MM/yyyy
+    val visitTimeRange: String,  // HH:mm - HH:mm
+    val modelo: String,
+    val numSerie: String,
+    val version: String,
+    val combustible: String,
+    // Combustion readings
+    val rendimiento: String,
+    val co: String,
+    val coCorrected: String,
+    val coAmbiente: String,
+    val co2: String,
+    val o2: String,
+    val o2Ref: String,
+    val temperaturaHumos: String,
+    val temperaturaAmbiente: String,
+    val temperaturaACS: String,
+    val temperaturaAguaFria: String,
+    val caudalAgua: String,
+    val potenciaACS: String,
+    val presionDinamica: String,
+    val presionEstatica: String,
+    val tiro: String,
+    val lambda: String,
+    val perdidasChimenea: String
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMaintenanceSheet(
     onDismiss: () -> Unit,
-    onConfirm: (MaintenanceType, String, String, String) -> Unit
+    onConfirm: (BoilerRevisionForm) -> Unit
 ) {
     var selectedType by remember { mutableStateOf(MaintenanceType.ANNUAL_REVISION) }
     var description by remember { mutableStateOf("") }
     var techName by remember { mutableStateOf("") }
     var certRef by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+    var showCombustion by remember { mutableStateOf(false) }
+
+    // Visit info
+    var visitDate by remember { mutableStateOf("") }
+    var visitTimeRange by remember { mutableStateOf("") }
+
+    // Equipment
+    var modelo by remember { mutableStateOf("") }
+    var numSerie by remember { mutableStateOf("") }
+    var version by remember { mutableStateOf("") }
+    var combustible by remember { mutableStateOf("GASNAT.") }
+
+    // Combustion readings
+    var rendimiento by remember { mutableStateOf("") }
+    var co by remember { mutableStateOf("") }
+    var coCorrected by remember { mutableStateOf("") }
+    var coAmbiente by remember { mutableStateOf("") }
+    var co2 by remember { mutableStateOf("") }
+    var o2 by remember { mutableStateOf("") }
+    var o2Ref by remember { mutableStateOf("") }
+    var temperaturaHumos by remember { mutableStateOf("") }
+    var temperaturaAmbiente by remember { mutableStateOf("") }
+    var temperaturaACS by remember { mutableStateOf("") }
+    var temperaturaAguaFria by remember { mutableStateOf("") }
+    var caudalAgua by remember { mutableStateOf("") }
+    var potenciaACS by remember { mutableStateOf("") }
+    var presionDinamica by remember { mutableStateOf("") }
+    var presionEstatica by remember { mutableStateOf("") }
+    var tiro by remember { mutableStateOf("") }
+    var lambda by remember { mutableStateOf("") }
+    var perdidasChimenea by remember { mutableStateOf("") }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = BluePrimary,
@@ -868,104 +1051,271 @@ fun AddMaintenanceSheet(
         unfocusedLabelColor = TextSecondary
     )
 
+    val isRevision = selectedType == MaintenanceType.ANNUAL_REVISION
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = SurfaceCont,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Column(
+        androidx.compose.foundation.lazy.LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp)
                 .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .size(36.dp, 4.dp)
-                    .clip(CircleShape)
-                    .background(OutlineVar)
-            )
-
-            Text("Nuevo registro de mantenimiento", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it }
-            ) {
-                OutlinedTextField(
-                    value = selectedType.displayName,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Tipo de intervención") },
-                    leadingIcon = {
-                        Icon(selectedType.icon(), contentDescription = null, tint = selectedType.chipColor(), modifier = Modifier.size(18.dp))
-                    },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    colors = fieldColors
+            item {
+                Box(
+                    modifier = Modifier.align(Alignment.CenterHorizontally).size(36.dp, 4.dp).clip(CircleShape).background(OutlineVar)
                 )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    containerColor = SurfaceContHigh
-                ) {
-                    MaintenanceType.entries.forEach { type ->
-                        DropdownMenuItem(
-                            leadingIcon = { Icon(type.icon(), contentDescription = null, tint = type.chipColor(), modifier = Modifier.size(16.dp)) },
-                            text = { Text(type.displayName, color = TextPrimary) },
-                            onClick = { selectedType = type; expanded = false }
-                        )
+            }
+            item {
+                Text("Nuevo parte de mantenimiento", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+
+            // Type selector
+            item {
+                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                    OutlinedTextField(
+                        value = selectedType.displayName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Tipo de intervención") },
+                        leadingIcon = {
+                            Icon(selectedType.icon(), contentDescription = null, tint = selectedType.chipColor(), modifier = Modifier.size(18.dp))
+                        },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        colors = fieldColors
+                    )
+                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = SurfaceContHigh) {
+                        MaintenanceType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                leadingIcon = { Icon(type.icon(), contentDescription = null, tint = type.chipColor(), modifier = Modifier.size(16.dp)) },
+                                text = { Text(type.displayName, color = TextPrimary) },
+                                onClick = { selectedType = type; expanded = false }
+                            )
+                        }
                     }
                 }
             }
 
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Descripción de la intervención") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                colors = fieldColors
-            )
-            OutlinedTextField(
-                value = techName,
-                onValueChange = { techName = it },
-                label = { Text("Técnico responsable (opcional)") },
-                leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = fieldColors
-            )
-            OutlinedTextField(
-                value = certRef,
-                onValueChange = { certRef = it },
-                label = { Text("Referencia certificado (opcional)") },
-                leadingIcon = { Icon(Icons.Outlined.Description, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = fieldColors
-            )
+            // Visit date + time
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = visitDate,
+                        onValueChange = { visitDate = it },
+                        label = { Text("Fecha visita (dd/MM/yyyy)") },
+                        modifier = Modifier.weight(1f),
+                        colors = fieldColors
+                    )
+                    OutlinedTextField(
+                        value = visitTimeRange,
+                        onValueChange = { visitTimeRange = it },
+                        label = { Text("Horario") },
+                        placeholder = { Text("10:04 - 10:39", color = TextSecondary.copy(0.5f)) },
+                        modifier = Modifier.weight(1f),
+                        colors = fieldColors
+                    )
+                }
+            }
 
-            Button(
-                onClick = {
-                    if (description.isNotBlank()) onConfirm(selectedType, description, techName, certRef)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                enabled = description.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = BluePrimary, contentColor = Color(0xFF001D31)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Guardar registro", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            // Description + technician
+            item {
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Observaciones / descripción") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    colors = fieldColors
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = techName,
+                    onValueChange = { techName = it },
+                    label = { Text("Técnico responsable") },
+                    leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = fieldColors
+                )
+            }
+
+            // Equipment info (for ANNUAL_REVISION)
+            if (isRevision) {
+                item {
+                    Text("EQUIPO", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                }
+                item {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(value = modelo, onValueChange = { modelo = it }, label = { Text("Modelo") }, modifier = Modifier.weight(1f), colors = fieldColors)
+                        OutlinedTextField(value = numSerie, onValueChange = { numSerie = it }, label = { Text("Nº Serie") }, modifier = Modifier.weight(1f), colors = fieldColors)
+                    }
+                }
+                item {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(value = version, onValueChange = { version = it }, label = { Text("Versión") }, modifier = Modifier.weight(1f), colors = fieldColors)
+                        OutlinedTextField(value = combustible, onValueChange = { combustible = it }, label = { Text("Combustible") }, modifier = Modifier.weight(1f), colors = fieldColors)
+                    }
+                }
+
+                // Combustion analysis toggle
+                item {
+                    Surface(
+                        onClick = { showCombustion = !showCombustion },
+                        color = if (showCombustion) BluePrimary.copy(alpha = 0.12f) else SurfaceContHigh,
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Science, contentDescription = null, tint = BluePrimary, modifier = Modifier.size(16.dp))
+                                Text("Análisis de combustión", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            }
+                            Icon(
+                                if (showCombustion) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = TextSecondary
+                            )
+                        }
+                    }
+                }
+
+                if (showCombustion) {
+                    item { Text("LECTURAS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp) }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CombustionField("Rendimiento (%)", rendimiento, { rendimiento = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("T. Humos (°C)", temperaturaHumos, { temperaturaHumos = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("T. Ambiente (°C)", temperaturaAmbiente, { temperaturaAmbiente = it }, Modifier.weight(1f), fieldColors)
+                        }
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CombustionField("CO (ppm)", co, { co = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("CO corregido (ppm)", coCorrected, { coCorrected = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("CO ambiente (ppm)", coAmbiente, { coAmbiente = it }, Modifier.weight(1f), fieldColors)
+                        }
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CombustionField("CO₂ (%)", co2, { co2 = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("O₂ (%)", o2, { o2 = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("O₂ ref. (%)", o2Ref, { o2Ref = it }, Modifier.weight(1f), fieldColors)
+                        }
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CombustionField("P. dinámica (mbar)", presionDinamica, { presionDinamica = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("P. estática (mbar)", presionEstatica, { presionEstatica = it }, Modifier.weight(1f), fieldColors)
+                        }
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CombustionField("T. ACS (°C)", temperaturaACS, { temperaturaACS = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("T. agua fría (°C)", temperaturaAguaFria, { temperaturaAguaFria = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("Caudal (l/min)", caudalAgua, { caudalAgua = it }, Modifier.weight(1f), fieldColors)
+                        }
+                    }
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CombustionField("Tiro (mbar)", tiro, { tiro = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("Lambda (%)", lambda, { lambda = it }, Modifier.weight(1f), fieldColors)
+                            CombustionField("Pérd. chimenea (%)", perdidasChimenea, { perdidasChimenea = it }, Modifier.weight(1f), fieldColors)
+                        }
+                    }
+                    item {
+                        CombustionField("Potencia ACS (KW)", potenciaACS, { potenciaACS = it }, Modifier.fillMaxWidth(), fieldColors)
+                    }
+                }
+            }
+
+            item {
+                OutlinedTextField(
+                    value = certRef,
+                    onValueChange = { certRef = it },
+                    label = { Text("Referencia certificado (opcional)") },
+                    leadingIcon = { Icon(Icons.Outlined.Description, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = fieldColors
+                )
+            }
+
+            item {
+                Button(
+                    onClick = {
+                        if (description.isNotBlank()) {
+                            onConfirm(
+                                BoilerRevisionForm(
+                                    type = selectedType,
+                                    description = description,
+                                    techName = techName,
+                                    certRef = certRef,
+                                    visitDate = visitDate,
+                                    visitTimeRange = visitTimeRange,
+                                    modelo = modelo,
+                                    numSerie = numSerie,
+                                    version = version,
+                                    combustible = combustible,
+                                    rendimiento = rendimiento,
+                                    co = co,
+                                    coCorrected = coCorrected,
+                                    coAmbiente = coAmbiente,
+                                    co2 = co2,
+                                    o2 = o2,
+                                    o2Ref = o2Ref,
+                                    temperaturaHumos = temperaturaHumos,
+                                    temperaturaAmbiente = temperaturaAmbiente,
+                                    temperaturaACS = temperaturaACS,
+                                    temperaturaAguaFria = temperaturaAguaFria,
+                                    caudalAgua = caudalAgua,
+                                    potenciaACS = potenciaACS,
+                                    presionDinamica = presionDinamica,
+                                    presionEstatica = presionEstatica,
+                                    tiro = tiro,
+                                    lambda = lambda,
+                                    perdidasChimenea = perdidasChimenea
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    enabled = description.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = BluePrimary, contentColor = Color(0xFF001D31)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Guardar parte", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                }
             }
         }
     }
+}
+
+@Composable
+private fun CombustionField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    colors: TextFieldColors
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, fontSize = 10.sp) },
+        modifier = modifier,
+        colors = colors,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true
+    )
 }
 
 // ---------------------------------------------------------------------------

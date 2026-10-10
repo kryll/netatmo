@@ -15,6 +15,9 @@ interface MaintenanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(record: MaintenanceRecordEntity): Long
 
+    @Query("SELECT * FROM maintenance_records WHERE type = 'ANNUAL_REVISION' ORDER BY date DESC LIMIT 1")
+    fun getLatestRevision(): Flow<MaintenanceRecordEntity?>
+
     @Delete
     suspend fun delete(record: MaintenanceRecordEntity)
 

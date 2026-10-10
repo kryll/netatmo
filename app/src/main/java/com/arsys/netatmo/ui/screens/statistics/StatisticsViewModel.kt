@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arsys.netatmo.data.api.NetatmoApiService
 import com.arsys.netatmo.data.local.dao.HomeCacheDao
+import com.arsys.netatmo.data.local.dao.MaintenanceDao
 import com.arsys.netatmo.data.local.dao.TemperatureHistoryDao
+import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
 import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
 import com.arsys.netatmo.data.repository.AuthRepository
 import com.arsys.netatmo.data.repository.ThermostatRepository
@@ -49,7 +51,9 @@ data class StatisticsUiState(
     // Monthly summary
     val monthlyHeatingHours: Float = 0f,
     val monthlyEnergyKwh: Float = 0f,
-    val monthlyCost: Float = 0f
+    val monthlyCost: Float = 0f,
+    // Latest boiler revision
+    val latestRevision: MaintenanceRecordEntity? = null
 )
 
 @HiltViewModel
@@ -59,6 +63,7 @@ class StatisticsViewModel @Inject constructor(
     private val homeCacheDao: HomeCacheDao,
     private val thermostatRepository: ThermostatRepository,
     private val temperatureHistoryDao: TemperatureHistoryDao,
+    private val maintenanceDao: MaintenanceDao,
     private val apiService: NetatmoApiService,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -75,6 +80,15 @@ class StatisticsViewModel @Inject constructor(
         val kwhPrice = prefs.getFloat("kwh_price", 0.15f)
         val contractedKw = prefs.getFloat("contracted_kw", 1.5f)
         _uiState.update { it.copy(kwhPrice = kwhPrice, contractedKw = contractedKw) }
+
+        // Observe latest boiler revision
+        viewModelScope.launch {
+            maintenanceDao.getLatestRevision()
+                .catch { }
+                .collect { revision ->
+                    _uiState.update { it.copy(latestRevision = revision) }
+                }
+        }
 
         // React to room selection changes and reload 24h history automatically
         viewModelScope.launch {

@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
 import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
 import com.arsys.netatmo.ui.theme.BoilerActiveColor
@@ -216,6 +217,14 @@ fun StatisticsScreen(
                         )
                     }
                 }
+            }
+
+            // Latest boiler revision card
+            item {
+                BoilerRevisionSummaryCard(
+                    revision = uiState.latestRevision,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             // Export button
@@ -1690,6 +1699,182 @@ fun StatCard(
                 color = TextPrimary
             )
             Text(title, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Boiler Revision Summary Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun BoilerRevisionSummaryCard(
+    revision: MaintenanceRecordEntity?,
+    modifier: Modifier = Modifier
+) {
+    val dateShort = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale("es", "ES")) }
+
+    Surface(
+        modifier = modifier,
+        color = SurfaceContainer,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(Primary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Engineering, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
+                    }
+                    Column {
+                        Text("Revisión caldera", style = MaterialTheme.typography.labelMedium, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        if (revision != null) {
+                            Text(
+                                "Última: ${dateShort.format(java.util.Date(revision.date))}${if (!revision.visitTimeRange.isNullOrBlank()) " · ${revision.visitTimeRange}" else ""}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                        } else {
+                            Text("Sin revisiones registradas", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        }
+                    }
+                }
+                if (revision != null) {
+                    val rendEff = revision.rendimiento
+                    val effColor = when {
+                        rendEff == null -> TextSecondary
+                        rendEff >= 95f -> GreenGood
+                        rendEff >= 88f -> AmberWarn
+                        else -> RedBad
+                    }
+                    Surface(color = effColor.copy(alpha = 0.12f), shape = RoundedCornerShape(50.dp)) {
+                        Text(
+                            if (rendEff != null) "η %.1f%%".format(rendEff) else "Sin datos",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = effColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            if (revision == null) {
+                Text(
+                    "Añade el parte de trabajo del técnico para ver el análisis de combustión.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+                return@Column
+            }
+
+            // Combustion analysis grid
+            val hasAnalysis = revision.rendimiento != null || revision.co != null || revision.temperaturaHumos != null
+            if (hasAnalysis) {
+                HorizontalDivider(color = OutlineVariant, thickness = 0.5.dp)
+                Text(
+                    "ANÁLISIS DE COMBUSTIÓN",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.8.sp
+                )
+                // Row 1: Rendimiento + CO + T.Humos
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    revision.rendimiento?.let { eff ->
+                        val c = if (eff >= 95f) GreenGood else if (eff >= 88f) AmberWarn else RedBad
+                        RevisionMetricCell("Rendimiento", "%.1f%%".format(eff), c, modifier = Modifier.weight(1f))
+                    }
+                    revision.co?.let { co ->
+                        val c = if (co < 50f) GreenGood else if (co < 100f) AmberWarn else RedBad
+                        RevisionMetricCell("CO", "%.0f ppm".format(co), c, modifier = Modifier.weight(1f))
+                    }
+                    revision.temperaturaHumos?.let { th ->
+                        RevisionMetricCell("T. Humos", "%.1f°C".format(th), TextSecondary, modifier = Modifier.weight(1f))
+                    }
+                }
+                // Row 2: CO2 + O2 + T.ACS
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    revision.co2?.let { co2 ->
+                        RevisionMetricCell("CO₂", "%.2f%%".format(co2), TextSecondary, modifier = Modifier.weight(1f))
+                    }
+                    revision.o2?.let { o2 ->
+                        RevisionMetricCell("O₂", "%.1f%%".format(o2), TextSecondary, modifier = Modifier.weight(1f))
+                    }
+                    revision.temperaturaACS?.let { tacs ->
+                        RevisionMetricCell("T. ACS", "%.1f°C".format(tacs), TextSecondary, modifier = Modifier.weight(1f))
+                    }
+                }
+                // Row 3: Presiones + Caudal
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    revision.presionDinamica?.let { pd ->
+                        RevisionMetricCell("P. Dinámica", "%.1f mbar".format(pd), TextSecondary, modifier = Modifier.weight(1f))
+                    }
+                    revision.presionEstatica?.let { pe ->
+                        RevisionMetricCell("P. Estática", "%.1f mbar".format(pe), TextSecondary, modifier = Modifier.weight(1f))
+                    }
+                    revision.caudalAgua?.let { q ->
+                        RevisionMetricCell("Caudal", "%.0f l/min".format(q), TextSecondary, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            // Equipment info
+            val hasEquipment = !revision.modelo.isNullOrBlank() || !revision.numSerie.isNullOrBlank()
+            if (hasEquipment) {
+                HorizontalDivider(color = OutlineVariant, thickness = 0.5.dp)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    revision.modelo?.let { modelo ->
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Modelo", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(modelo, style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    revision.numSerie?.let { ns ->
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Nº Serie", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(ns, style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    revision.combustible?.let { fuel ->
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Combustible", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(fuel, style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
+
+            // Technician observations
+            if (revision.description.isNotBlank() || !revision.technicianName.isNullOrBlank()) {
+                HorizontalDivider(color = OutlineVariant, thickness = 0.5.dp)
+                if (!revision.technicianName.isNullOrBlank()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(12.dp))
+                        Text("Téc. ${revision.technicianName}", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                    }
+                }
+                if (revision.description.isNotBlank()) {
+                    Text(revision.description, style = MaterialTheme.typography.bodySmall, color = TextSecondary, lineHeight = 18.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RevisionMetricCell(label: String, value: String, valueColor: Color, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, color = SurfaceContainerHigh, shape = RoundedCornerShape(8.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary, maxLines = 1)
+            Text(value, style = MaterialTheme.typography.bodySmall, color = valueColor, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }

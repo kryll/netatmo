@@ -27,7 +27,7 @@ import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
         AdvancedAutomationEntity::class,
         MaintenanceRecordEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -45,6 +45,40 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun maintenanceDao(): MaintenanceDao
 
     companion object {
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add combustion analysis fields to maintenance_records
+                val cols = listOf(
+                    "rendimiento REAL",
+                    "co REAL",
+                    "coCorrected REAL",
+                    "coAmbiente REAL",
+                    "co2 REAL",
+                    "o2 REAL",
+                    "o2Ref REAL",
+                    "temperaturaHumos REAL",
+                    "temperaturaAmbiente REAL",
+                    "temperaturaACS REAL",
+                    "temperaturaAguaFria REAL",
+                    "caudalAgua REAL",
+                    "potenciaACS REAL",
+                    "presionDinamica REAL",
+                    "presionEstatica REAL",
+                    "tiro REAL",
+                    "lambda REAL",
+                    "perdidasChimenea REAL",
+                    "combustible TEXT",
+                    "modelo TEXT",
+                    "version TEXT",
+                    "numSerie TEXT",
+                    "visitTimeRange TEXT"
+                )
+                cols.forEach { col ->
+                    db.execSQL("ALTER TABLE maintenance_records ADD COLUMN $col")
+                }
+            }
+        }
+
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
