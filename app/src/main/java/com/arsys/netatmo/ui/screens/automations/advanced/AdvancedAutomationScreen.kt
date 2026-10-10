@@ -16,8 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
@@ -44,12 +44,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -67,16 +67,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.arsys.netatmo.ui.theme.OutlineVariant
+import com.arsys.netatmo.ui.theme.SurfaceContainer
+import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
+import com.arsys.netatmo.ui.theme.SurfaceContainerLow
+import com.arsys.netatmo.ui.theme.SurfaceContainerLowest
 
-private val Accent = Color(0xFF0284C7)
-private val TextPrimary = Color(0xFF1E293B)
+// ── Data models ──────────────────────────────────────────────────────────────
 
 data class AutomationTrigger(
     val type: String,
@@ -109,42 +115,30 @@ data class AutomationAction(
     val scenarioId: String = ""
 )
 
-private fun AutomationTrigger.toMap(): Map<String, Any> = mapOf(
-    "type" to type, "hour" to hour, "minute" to minute,
-    "days" to days, "entity" to entity, "below" to below,
-    "value" to value, "event" to event, "offset" to offset, "action" to action
-)
+// ── Map converters ────────────────────────────────────────────────────────────
 
 private fun Map<String, Any>.toAutoTrigger() = AutomationTrigger(
-    type = this["type"] as? String ?: "",
+    type = this["type"] as? String ?: this["platform"] as? String ?: "",
     hour = (this["hour"] as? Number)?.toInt() ?: 0,
     minute = (this["minute"] as? Number)?.toInt() ?: 0,
     days = (this["days"] as? List<*>)?.mapNotNull { (it as? Number)?.toInt() } ?: emptyList(),
     entity = this["entity"] as? String ?: "",
-    below = this["below"] as? Boolean ?: true,
-    value = (this["value"] as? Number)?.toDouble() ?: 0.0,
+    below = this["below"] as? Boolean ?: (this["below"] != null),
+    value = (this["below"] as? Number)?.toDouble() ?: (this["above"] as? Number)?.toDouble()
+        ?: (this["value"] as? Number)?.toDouble() ?: 0.0,
     event = this["event"] as? String ?: "sunset",
     offset = (this["offset"] as? Number)?.toInt() ?: 0,
     action = this["action"] as? String ?: "enter"
 )
 
-private fun AutomationCondition.toMap(): Map<String, Any> = mapOf(
-    "type" to type, "from" to from, "to" to to,
-    "entity" to entity, "below" to below, "value" to value
-)
-
 private fun Map<String, Any>.toAutoCondition() = AutomationCondition(
     type = this["type"] as? String ?: "",
-    from = this["from"] as? String ?: "",
-    to = this["to"] as? String ?: "",
+    from = this["from"] as? String ?: this["after"] as? String ?: "",
+    to = this["to"] as? String ?: this["before"] as? String ?: "",
     entity = this["entity"] as? String ?: "",
-    below = this["below"] as? Boolean ?: true,
-    value = (this["value"] as? Number)?.toDouble() ?: 0.0
-)
-
-private fun AutomationAction.toMap(): Map<String, Any> = mapOf(
-    "type" to type, "temperature" to temperature, "mode" to mode,
-    "title" to title, "minutes" to minutes, "scenarioId" to scenarioId
+    below = this["below"] != null,
+    value = (this["below"] as? Number)?.toDouble() ?: (this["above"] as? Number)?.toDouble()
+        ?: (this["value"] as? Number)?.toDouble() ?: 0.0
 )
 
 private fun Map<String, Any>.toAutoAction() = AutomationAction(
@@ -155,6 +149,8 @@ private fun Map<String, Any>.toAutoAction() = AutomationAction(
     minutes = (this["minutes"] as? Number)?.toInt() ?: 0,
     scenarioId = this["scenarioId"] as? String ?: ""
 )
+
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -177,81 +173,80 @@ fun AdvancedAutomationScreen(
     LaunchedEffect(uiState.name) { name = uiState.name }
     LaunchedEffect(uiState.triggerMode) { triggerMode = uiState.triggerMode }
     LaunchedEffect(uiState.enabled) { enabled = uiState.enabled }
+    LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) navController.popBackStack() }
+    LaunchedEffect(uiState.isDeleted) { if (uiState.isDeleted) navController.popBackStack() }
 
-    LaunchedEffect(uiState.isSaved) {
-        if (uiState.isSaved) navController.popBackStack()
-    }
-    LaunchedEffect(uiState.isDeleted) {
-        if (uiState.isDeleted) navController.popBackStack()
-    }
-
+    // ── Delete dialog ─────────────────────────────────────────────────────────
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
+            containerColor = SurfaceContainer,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("Eliminar automatización") },
-            text = { Text("¿Estás seguro de que quieres eliminar esta automatización? Esta acción no se puede deshacer.") },
+            text = {
+                Text("¿Estás seguro? Esta acción no se puede deshacer.")
+            },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        viewModel.delete()
-                    },
+                    onClick = { showDeleteDialog = false; viewModel.delete() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Eliminar")
-                }
+                ) { Text("Eliminar") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancelar")
-                }
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancelar") }
             }
         )
     }
 
+    // ── Bottom sheets ─────────────────────────────────────────────────────────
     if (showTriggerSheet) {
         TriggerEditorBottomSheet(
             onDismiss = { showTriggerSheet = false },
-            onAdd = { trigger: AutomationTrigger ->
-                viewModel.addTrigger(trigger.toMap())
+            onAdd = { map ->
+                viewModel.addTrigger(map)
                 showTriggerSheet = false
             }
         )
     }
-
     if (showConditionSheet) {
         ConditionEditorBottomSheet(
             onDismiss = { showConditionSheet = false },
-            onAdd = { condition: AutomationCondition ->
-                viewModel.addCondition(condition.toMap())
+            onAdd = { map ->
+                viewModel.addCondition(map)
                 showConditionSheet = false
             }
         )
     }
-
     if (showActionSheet) {
         ActionEditorBottomSheet(
             onDismiss = { showActionSheet = false },
-            onAdd = { action: AutomationAction ->
-                viewModel.addAction(action.toMap())
+            onAdd = { map ->
+                viewModel.addAction(map)
                 showActionSheet = false
             }
         )
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = if (automationId == -1L) "Nueva automatización" else "Editar automatización",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Accent)
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 },
                 actions = {
@@ -265,11 +260,17 @@ fun AdvancedAutomationScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = SurfaceContainerLowest,
+                    scrolledContainerColor = SurfaceContainerLowest
+                )
             )
         },
         bottomBar = {
-            Surface(shadowElevation = 8.dp) {
+            Surface(
+                color = SurfaceContainerLow,
+                tonalElevation = 0.dp
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -290,9 +291,17 @@ fun AdvancedAutomationScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
                     ) {
-                        Text("Guardar", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Guardar automatización",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
@@ -301,164 +310,245 @@ fun AdvancedAutomationScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background),
+                .padding(innerPadding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Name field ────────────────────────────────────────────────────
             item {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Nombre") },
+                    label = { Text("Nombre de la automatización") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = OutlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        unfocusedContainerColor = SurfaceContainer,
+                        focusedContainerColor = SurfaceContainer
+                    )
                 )
             }
 
+            // ── IF section (Triggers) ─────────────────────────────────────────
             item {
-                SectionHeader(title = "Disparadores", subtitle = "Cuándo se ejecuta")
-            }
-            itemsIndexed(uiState.triggers) { index, triggerMap ->
-                TriggerChipRow(trigger = triggerMap.toAutoTrigger(), onDelete = { viewModel.removeTrigger(index) })
-            }
-            item {
-                OutlinedButton(
-                    onClick = { showTriggerSheet = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, Accent)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Accent, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Añadir disparador", color = Accent)
-                }
-            }
-
-            item {
-                SectionHeader(title = "Condiciones", subtitle = "Solo si se cumplen")
-            }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Modo:", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
-                    FilterChip(
-                        selected = triggerMode == "any",
-                        onClick = { triggerMode = "any" },
-                        label = { Text("Cualquiera") }
+                AutomationSectionCard {
+                    SectionHeader(
+                        icon = Icons.Default.Bolt,
+                        label = "SI — DISPARADORES",
+                        count = uiState.triggers.size,
+                        accentColor = MaterialTheme.colorScheme.primary
                     )
-                    FilterChip(
-                        selected = triggerMode == "all",
-                        onClick = { triggerMode = "all" },
-                        label = { Text("Todas") }
+                    Spacer(Modifier.height(12.dp))
+
+                    uiState.triggers.forEachIndexed { index, map ->
+                        TriggerPill(
+                            trigger = map.toAutoTrigger(),
+                            onDelete = { viewModel.removeTrigger(index) }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    AddItemButton(
+                        label = "Añadir disparador",
+                        onClick = { showTriggerSheet = true }
                     )
                 }
             }
-            itemsIndexed(uiState.conditions) { index, conditionMap ->
-                ConditionChipRow(condition = conditionMap.toAutoCondition(), onDelete = { viewModel.removeCondition(index) })
-            }
+
+            // ── IF (conditions) section ────────────────────────────────────────
             item {
-                OutlinedButton(
-                    onClick = { showConditionSheet = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, Accent)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Accent, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Añadir condición", color = Accent)
+                AutomationSectionCard {
+                    SectionHeader(
+                        icon = Icons.Default.CheckCircle,
+                        label = "Y SI — CONDICIONES",
+                        count = uiState.conditions.size,
+                        accentColor = MaterialTheme.colorScheme.tertiary
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    // Trigger mode selector
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Modo:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        listOf("any" to "Cualquiera", "all" to "Todas").forEach { (value, label) ->
+                            FilterChip(
+                                selected = triggerMode == value,
+                                onClick = { triggerMode = value },
+                                label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                                    selectedLabelColor = MaterialTheme.colorScheme.tertiary,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = triggerMode == value,
+                                    selectedBorderColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
+                                    borderColor = OutlineVariant
+                                )
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+
+                    uiState.conditions.forEachIndexed { index, map ->
+                        ConditionPill(
+                            condition = map.toAutoCondition(),
+                            onDelete = { viewModel.removeCondition(index) }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    AddItemButton(
+                        label = "Añadir condición",
+                        onClick = { showConditionSheet = true }
+                    )
                 }
             }
 
+            // ── THEN section (Actions) ─────────────────────────────────────────
             item {
-                SectionHeader(title = "Acciones", subtitle = "Qué hacer")
-            }
-            itemsIndexed(uiState.actions) { index, actionMap ->
-                ActionChipRow(action = actionMap.toAutoAction(), onDelete = { viewModel.removeAction(index) })
-            }
-            item {
-                OutlinedButton(
-                    onClick = { showActionSheet = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, Accent)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Accent, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Añadir acción", color = Accent)
+                AutomationSectionCard {
+                    SectionHeader(
+                        icon = Icons.Default.PlayArrow,
+                        label = "ENTONCES — ACCIONES",
+                        count = uiState.actions.size,
+                        accentColor = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    uiState.actions.forEachIndexed { index, map ->
+                        ActionPill(
+                            action = map.toAutoAction(),
+                            onDelete = { viewModel.removeAction(index) }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    AddItemButton(
+                        label = "Añadir acción",
+                        onClick = { showActionSheet = true }
+                    )
                 }
             }
 
+            // ── Enabled switch ────────────────────────────────────────────────
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceContainerLow),
+                    border = BorderStroke(1.dp, OutlineVariant)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "Automatización activa",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium,
-                                color = TextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                if (enabled) "Se ejecutará cuando se cumplan las condiciones" else "No se ejecutará",
+                                if (enabled) "Se ejecutará cuando se cumplan las condiciones"
+                                else "Desactivada — no se ejecutará",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        Spacer(Modifier.width(12.dp))
                         Switch(
                             checked = enabled,
                             onCheckedChange = { enabled = it },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Accent
+                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                uncheckedTrackColor = SurfaceContainerHigh
                             )
                         )
                     }
                 }
             }
+
+            item { Spacer(Modifier.height(4.dp)) }
+        }
+    }
+}
+
+// ── Reusable layout ───────────────────────────────────────────────────────────
+
+@Composable
+private fun AutomationSectionCard(content: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceContainer),
+        border = BorderStroke(1.dp, OutlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            content()
         }
     }
 }
 
 @Composable
-private fun SectionHeader(title: String, subtitle: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp)
+private fun SectionHeader(
+    icon: ImageVector,
+    label: String,
+    count: Int,
+    accentColor: Color
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = accentColor,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = accentColor,
+            letterSpacing = 0.5.sp
+        )
+        Spacer(Modifier.weight(1f))
+        if (count > 0) {
             Box(
                 modifier = Modifier
-                    .width(4.dp)
-                    .height(56.dp)
-                    .background(
-                        Accent,
-                        RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
-                    )
-            )
-            Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = 0.2f))
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = count.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -466,150 +556,172 @@ private fun SectionHeader(title: String, subtitle: String) {
 }
 
 @Composable
-private fun TriggerChipRow(trigger: AutomationTrigger, onDelete: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(8.dp)
+private fun AddItemButton(label: String, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+// ── Pill composables ──────────────────────────────────────────────────────────
+
+@Composable
+private fun TriggerPill(trigger: AutomationTrigger, onDelete: () -> Unit) {
+    val primary = MaterialTheme.colorScheme.primary
+    ItemPill(
+        icon = triggerIcon(trigger.type),
+        label = triggerSummary(trigger),
+        iconTint = primary,
+        bgColor = primary.copy(alpha = 0.12f),
+        borderColor = primary.copy(alpha = 0.35f),
+        textColor = primary,
+        onDelete = onDelete
+    )
+}
+
+@Composable
+private fun ConditionPill(condition: AutomationCondition, onDelete: () -> Unit) {
+    val tertiary = MaterialTheme.colorScheme.tertiary
+    ItemPill(
+        icon = conditionIcon(condition.type),
+        label = conditionSummary(condition),
+        iconTint = tertiary,
+        bgColor = tertiary.copy(alpha = 0.12f),
+        borderColor = tertiary.copy(alpha = 0.35f),
+        textColor = tertiary,
+        onDelete = onDelete
+    )
+}
+
+@Composable
+private fun ActionPill(action: AutomationAction, onDelete: () -> Unit) {
+    val secondary = MaterialTheme.colorScheme.secondary
+    val secondaryContainer = MaterialTheme.colorScheme.secondaryContainer
+    ItemPill(
+        icon = actionIcon(action.type),
+        label = actionSummary(action),
+        iconTint = secondary,
+        bgColor = secondaryContainer.copy(alpha = 0.18f),
+        borderColor = secondary.copy(alpha = 0.35f),
+        textColor = secondary,
+        onDelete = onDelete
+    )
+}
+
+@Composable
+private fun ItemPill(
+    icon: ImageVector,
+    label: String,
+    iconTint: Color,
+    bgColor: Color,
+    borderColor: Color,
+    textColor: Color,
+    onDelete: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = bgColor,
+        border = BorderStroke(1.dp, borderColor),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = triggerIcon(trigger.type),
+                imageVector = icon,
                 contentDescription = null,
-                tint = Accent,
-                modifier = Modifier.size(24.dp)
+                tint = iconTint,
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
             Text(
-                text = triggerSummary(trigger),
+                text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary,
-                modifier = Modifier.weight(1f)
+                color = textColor,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            Spacer(Modifier.width(4.dp))
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(28.dp)
+            ) {
                 Icon(
                     Icons.Default.Close,
                     contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    tint = textColor.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
     }
 }
 
-@Composable
-private fun ConditionChipRow(condition: AutomationCondition, onDelete: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = conditionIcon(condition.type),
-                contentDescription = null,
-                tint = Accent,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = conditionSummary(condition),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActionChipRow(action: AutomationAction, onDelete: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = actionIcon(action.type),
-                contentDescription = null,
-                tint = Accent,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = actionSummary(action),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-    }
-}
+// ── Summary helpers ───────────────────────────────────────────────────────────
 
 private fun triggerSummary(trigger: AutomationTrigger): String = when (trigger.type) {
     "time" -> {
-        val time = "%02d:%02d".format(trigger.hour, trigger.minute)
-        val days = trigger.days.joinToString(",")
-        "Hora: $time días $days"
+        val time = trigger.let {
+            val t = (it as? AutomationTrigger)
+            // try to use raw time string stored via the new sheet
+            "%02d:%02d".format(it.hour, it.minute)
+        }
+        val days = trigger.days.joinToString(", ") { dayName(it) }
+        if (days.isBlank()) "Hora: $time" else "Hora: $time · $days"
     }
-    "numeric_state" -> when (trigger.entity) {
-        "outdoor_temp" -> "Temp ext. ${if (trigger.below) "bajo" else "sobre"} ${trigger.value.toInt()}°C"
-        "indoor_temp" -> "Temp int. ${if (trigger.below) "bajo" else "sobre"} ${trigger.value.toInt()}°C"
-        else -> trigger.entity
+    "numeric_state" -> {
+        val entity = if (trigger.entity == "outdoor_temp") "Temp. exterior" else "Temp. interior"
+        val dir = if (trigger.below) "por debajo de" else "por encima de"
+        "$entity $dir ${trigger.value.toInt()}°C"
     }
-    "sun" -> "Sol: ${trigger.event} +${trigger.offset} min"
-    "geofence" -> "Geovalla: ${trigger.action}"
+    "sun" -> {
+        val event = if (trigger.event == "sunset") "Puesta de sol" else "Salida del sol"
+        if (trigger.offset != 0) "$event ± ${trigger.offset} min" else event
+    }
+    "geofence" -> if (trigger.action == "enter") "Al llegar a casa" else "Al salir de casa"
     else -> trigger.type
 }
 
 private fun conditionSummary(condition: AutomationCondition): String = when (condition.type) {
-    "time_range" -> "Hora: ${condition.from} – ${condition.to}"
-    "numeric_state" -> "Temp ${condition.entity} ${if (condition.below) "bajo" else "sobre"} ${condition.value.toInt()}"
+    "time_range" -> "Entre ${condition.from} y ${condition.to}"
+    "numeric_state" -> {
+        val entity = if (condition.entity == "outdoor_temp") "Temp. exterior" else "Temp. interior"
+        val dir = if (condition.below) "por debajo de" else "por encima de"
+        "$entity $dir ${condition.value.toInt()}°C"
+    }
     "presence" -> "Alguien en casa"
     else -> condition.type
 }
 
 private fun actionSummary(action: AutomationAction): String = when (action.type) {
-    "set_temperature" -> "Setpoint ${"%.1f".format(action.temperature)}°C"
-    "set_mode" -> "Modo: ${action.mode}"
-    "notify" -> "Notificar: ${action.title}"
+    "set_temperature" -> "Fijar temperatura a ${"%.1f".format(action.temperature)}°C"
+    "set_mode" -> "Cambiar modo a ${modeName(action.mode)}"
+    "notify" -> "Notificación: ${action.title.ifBlank { "(sin título)" }}"
     "delay" -> "Esperar ${action.minutes} min"
     "apply_scenario" -> "Escenario: ${action.scenarioId}"
     else -> action.type
 }
+
+private fun dayName(day: Int): String = when (day) {
+    1 -> "L"; 2 -> "M"; 3 -> "X"; 4 -> "J"; 5 -> "V"; 6 -> "S"; 7 -> "D"; else -> "$day"
+}
+
+private fun modeName(mode: String): String = when (mode) {
+    "schedule" -> "Programado"; "manual" -> "Manual"; "away" -> "Ausente"
+    "hg" -> "Anticongelación"; "off" -> "Apagado"
+    "heating" -> "Calefacción"; "cooling" -> "Frío"
+    else -> mode
+}
+
+// ── Icon helpers ──────────────────────────────────────────────────────────────
 
 private fun triggerIcon(type: String): ImageVector = when (type) {
     "time" -> Icons.Default.Schedule
@@ -633,480 +745,4 @@ private fun actionIcon(type: String): ImageVector = when (type) {
     "delay" -> Icons.Default.HourglassEmpty
     "apply_scenario" -> Icons.Default.AutoAwesome
     else -> Icons.Default.PlayArrow
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TriggerEditorBottomSheet(
-    onDismiss: () -> Unit,
-    onAdd: (AutomationTrigger) -> Unit
-) {
-    var selectedType by remember { mutableStateOf("time") }
-    var hour by remember { mutableStateOf(8) }
-    var minute by remember { mutableStateOf(0) }
-    var selectedDays by remember { mutableStateOf(listOf(1, 2, 3, 4, 5)) }
-    var entity by remember { mutableStateOf("outdoor_temp") }
-    var below by remember { mutableStateOf(true) }
-    var value by remember { mutableStateOf(18.0) }
-    var sunEvent by remember { mutableStateOf("sunset") }
-    var sunOffset by remember { mutableStateOf(0) }
-    var geofenceAction by remember { mutableStateOf("enter") }
-
-    val triggerTypes = listOf("time", "numeric_state", "sun", "geofence")
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "Añadir disparador",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-
-            Text(
-                "Tipo",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                triggerTypes.forEach { type ->
-                    FilterChip(
-                        selected = selectedType == type,
-                        onClick = { selectedType = type },
-                        label = {
-                            Text(
-                                when (type) {
-                                    "time" -> "Hora"
-                                    "numeric_state" -> "Temp"
-                                    "sun" -> "Sol"
-                                    "geofence" -> "Geo"
-                                    else -> type
-                                }
-                            )
-                        }
-                    )
-                }
-            }
-
-            when (selectedType) {
-                "time" -> {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = hour.toString(),
-                            onValueChange = { it.toIntOrNull()?.let { h -> if (h in 0..23) hour = h } },
-                            label = { Text("Hora") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        Text(":", style = MaterialTheme.typography.headlineMedium)
-                        OutlinedTextField(
-                            value = minute.toString(),
-                            onValueChange = { it.toIntOrNull()?.let { m -> if (m in 0..59) minute = m } },
-                            label = { Text("Min") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                    }
-                    Text(
-                        "Días",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val dayLabels = listOf("L", "M", "X", "J", "V", "S", "D")
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        dayLabels.forEachIndexed { index, label ->
-                            val day = index + 1
-                            FilterChip(
-                                selected = day in selectedDays,
-                                onClick = {
-                                    selectedDays = if (day in selectedDays) {
-                                        selectedDays - day
-                                    } else {
-                                        selectedDays + day
-                                    }
-                                },
-                                label = { Text(label) }
-                            )
-                        }
-                    }
-                }
-                "numeric_state" -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = entity == "outdoor_temp",
-                            onClick = { entity = "outdoor_temp" },
-                            label = { Text("Exterior") }
-                        )
-                        FilterChip(
-                            selected = entity == "indoor_temp",
-                            onClick = { entity = "indoor_temp" },
-                            label = { Text("Interior") }
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = below,
-                            onClick = { below = true },
-                            label = { Text("Bajo") }
-                        )
-                        FilterChip(
-                            selected = !below,
-                            onClick = { below = false },
-                            label = { Text("Sobre") }
-                        )
-                    }
-                    OutlinedTextField(
-                        value = value.toInt().toString(),
-                        onValueChange = { it.toDoubleOrNull()?.let { v -> value = v } },
-                        label = { Text("Temperatura (°C)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                "sun" -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = sunEvent == "sunset",
-                            onClick = { sunEvent = "sunset" },
-                            label = { Text("Atardecer") }
-                        )
-                        FilterChip(
-                            selected = sunEvent == "sunrise",
-                            onClick = { sunEvent = "sunrise" },
-                            label = { Text("Amanecer") }
-                        )
-                    }
-                    OutlinedTextField(
-                        value = sunOffset.toString(),
-                        onValueChange = { it.toIntOrNull()?.let { o -> sunOffset = o } },
-                        label = { Text("Offset (min)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                "geofence" -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = geofenceAction == "enter",
-                            onClick = { geofenceAction = "enter" },
-                            label = { Text("Entrar") }
-                        )
-                        FilterChip(
-                            selected = geofenceAction == "exit",
-                            onClick = { geofenceAction = "exit" },
-                            label = { Text("Salir") }
-                        )
-                    }
-                }
-            }
-
-            Button(
-                onClick = {
-                    onAdd(
-                        AutomationTrigger(
-                            type = selectedType,
-                            hour = hour,
-                            minute = minute,
-                            days = selectedDays,
-                            entity = entity,
-                            below = below,
-                            value = value,
-                            event = sunEvent,
-                            offset = sunOffset,
-                            action = geofenceAction
-                        )
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent)
-            ) {
-                Text("Añadir")
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ConditionEditorBottomSheet(
-    onDismiss: () -> Unit,
-    onAdd: (AutomationCondition) -> Unit
-) {
-    var selectedType by remember { mutableStateOf("time_range") }
-    var from by remember { mutableStateOf("08:00") }
-    var to by remember { mutableStateOf("22:00") }
-    var entity by remember { mutableStateOf("outdoor_temp") }
-    var below by remember { mutableStateOf(true) }
-    var value by remember { mutableStateOf(18.0) }
-
-    val conditionTypes = listOf("time_range", "numeric_state", "presence")
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "Añadir condición",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-
-            Text(
-                "Tipo",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                conditionTypes.forEach { type ->
-                    FilterChip(
-                        selected = selectedType == type,
-                        onClick = { selectedType = type },
-                        label = {
-                            Text(
-                                when (type) {
-                                    "time_range" -> "Horario"
-                                    "numeric_state" -> "Temp"
-                                    "presence" -> "Presencia"
-                                    else -> type
-                                }
-                            )
-                        }
-                    )
-                }
-            }
-
-            when (selectedType) {
-                "time_range" -> {
-                    OutlinedTextField(
-                        value = from,
-                        onValueChange = { from = it },
-                        label = { Text("Desde (HH:MM)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = to,
-                        onValueChange = { to = it },
-                        label = { Text("Hasta (HH:MM)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                "numeric_state" -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = entity == "outdoor_temp",
-                            onClick = { entity = "outdoor_temp" },
-                            label = { Text("Exterior") }
-                        )
-                        FilterChip(
-                            selected = entity == "indoor_temp",
-                            onClick = { entity = "indoor_temp" },
-                            label = { Text("Interior") }
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = below,
-                            onClick = { below = true },
-                            label = { Text("Bajo") }
-                        )
-                        FilterChip(
-                            selected = !below,
-                            onClick = { below = false },
-                            label = { Text("Sobre") }
-                        )
-                    }
-                    OutlinedTextField(
-                        value = value.toInt().toString(),
-                        onValueChange = { it.toDoubleOrNull()?.let { v -> value = v } },
-                        label = { Text("Temperatura (°C)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                "presence" -> {
-                    Text(
-                        "Se ejecutará solo si alguien está en casa.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Button(
-                onClick = {
-                    onAdd(
-                        AutomationCondition(
-                            type = selectedType,
-                            from = from,
-                            to = to,
-                            entity = entity,
-                            below = below,
-                            value = value
-                        )
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent)
-            ) {
-                Text("Añadir")
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ActionEditorBottomSheet(
-    onDismiss: () -> Unit,
-    onAdd: (AutomationAction) -> Unit
-) {
-    var selectedType by remember { mutableStateOf("set_temperature") }
-    var temperature by remember { mutableStateOf(20.0) }
-    var mode by remember { mutableStateOf("schedule") }
-    var title by remember { mutableStateOf("") }
-    var minutes by remember { mutableStateOf(5) }
-    var scenarioId by remember { mutableStateOf("") }
-
-    val actionTypes = listOf("set_temperature", "set_mode", "notify", "delay", "apply_scenario")
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "Añadir acción",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-
-            Text(
-                "Tipo",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                actionTypes.forEach { type ->
-                    FilterChip(
-                        selected = selectedType == type,
-                        onClick = { selectedType = type },
-                        label = {
-                            Text(
-                                when (type) {
-                                    "set_temperature" -> "Temp"
-                                    "set_mode" -> "Modo"
-                                    "notify" -> "Notif."
-                                    "delay" -> "Esperar"
-                                    "apply_scenario" -> "Escenario"
-                                    else -> type
-                                },
-                                fontSize = 11.sp
-                            )
-                        }
-                    )
-                }
-            }
-
-            when (selectedType) {
-                "set_temperature" -> {
-                    OutlinedTextField(
-                        value = temperature.toString(),
-                        onValueChange = { it.toDoubleOrNull()?.let { t -> temperature = t } },
-                        label = { Text("Temperatura (°C)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                "set_mode" -> {
-                    val modes = listOf("schedule", "manual", "away", "hg", "off")
-                    val modeLabels = mapOf(
-                        "schedule" to "Programado",
-                        "manual" to "Manual",
-                        "away" to "Ausente",
-                        "hg" to "Anticongelación",
-                        "off" to "Apagado"
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        modes.forEach { m ->
-                            FilterChip(
-                                selected = mode == m,
-                                onClick = { mode = m },
-                                label = { Text(modeLabels[m] ?: m) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-                "notify" -> {
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("Título de notificación") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                "delay" -> {
-                    OutlinedTextField(
-                        value = minutes.toString(),
-                        onValueChange = { it.toIntOrNull()?.let { m -> minutes = m } },
-                        label = { Text("Minutos de espera") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                "apply_scenario" -> {
-                    OutlinedTextField(
-                        value = scenarioId,
-                        onValueChange = { scenarioId = it },
-                        label = { Text("ID del escenario") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-            }
-
-            Button(
-                onClick = {
-                    onAdd(
-                        AutomationAction(
-                            type = selectedType,
-                            temperature = temperature,
-                            mode = mode,
-                            title = title,
-                            minutes = minutes,
-                            scenarioId = scenarioId
-                        )
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent)
-            ) {
-                Text("Añadir")
-            }
-        }
-    }
 }
