@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,7 @@ import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
 import com.arsys.netatmo.ui.theme.SurfaceContainerHighest
 import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 import com.arsys.netatmo.ui.theme.SurfaceContainerLowest
+import java.util.Calendar
 
 // ─── Design constants ─────────────────────────────────────────────────────────
 
@@ -59,6 +61,29 @@ private fun zoneIcon(zoneId: Int) = ZONE_ICONS.getOrElse(zoneId % ZONE_ICONS.siz
 private fun formatTime(minuteOfDay: Int) = "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
 
 private val DAY_LABELS = listOf("L", "M", "X", "J", "V", "S", "D")
+private val DAY_NAMES = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+
+private fun formatDuration(minutes: Int): String {
+    val h = minutes / 60; val m = minutes % 60
+    return when {
+        h == 0 -> "${m}min"
+        m == 0 -> "${h}h"
+        else -> "${h}h ${m}min"
+    }
+}
+
+private fun zoneDescription(name: String): String = when {
+    name.contains("noche", ignoreCase = true) -> "Ahorro energético nocturno"
+    name.contains("mañana", ignoreCase = true) -> "Despertar confortable"
+    name.contains("eco", ignoreCase = true) -> "Modo económico inteligente"
+    name.contains("confort", ignoreCase = true) -> "Temperatura de confort plena"
+    else -> "Zona de temperatura"
+}
+
+private fun dayGroup(index: Int): String = when (index) {
+    in 0..4 -> "L – V"
+    else -> "S – D"
+}
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +99,8 @@ fun ScheduleEditorScreen(
     var showSlotDetail by remember { mutableStateOf<SlotUi?>(null) }
     var showNameDialog by remember { mutableStateOf(false) }
     var showZoneManager by remember { mutableStateOf(false) }
+    var autoAdaptEnabled by remember { mutableStateOf(true) }
+    var openWindowEnabled by remember { mutableStateOf(true) }
 
     LaunchedEffect(scheduleId) { viewModel.loadSchedule(scheduleId) }
     LaunchedEffect(uiState.saved) { if (uiState.saved) navController.popBackStack() }
@@ -83,133 +110,28 @@ fun ScheduleEditorScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            BottomActionBar(
+                onSave = { viewModel.save() },
+                onReset = { viewModel.loadSchedule(scheduleId) },
+                isSaving = uiState.isSaving
+            )
+        }
     ) { scaffoldPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(scaffoldPadding)
         ) {
-            // ── TopAppBar dark ────────────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceContainerLowest)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(horizontal = 4.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
-                                Icons.Default.ArrowBack,
-                                contentDescription = "Volver",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { showNameDialog = true },
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = uiState.name,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = "Toca para editar",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-
-                        IconButton(onClick = { showZoneManager = true }) {
-                            Icon(
-                                Icons.Default.Tune,
-                                contentDescription = "Gestionar zonas",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        if (uiState.isSaving) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .padding(12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    strokeWidth = 2.dp
-                                )
-                            }
-                        } else {
-                            IconButton(onClick = { viewModel.save() }) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = "Guardar",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-
-                    // ── Day selector chips ────────────────────────────────────
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        DAY_LABELS.forEachIndexed { index, label ->
-                            val selected = uiState.selectedDay == index
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (selected) MaterialTheme.colorScheme.primaryContainer
-                                        else SurfaceContainerHigh
-                                    )
-                                    .clickable { viewModel.selectDay(index) }
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
-                }
-            }
-
-            // ── Timeline bar ──────────────────────────────────────────────────
-            TimelineBar(
-                slots = daySlots,
-                zones = uiState.zones,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            TopBar(
+                title = uiState.name,
+                onBack = { navController.popBackStack() },
+                onInfo = { showZoneManager = true },
+                onSave = { viewModel.save() },
+                isSaving = uiState.isSaving
             )
 
-            // ── Error banner ──────────────────────────────────────────────────
             uiState.error?.let {
                 Text(
                     text = it,
@@ -219,17 +141,91 @@ fun ScheduleEditorScreen(
                 )
             }
 
-            // ── Slot list ─────────────────────────────────────────────────────
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(bottom = 24.dp)
+                contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                items(daySlots, key = { "${it.dayOfWeek}-${it.minuteOfDay}" }) { slot ->
-                    SlotCard(
-                        slot = slot,
+                item {
+                    ActivePresetCard(
+                        name = uiState.name,
+                        slotCount = daySlots.size,
+                        autoAdaptEnabled = autoAdaptEnabled,
+                        onClick = { showNameDialog = true }
+                    )
+                }
+
+                item {
+                    DaySelectorRow(
+                        selectedDay = uiState.selectedDay,
+                        slots = uiState.slots,
+                        onSelect = viewModel::selectDay
+                    )
+                }
+
+                item {
+                    DayGroupLabel(selectedDay = uiState.selectedDay)
+                }
+
+                item {
+                    TimelineCard(
+                        slots = daySlots,
                         zones = uiState.zones,
-                        rooms = uiState.rooms,
-                        onClick = { showSlotDetail = slot },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Franjas de temperatura",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(
+                            onClick = { showZoneManager = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Tune,
+                                contentDescription = "Gestionar zonas",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                itemsIndexed(
+                    daySlots,
+                    key = { _, slot -> "${slot.dayOfWeek}-${slot.minuteOfDay}" }
+                ) { index, slot ->
+                    val endMinute = daySlots.getOrNull(index + 1)?.minuteOfDay ?: 1440
+                    val zone = uiState.zones.find { it.id == slot.zoneId }
+                    SlotExpandedCard(
+                        slot = slot,
+                        zone = zone,
+                        endMinute = endMinute,
+                        onTempChange = { newTemp ->
+                            zone?.let { viewModel.updateZone(it.copy(temperature = newTemp)) }
+                        },
+                        onEdit = { showSlotDetail = slot },
+                        onDelete = { viewModel.removeSlot(slot.dayOfWeek, slot.minuteOfDay) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
@@ -241,7 +237,7 @@ fun ScheduleEditorScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { showAddSlotDialog = true }
-                            .padding(horizontal = 24.dp, vertical = 18.dp),
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -258,6 +254,15 @@ fun ScheduleEditorScreen(
                             fontWeight = FontWeight.Medium
                         )
                     }
+                }
+
+                item {
+                    SmartTogglesCard(
+                        autoAdaptEnabled = autoAdaptEnabled,
+                        openWindowEnabled = openWindowEnabled,
+                        onAutoAdaptChange = { autoAdaptEnabled = it },
+                        onOpenWindowChange = { openWindowEnabled = it }
+                    )
                 }
             }
         }
@@ -310,100 +315,369 @@ fun ScheduleEditorScreen(
     }
 }
 
-// ─── Timeline bar ─────────────────────────────────────────────────────────────
+// ─── TopBar ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun TimelineBar(
-    slots: List<SlotUi>,
-    zones: List<ZoneUi>,
-    modifier: Modifier = Modifier
+private fun TopBar(
+    title: String,
+    onBack: () -> Unit,
+    onInfo: () -> Unit,
+    onSave: () -> Unit,
+    isSaving: Boolean
 ) {
-    if (slots.isEmpty()) {
-        Box(
-            modifier
-                .fillMaxWidth()
-                .height(18.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(SurfaceContainerLow)
-        )
-        return
-    }
-
-    data class Segment(val color: Color, val weight: Float, val startMinute: Int)
-
-    val segments = mutableListOf<Segment>()
-    if (slots.first().minuteOfDay > 0) {
-        segments += Segment(zoneColor(slots.last().zoneId), slots.first().minuteOfDay.toFloat(), 0)
-    }
-    slots.forEachIndexed { i, slot ->
-        val end = if (i < slots.size - 1) slots[i + 1].minuteOfDay else 1440
-        segments += Segment(zoneColor(slot.zoneId), (end - slot.minuteOfDay).toFloat(), slot.minuteOfDay)
-    }
-
-    Column(modifier = modifier) {
-        // Colored bar over surfaceContainerLow base
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(18.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(SurfaceContainerLow)
-        ) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                segments.forEach { seg ->
-                    Box(
-                        Modifier
-                            .weight(seg.weight)
-                            .fillMaxHeight()
-                            .background(seg.color.copy(alpha = 0.85f))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceContainerLowest)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
-            }
-        }
-        // Time labels aligned to segment starts
-        Spacer(Modifier.height(4.dp))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            segments.forEach { seg ->
-                val showLabel = seg.weight / 1440f > 0.07f
                 Text(
-                    text = if (showLabel) formatTime(seg.startMinute) else "",
-                    modifier = Modifier.weight(seg.weight),
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Start
+                    text = "Programación Semanal",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+                IconButton(onClick = onInfo) {
+                    Icon(
+                        Icons.Default.Tune,
+                        contentDescription = "Gestionar zonas",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (isSaving) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                } else {
+                    IconButton(onClick = onSave) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = "Guardar",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+            HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
+        }
+    }
+}
+
+// ─── ActivePresetCard ─────────────────────────────────────────────────────────
+
+@Composable
+private fun ActivePresetCard(
+    name: String,
+    slotCount: Int,
+    autoAdaptEnabled: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Name pill
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(SurfaceContainerHigh)
+                .border(1.dp, OutlineVariant, RoundedCornerShape(20.dp))
+                .clickable { onClick() }
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                Icons.Default.ExpandMore,
+                contentDescription = "Editar nombre",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        // Slot count chip
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(SurfaceContainerHigh)
+                .border(1.dp, OutlineVariant, RoundedCornerShape(20.dp))
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Schedule,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "$slotCount franjas",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Auto-Adapt chip
+        if (autoAdaptEnabled) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Bolt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "Auto",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
     }
 }
 
-// ─── Slot card ────────────────────────────────────────────────────────────────
+// ─── DaySelectorRow ──────────────────────────────────────────────────────────
 
 @Composable
-private fun SlotCard(
-    slot: SlotUi,
+private fun DaySelectorRow(
+    selectedDay: Int,
+    slots: List<SlotUi>,
+    onSelect: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        DAY_LABELS.forEachIndexed { index, label ->
+            val selected = selectedDay == index
+            val hasSlots = slots.any { it.dayOfWeek == index }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else SurfaceContainerHigh
+                        )
+                        .clickable { onSelect(index) }
+                ) {
+                    Text(
+                        text = label,
+                        color = if (selected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 13.sp
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (hasSlots) MaterialTheme.colorScheme.primary
+                            else Color.Transparent
+                        )
+                )
+            }
+        }
+    }
+}
+
+// ─── DayGroupLabel ───────────────────────────────────────────────────────────
+
+@Composable
+private fun DayGroupLabel(selectedDay: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Default.DateRange,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "${DAY_NAMES[selectedDay]} · ${dayGroup(selectedDay)}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// ─── Timeline card ────────────────────────────────────────────────────────────
+
+@Composable
+private fun TimelineCard(
+    slots: List<SlotUi>,
     zones: List<ZoneUi>,
-    rooms: List<Room>,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val zone = zones.find { it.id == slot.zoneId }
+    val now = remember {
+        val cal = Calendar.getInstance()
+        cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+    }
+
+    // Build segments as list of (color, weight)
+    val segments: List<Pair<Color, Float>> = remember(slots, zones) {
+        if (slots.isEmpty()) return@remember listOf(Pair(Color(0xFF1C2025), 1440f))
+        val result = mutableListOf<Pair<Color, Float>>()
+        if (slots.first().minuteOfDay > 0) {
+            result += Pair(zoneColor(slots.last().zoneId).copy(alpha = 0.5f), slots.first().minuteOfDay.toFloat())
+        }
+        slots.forEachIndexed { i, slot ->
+            val end = if (i < slots.size - 1) slots[i + 1].minuteOfDay else 1440
+            result += Pair(zoneColor(slot.zoneId), (end - slot.minuteOfDay).toFloat())
+        }
+        result
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(SurfaceContainerLow)
+            .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Column {
+            // Colored timeline bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(SurfaceContainerHigh)
+            ) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    segments.forEach { (color, weight) ->
+                        Box(
+                            Modifier
+                                .weight(weight)
+                                .fillMaxHeight()
+                                .background(color.copy(alpha = 0.8f))
+                        )
+                    }
+                }
+                // Current time needle using weighted spacers
+                Row(modifier = Modifier.fillMaxSize()) {
+                    if (now > 0) Spacer(Modifier.weight(now.toFloat()))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(2.dp)
+                            .background(Color.White.copy(alpha = 0.9f))
+                    )
+                    if (now < 1440) Spacer(Modifier.weight((1440 - now).toFloat()))
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            // Time axis labels
+            Row(modifier = Modifier.fillMaxWidth()) {
+                val axisLabels = listOf("00:00", "06:00", "12:00", "18:00", "24:00")
+                axisLabels.forEachIndexed { i, label ->
+                    Text(
+                        text = label,
+                        modifier = if (i == axisLabels.lastIndex) Modifier else Modifier.weight(1f),
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = if (i == 0) TextAlign.Start
+                        else if (i == axisLabels.lastIndex) TextAlign.End
+                        else TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─── SlotExpandedCard ─────────────────────────────────────────────────────────
+
+@Composable
+private fun SlotExpandedCard(
+    slot: SlotUi,
+    zone: ZoneUi?,
+    endMinute: Int,
+    onTempChange: (Double) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val color = zoneColor(slot.zoneId)
     val icon = zoneIcon(slot.zoneId)
+    val duration = endMinute - slot.minuteOfDay
+    val temp = zone?.temperature ?: 20.0
 
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(SurfaceContainerLow)
             .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
-            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
         ) {
-            // Left colored border 4dp
+            // Left colored border
             Box(
                 modifier = Modifier
                     .width(4.dp)
@@ -412,80 +686,358 @@ private fun SlotCard(
                     .background(color)
             )
 
-            Row(
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(vertical = 14.dp, horizontal = 12.dp),
-                verticalAlignment = Alignment.Top
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
             ) {
-                // Time column – 68dp, labelLarge
-                Text(
-                    text = formatTime(slot.minuteOfDay),
-                    modifier = Modifier
-                        .width(68.dp)
-                        .align(Alignment.Top),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Header row: icon + name/time + MoreVert
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Zone icon box
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(color.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = color,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
 
-                // Zone icon
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .align(Alignment.Top)
-                )
+                    Spacer(Modifier.width(10.dp))
 
-                Spacer(Modifier.width(12.dp))
-
-                // Room temperatures – bodyMedium
-                Column(modifier = Modifier.weight(1f)) {
-                    if (zone != null && rooms.isNotEmpty()) {
-                        rooms.forEach { room ->
-                            val temp = zone.roomTemps[room.id] ?: zone.temperature
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = zone?.name ?: "Zona ${slot.zoneId}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            // Duration badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(SurfaceContainerHigh)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
                                 Text(
-                                    text = "%.0f°C".format(temp),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.width(44.dp)
-                                )
-                                Text(
-                                    text = room.name,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    text = formatDuration(duration),
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Spacer(Modifier.height(2.dp))
                         }
-                    } else {
                         Text(
-                            text = zone?.name ?: "Zona ${slot.zoneId}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "${formatTime(slot.minuteOfDay)} → ${formatTime(endMinute)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (zone != null) {
-                            Text(
-                                text = "%.1f°C".format(zone.temperature),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    }
+
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "Opciones",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
 
-                // ChevronRight
+                Spacer(Modifier.height(8.dp))
+
+                // Description
+                if (zone != null) {
+                    Text(
+                        text = zoneDescription(zone.name),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                // Temperature control row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Minus button
+                    IconButton(
+                        onClick = { onTempChange((temp - 0.5).coerceIn(7.0, 30.0)) },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(SurfaceContainerHigh)
+                    ) {
+                        Icon(
+                            Icons.Default.Remove,
+                            contentDescription = "Bajar temperatura",
+                            tint = color,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    // Temperature display
+                    Text(
+                        text = "%.1f°C".format(temp),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = color
+                    )
+
+                    // Plus button
+                    IconButton(
+                        onClick = { onTempChange((temp + 0.5).coerceIn(7.0, 30.0)) },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(SurfaceContainerHigh)
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Subir temperatura",
+                            tint = color,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── SmartTogglesCard ─────────────────────────────────────────────────────────
+
+@Composable
+private fun SmartTogglesCard(
+    autoAdaptEnabled: Boolean,
+    openWindowEnabled: Boolean,
+    onAutoAdaptChange: (Boolean) -> Unit,
+    onOpenWindowChange: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(SurfaceContainerLow)
+            .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "Funciones inteligentes",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.height(12.dp))
+
+        // Auto-Adapt toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (autoAdaptEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        else SurfaceContainerHigh
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = "Ver detalles",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterVertically)
+                    Icons.Default.Bolt,
+                    contentDescription = null,
+                    tint = if (autoAdaptEnabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Auto-Adapt",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Ajuste predictivo de temperatura",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = autoAdaptEnabled,
+                onCheckedChange = onAutoAdaptChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    uncheckedTrackColor = SurfaceContainerHigh
+                )
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
+        Spacer(Modifier.height(8.dp))
+
+        // Open Window toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (openWindowEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        else SurfaceContainerHigh
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Thermostat,
+                    contentDescription = null,
+                    tint = if (openWindowEnabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Detección ventana abierta",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Pausa automática al abrir ventana",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = openWindowEnabled,
+                onCheckedChange = onOpenWindowChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    uncheckedTrackColor = SurfaceContainerHigh
+                )
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
+        Spacer(Modifier.height(8.dp))
+
+        // Weather integration row (informational)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFF97316).copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.WbSunny,
+                    contentDescription = null,
+                    tint = Color(0xFFF97316),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = "Integración meteorológica",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Activa · Conectada con estación exterior",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFF97316)
+                )
+            }
+        }
+    }
+}
+
+// ─── BottomActionBar ─────────────────────────────────────────────────────────
+
+@Composable
+private fun BottomActionBar(
+    onSave: () -> Unit,
+    onReset: () -> Unit,
+    isSaving: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceContainerLowest)
+    ) {
+        HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(
+                onClick = onReset,
+                enabled = !isSaving,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Text("Restablecer")
+            }
+            Button(
+                onClick = onSave,
+                enabled = !isSaving,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Guardar programación")
+                }
             }
         }
     }
@@ -646,7 +1198,6 @@ private fun RoomTempRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
-        // Minus button on surfaceContainerHigh
         IconButton(
             onClick = { onTempChange((temp - 0.5).coerceIn(7.0, 30.0)) },
             modifier = Modifier
@@ -665,7 +1216,6 @@ private fun RoomTempRow(
             modifier = Modifier.width(60.dp),
             textAlign = TextAlign.Center
         )
-        // Plus button on surfaceContainerHigh
         IconButton(
             onClick = { onTempChange((temp + 0.5).coerceIn(7.0, 30.0)) },
             modifier = Modifier
@@ -705,7 +1255,6 @@ private fun AddSlotDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Big time display – displaySmall
                 Text(
                     text = "%02d:%02d".format(hour, minute),
                     style = MaterialTheme.typography.displaySmall,
@@ -715,7 +1264,6 @@ private fun AddSlotDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Hour slider
                 Column {
                     Text(
                         "Hora: $hour",
@@ -735,7 +1283,6 @@ private fun AddSlotDialog(
                     )
                 }
 
-                // Minute slider (5-min steps)
                 Column {
                     Text(
                         "Minutos: %02d".format(minute),
@@ -757,7 +1304,6 @@ private fun AddSlotDialog(
 
                 HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
 
-                // Zone selector – pills with color
                 Text(
                     "Zona:",
                     style = MaterialTheme.typography.labelMedium,
@@ -1012,7 +1558,6 @@ private fun ZoneManagerRow(
             )
         )
 
-        // Temp controls – IconButtons on surfaceContainerHigh
         IconButton(
             onClick = { onTempChange((zone.temperature - 0.5).coerceIn(7.0, 30.0)) },
             modifier = Modifier

@@ -1,48 +1,89 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Netatmo Smart icon foreground (108×108dp viewport).
+  Safe zone: 18–90dp (72×72). All elements sit within that square.
+  Origin of 512×512 SVG mapped to 72×72 → scale = 72/512 = 0.140625, offset +18.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!--
-        Dial design: center (54,54), ring radius 34.
-        Gap at the bottom (45°→135° screen = 4-8 o'clock).
-        Ring goes from bottom-left (30,78) counterclockwise through top to bottom-right (78,78).
-        Active arc covers ~65% of 270° ≈ 175° — ends at ~1 o'clock (76,28).
-    -->
-
-    <!-- Inner decorative ring — subtle depth -->
+    <!-- Orange ambient glow (behind orange circle) -->
     <path
-        android:pathData="M54,36 a18,18 0 1,0 0.01,0Z"
+        android:fillColor="#28f97316"
+        android:pathData="M49.48,52.45 A10,10 0 1 0 69.48,52.45 A10,10 0 1 0 49.48,52.45 Z"/>
+
+    <!-- Cyan ambient glow (behind cyan circle) -->
+    <path
+        android:fillColor="#280284c7"
+        android:pathData="M40.53,53.16 A7,7 0 1 0 54.53,53.16 A7,7 0 1 0 40.53,53.16 Z"/>
+
+    <!-- Outer dashed decorative ring (faint) -->
+    <path
         android:fillColor="#00000000"
-        android:strokeColor="#99FFFFFF"
-        android:strokeWidth="1.5" />
+        android:strokeColor="#1A38bdf8"
+        android:strokeWidth="1"
+        android:pathData="M29.0,54.0 A25,25 0 1 0 79.0,54.0 A25,25 0 1 0 29.0,54.0 Z"/>
 
-    <!-- Ring track (270° — background of the dial) -->
+    <!-- Cyan smart-atmosphere arc -->
     <path
-        android:pathData="M30,78 A34,34 0 1 0 78,78"
         android:fillColor="#00000000"
-        android:strokeColor="#40FFFFFF"
-        android:strokeWidth="5"
-        android:strokeLineCap="round" />
+        android:strokeColor="#38bdf8"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M40.5,60.19 C36.28,51.75 38.39,41.91 46.13,36.98 C52.45,33.03 60.89,34.16 66.09,39.38"/>
 
-    <!-- Active arc (~65% warm, from bottom-left counterclockwise to ~1 o'clock) -->
+    <!-- Orange thermal-flow arc -->
     <path
-        android:pathData="M30,78 A34,34 0 0 0 76,28"
         android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="5"
-        android:strokeLineCap="round" />
+        android:strokeColor="#f97316"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M67.92,47.53 C70.73,54.56 69.33,62.30 63.0,67.92 C56.67,73.55 46.81,72.84 41.2,67.22"/>
 
-    <!-- Indicator dot at arc end -->
+    <!-- Cyan filled circle (comfort orbit, left node) -->
     <path
-        android:pathData="M71,28 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0"
-        android:fillColor="#FFFFFFFF" />
+        android:fillColor="#0284c7"
+        android:pathData="M43.59,53.16 A3.94,3.94 0 1 0 51.47,53.16 A3.94,3.94 0 1 0 43.59,53.16 Z"/>
 
-    <!-- Center dot -->
+    <!-- White inner dot of cyan circle -->
     <path
-        android:pathData="M49,54 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0"
-        android:fillColor="#CCFFFFFF" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M45.56,53.16 A1.97,1.97 0 1 0 49.50,53.16 A1.97,1.97 0 1 0 45.56,53.16 Z"/>
+
+    <!-- Orange filled circle (heating modulation core, right node) -->
+    <path
+        android:fillColor="#f97316"
+        android:pathData="M54.14,52.45 A5.34,5.34 0 1 0 64.82,52.45 A5.34,5.34 0 1 0 54.14,52.45 Z"/>
+
+    <!-- White flame / leaf shape inside orange circle -->
+    <path
+        android:fillColor="#F2FFFFFF"
+        android:pathData="M59.48,48.94 C61.31,50.91 62.44,52.88 62.44,54.0 C62.44,55.69 61.17,56.95 59.48,56.95 C57.79,56.95 56.53,55.69 56.53,54.0 C56.53,52.88 57.66,50.91 59.48,48.94 Z"/>
+
+    <!-- IoT sync beam linking the two nodes -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#CCFFFFFF"
+        android:strokeWidth="1"
+        android:strokeLineCap="round"
+        android:pathData="M51.47,52.88 L54.56,52.74"/>
+
+    <!-- Precision dot – top right (cyan) -->
+    <path
+        android:fillColor="#38bdf8"
+        android:pathData="M64.31,43.31 A1.5,1.5 0 1 0 67.31,43.31 A1.5,1.5 0 1 0 64.31,43.31 Z"/>
+
+    <!-- Precision dot – top left (cyan, dimmer) -->
+    <path
+        android:fillColor="#8038bdf8"
+        android:pathData="M40.71,44.72 A1.1,1.1 0 1 0 42.91,44.72 A1.1,1.1 0 1 0 40.71,44.72 Z"/>
+
+    <!-- Precision dot – bottom right (orange) -->
+    <path
+        android:fillColor="#B3fb923c"
+        android:pathData="M63.21,62.30 A1.1,1.1 0 1 0 65.41,62.30 A1.1,1.1 0 1 0 63.21,62.30 Z"/>
 
 </vector>
