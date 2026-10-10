@@ -138,11 +138,11 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             if (showBottomBar) {
                 Column {
                     HorizontalDivider(
-                        color = Color(0xFFE2E8F0),
+                        color = Color(0xFF3F4850),
                         thickness = 1.dp
                     )
                     NavigationBar(
-                        containerColor = Color(0xFF0A0E13),
+                        containerColor = Color(0xFF0F1419),
                         tonalElevation = 0.dp
                     ) {
                         bottomNavItems.forEach { screen ->
@@ -154,8 +154,8 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                                     selectedIconColor = Color(0xFF93CCFF),
                                     selectedTextColor = Color(0xFF93CCFF),
                                     indicatorColor = Color(0xFF93CCFF).copy(alpha = 0.2f),
-                                    unselectedIconColor = Color(0xFF89929B),
-                                    unselectedTextColor = Color(0xFF89929B)
+                                    unselectedIconColor = Color(0xFFBFC7D2),
+                                    unselectedTextColor = Color(0xFFBFC7D2)
                                 ),
                                 onClick = {
                                     navController.navigate(screen.route) {
@@ -250,7 +250,12 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                     onNavigateToCredentials = {
                         navController.navigate(Screen.NetatmoCredentials.route)
                     },
-                    onNavigateToFamily = { navController.navigate("family_management") }
+                    onNavigateToFamily = { navController.navigate("family_management") },
+                    onNavigateToAirQuality = { navController.navigate("air_quality") },
+                    onNavigateToBoilerStatus = { navController.navigate("boiler_status") },
+                    onNavigateToMaintenance = { navController.navigate("maintenance_history") },
+                    onNavigateToDevicePairing = { navController.navigate("device_pairing") },
+                    onNavigateToPurge = { navController.navigate("purge_system") }
                 )
             }
             composable(Screen.NetatmoCredentials.route) {

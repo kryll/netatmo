@@ -40,6 +40,11 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     onNavigateToCredentials: () -> Unit = {},
     onNavigateToFamily: () -> Unit = {},
+    onNavigateToAirQuality: () -> Unit = {},
+    onNavigateToBoilerStatus: () -> Unit = {},
+    onNavigateToMaintenance: () -> Unit = {},
+    onNavigateToDevicePairing: () -> Unit = {},
+    onNavigateToPurge: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
