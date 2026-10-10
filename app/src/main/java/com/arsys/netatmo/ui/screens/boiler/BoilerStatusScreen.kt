@@ -82,9 +82,9 @@ fun BoilerStatusScreen(
     )
 
     val health       = state.boilerHealth
-    val pressureBar  = health.pressureBar ?: 1.35f
+    val pressureBar  = health.pressureBar?.toFloat() ?: 1.35f
     val modulationPct = health.modulationPct
-    val impulsionTempC = health.impulsionTempC
+    val impulsionTempC = health.impulsionTempC?.toFloat()
     val isModulating = health.isModulating
     val rfStrength   = state.modules.firstOrNull { it.type == "NAPlug" }?.rfStrength
 
