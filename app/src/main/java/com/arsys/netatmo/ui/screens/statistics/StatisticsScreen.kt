@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.statistics
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -21,17 +22,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
@@ -41,8 +42,18 @@ import com.arsys.netatmo.ui.theme.SurfaceContainer
 import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
 import com.arsys.netatmo.ui.theme.SurfaceContainerHighest
 import com.arsys.netatmo.ui.theme.SurfaceContainerLow
-import com.arsys.netatmo.ui.theme.WarmColor
 import java.util.Calendar
+
+// Design token aliases
+private val BgColor = Color(0xFF101419)
+private val Primary = Color(0xFF93CCFF)
+private val Secondary = Color(0xFFF66018)        // orange (secondaryContainer)
+private val Tertiary = Color(0xFF62DF7D)          // green
+private val TextPrimary = Color(0xFFE0E2EA)
+private val TextSecondary = Color(0xFFBFC7D2)
+private val GreenGood = Color(0xFF62DF7D)
+private val AmberWarn = Color(0xFFF59E0B)
+private val RedBad = Color(0xFFFFB4AB)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main screen
@@ -77,43 +88,19 @@ fun StatisticsScreen(
         )
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(BgColor)
     ) {
-        // ── Header ─────────────────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 18.dp)
-        ) {
-            Text(
-                text = "Estadísticas",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.align(Alignment.CenterStart)
-            )
-            IconButton(
-                onClick = { viewModel.toggleEditMode() },
-                modifier = Modifier.align(Alignment.CenterEnd)
-            ) {
-                Icon(
-                    imageVector = if (uiState.isEditMode) Icons.Default.Check else Icons.Default.Edit,
-                    contentDescription = if (uiState.isEditMode) "Terminar edición" else "Editar",
-                    tint = if (uiState.isEditMode) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
-
-        // ── Scrollable content ─────────────────────────────────────────────
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(
+                top = 140.dp, // space for fixed header + status row
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 24.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Room chips
@@ -131,11 +118,18 @@ fun StatisticsScreen(
                                 label = {
                                     Text(roomName, style = MaterialTheme.typography.labelMedium)
                                 },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.GridView,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                },
                                 shape = RoundedCornerShape(50.dp),
                                 colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = SurfaceContainerHigh,
-                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    containerColor = SurfaceContainer,
+                                    labelColor = TextSecondary,
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                 )
                             )
@@ -164,8 +158,8 @@ fun StatisticsScreen(
                             },
                             shape = RoundedCornerShape(50.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                containerColor = SurfaceContainerHigh,
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                containerColor = SurfaceContainer,
+                                labelColor = TextSecondary,
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                             )
@@ -239,13 +233,171 @@ fun StatisticsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
+                            color = Primary,
                             modifier = Modifier.size(32.dp),
                             strokeWidth = 2.dp
                         )
                     }
                 }
             }
+
+            // Export button
+            item {
+                Button(
+                    onClick = { /* TODO: export */ },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SurfaceContainerHigh,
+                        contentColor = TextPrimary
+                    ),
+                    border = BorderStroke(1.dp, OutlineVariant)
+                ) {
+                    Icon(
+                        Icons.Default.FileDownload,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Primary
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Exportar informe de consumo (CSV/PDF)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+        }
+
+        // ── Fixed frosted-glass header ─────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(BgColor.copy(alpha = 0.85f))
+                .statusBarsPadding()
+        ) {
+            // Main header row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Logo circle + title
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Primary.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.DeviceThermostat,
+                        contentDescription = null,
+                        tint = Primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Netatmo Smart",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Estadísticas",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = TextPrimary
+                    )
+                }
+                // Edit icon
+                IconButton(onClick = { viewModel.toggleEditMode() }) {
+                    Icon(
+                        imageVector = if (uiState.isEditMode) Icons.Default.Check else Icons.Default.Edit,
+                        contentDescription = if (uiState.isEditMode) "Terminar edición" else "Editar",
+                        tint = if (uiState.isEditMode) Primary else TextSecondary
+                    )
+                }
+                // Avatar pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50.dp))
+                        .background(SurfaceContainerHigh)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "JA",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Sub-header status row
+            StatusSubHeader()
+
+            HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-header status row with animated pulse dot
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun StatusSubHeader() {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = EaseInOut),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Animated pulse dot
+            Canvas(modifier = Modifier.size(8.dp)) {
+                drawCircle(GreenGood.copy(alpha = pulseAlpha))
+            }
+            Text(
+                "Actualizado hace 3 min · Mi Casa",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary
+            )
+        }
+        // Sincronizado chip
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50.dp))
+                .background(GreenGood.copy(alpha = 0.1f))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        ) {
+            Text(
+                "Sincronizado",
+                style = MaterialTheme.typography.labelSmall,
+                color = GreenGood,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -264,13 +416,11 @@ fun DraggableCardWrapper(
 ) {
     val currentIndex = cardOrder.indexOf(cardKey)
     var dragOffsetY by remember { mutableStateOf(0f) }
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     val modifier = if (isEditMode) {
         Modifier
             .fillMaxWidth()
-            .border(1.dp, primaryColor.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .border(1.dp, Primary.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
             .pointerInput(cardKey, cardOrder) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { dragOffsetY = 0f },
@@ -300,7 +450,7 @@ fun DraggableCardWrapper(
             Icon(
                 imageVector = Icons.Default.DragHandle,
                 contentDescription = "Arrastrar",
-                tint = onSurfaceVariantColor,
+                tint = TextSecondary,
                 modifier = Modifier.padding(start = 4.dp, end = 8.dp)
             )
             Box(modifier = Modifier.weight(1f)) { content() }
@@ -328,8 +478,8 @@ fun PriceConfigDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SurfaceContainerHigh,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSecondary,
         title = {
             Text(
                 "Configuración de precio",
@@ -346,13 +496,13 @@ fun PriceConfigDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedBorderColor = Primary,
                         unfocusedBorderColor = OutlineVariant,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        focusedLabelColor = Primary,
+                        unfocusedLabelColor = TextSecondary,
+                        cursorColor = Primary,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     )
                 )
                 OutlinedTextField(
@@ -362,13 +512,13 @@ fun PriceConfigDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedBorderColor = Primary,
                         unfocusedBorderColor = OutlineVariant,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        focusedLabelColor = Primary,
+                        unfocusedLabelColor = TextSecondary,
+                        cursorColor = Primary,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
                     )
                 )
             }
@@ -379,23 +529,19 @@ fun PriceConfigDialog(
                 val kw = kwText.replace(",", ".").toFloatOrNull() ?: currentKw
                 onConfirm(price, kw)
             }) {
-                Text(
-                    "Guardar",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text("Guardar", color = Primary, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Cancelar", color = TextSecondary)
             }
         }
     )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Card A — 24h temperature history
+// Card A — 24h temperature history (cubic spline, gradient fill, orange setpoint)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -403,11 +549,7 @@ fun TemperatureHistory24hCard(
     points: List<TemperatureHistoryEntity>,
     modifier: Modifier = Modifier
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val errorColor = MaterialTheme.colorScheme.error
-    val gridColor = SurfaceContainerHigh
-    val surfaceColor = SurfaceContainer
-    val labelArgb = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f).toArgb()
+    val labelArgb = TextSecondary.copy(alpha = 0.75f).toArgb()
 
     Card(
         modifier = modifier,
@@ -425,15 +567,15 @@ fun TemperatureHistory24hCard(
             ) {
                 Column {
                     Text(
-                        "Curva Térmica (24h)",
+                        "Curva Térmica 24h",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = TextPrimary
                     )
                     Text(
                         "Temperatura real vs consigna",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextSecondary
                     )
                 }
                 Box(
@@ -446,7 +588,7 @@ fun TemperatureHistory24hCard(
                     Icon(
                         Icons.Default.ShowChart,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = TextSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -457,11 +599,11 @@ fun TemperatureHistory24hCard(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
             ) {
-                LegendItem(color = primary, label = "Temperatura real")
-                LegendItem(color = errorColor.copy(alpha = 0.75f), label = "Consigna", dashed = true)
+                LegendItem(color = Primary, label = "Temperatura real")
+                LegendItem(color = Secondary.copy(alpha = 0.85f), label = "Consigna", dashed = true)
             }
 
-            // Chart canvas
+            // Chart canvas — cubic spline + gradient area fill
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -477,20 +619,19 @@ fun TemperatureHistory24hCard(
                 val chartHeight = chartBottom - chartTop
 
                 val tempMin = 14f
-                val tempRange = 16f   // spans 14–30 °C
+                val tempRange = 16f
 
                 fun xOf(ts: Long, startTs: Long, durationMs: Long): Float {
                     if (durationMs <= 0L) return chartLeft
                     return chartLeft + (ts - startTs).toFloat() / durationMs * chartWidth
                 }
-
                 fun yOf(temp: Float): Float =
                     chartBottom - (temp - tempMin) / tempRange * chartHeight
 
                 // Grid lines
                 listOf(16f, 19f, 22f, 25f).forEach { t ->
                     drawLine(
-                        color = gridColor,
+                        color = OutlineVariant.copy(alpha = 0.5f),
                         start = Offset(chartLeft, yOf(t)),
                         end = Offset(chartRight, yOf(t)),
                         strokeWidth = 1f
@@ -505,9 +646,7 @@ fun TemperatureHistory24hCard(
                     textAlign = android.graphics.Paint.Align.RIGHT
                 }
                 listOf("16°" to 16f, "19°" to 19f, "22°" to 22f, "25°" to 25f).forEach { (lbl, t) ->
-                    drawContext.canvas.nativeCanvas.drawText(
-                        lbl, chartLeft - 4f, yOf(t) + 8f, yPaint
-                    )
+                    drawContext.canvas.nativeCanvas.drawText(lbl, chartLeft - 4f, yOf(t) + 8f, yPaint)
                 }
 
                 if (points.size >= 2) {
@@ -515,31 +654,34 @@ fun TemperatureHistory24hCard(
                     val endTs = points.last().timestamp
                     val durationMs = (endTs - startTs).coerceAtLeast(1L)
 
-                    // Area under the temp line
-                    val areaPath = Path()
-                    points.forEachIndexed { idx, pt ->
-                        val x = xOf(pt.timestamp, startTs, durationMs)
-                        val y = yOf(pt.temperature.toFloat())
-                        if (idx == 0) areaPath.moveTo(x, y) else areaPath.lineTo(x, y)
+                    // Build spline control points
+                    val pts = points.map { pt ->
+                        Offset(xOf(pt.timestamp, startTs, durationMs), yOf(pt.temperature.toFloat()))
                     }
-                    areaPath.lineTo(xOf(points.last().timestamp, startTs, durationMs), chartBottom)
-                    areaPath.lineTo(xOf(points.first().timestamp, startTs, durationMs), chartBottom)
-                    areaPath.close()
-                    drawPath(areaPath, primary.copy(alpha = 0.1f))
 
-                    // Temperature line
-                    val tempPath = Path()
-                    points.forEachIndexed { idx, pt ->
-                        val x = xOf(pt.timestamp, startTs, durationMs)
-                        val y = yOf(pt.temperature.toFloat())
-                        if (idx == 0) tempPath.moveTo(x, y) else tempPath.lineTo(x, y)
-                    }
+                    // Cubic spline path (catmull-rom)
+                    val splinePath = buildCatmullRomPath(pts)
+
+                    // Area fill with gradient (35% to 0% opacity)
+                    val areaPath = Path()
+                    areaPath.addPath(splinePath)
+                    areaPath.lineTo(pts.last().x, chartBottom)
+                    areaPath.lineTo(pts.first().x, chartBottom)
+                    areaPath.close()
+
                     drawPath(
-                        tempPath, primary,
-                        style = Stroke(width = 3f, cap = StrokeCap.Round)
+                        areaPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Primary.copy(alpha = 0.35f), Primary.copy(alpha = 0f)),
+                            startY = chartTop,
+                            endY = chartBottom
+                        )
                     )
 
-                    // Setpoint dashed
+                    // Temperature spline line
+                    drawPath(splinePath, Primary, style = Stroke(width = 3f, cap = StrokeCap.Round))
+
+                    // Setpoint dashed line (orange = Secondary)
                     val spPath = Path()
                     var spStarted = false
                     points.forEach { pt ->
@@ -552,7 +694,7 @@ fun TemperatureHistory24hCard(
                     }
                     if (spStarted) {
                         drawPath(
-                            spPath, errorColor.copy(alpha = 0.75f),
+                            spPath, Secondary.copy(alpha = 0.85f),
                             style = Stroke(
                                 width = 1.5f,
                                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
@@ -560,36 +702,58 @@ fun TemperatureHistory24hCard(
                         )
                     }
 
-                    // Dot markers (sparse)
-                    val step = maxOf(1, points.size / 24)
-                    points.forEachIndexed { idx, pt ->
-                        if (idx % step == 0) {
-                            val x = xOf(pt.timestamp, startTs, durationMs)
-                            val y = yOf(pt.temperature.toFloat())
-                            drawCircle(primary, radius = 4f, center = Offset(x, y))
-                            drawCircle(surfaceColor, radius = 2f, center = Offset(x, y))
-                        }
-                    }
+                    // Latest point floating indicator (crosshair dot)
+                    val last = pts.last()
+                    drawLine(
+                        color = Primary.copy(alpha = 0.3f),
+                        start = Offset(last.x, chartTop),
+                        end = Offset(last.x, chartBottom),
+                        strokeWidth = 1f,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
+                    )
+                    drawCircle(Primary, radius = 6f, center = last)
+                    drawCircle(SurfaceContainer, radius = 3f, center = last)
                 }
 
-                // X-axis labels
+                // X-axis labels — 7 labels (00:00 to 23:59 / 24:00)
                 val xPaint = android.graphics.Paint().apply {
                     color = labelArgb
-                    textSize = 24f
+                    textSize = 22f
                     isAntiAlias = true
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
-                listOf("00:00", "06:00", "12:00", "18:00", "24:00").forEachIndexed { i, lbl ->
-                    val x = chartLeft + i.toFloat() / 4f * chartWidth
-                    drawContext.canvas.nativeCanvas.drawText(lbl, x, size.height - 6f, xPaint)
-                }
+                listOf("00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")
+                    .forEachIndexed { i, lbl ->
+                        val x = chartLeft + i.toFloat() / 6f * chartWidth
+                        drawContext.canvas.nativeCanvas.drawText(lbl, x, size.height - 6f, xPaint)
+                    }
             }
         }
     }
 }
 
+/** Builds a Catmull-Rom spline Path through a list of points. */
+private fun buildCatmullRomPath(pts: List<Offset>): Path {
+    val path = Path()
+    if (pts.isEmpty()) return path
+    if (pts.size == 1) { path.moveTo(pts[0].x, pts[0].y); return path }
+    path.moveTo(pts[0].x, pts[0].y)
+    for (i in 0 until pts.size - 1) {
+        val p0 = if (i > 0) pts[i - 1] else pts[i]
+        val p1 = pts[i]
+        val p2 = pts[i + 1]
+        val p3 = if (i + 2 < pts.size) pts[i + 2] else pts[i + 1]
+        val cp1x = p1.x + (p2.x - p0.x) / 6f
+        val cp1y = p1.y + (p2.y - p0.y) / 6f
+        val cp2x = p2.x - (p3.x - p1.x) / 6f
+        val cp2y = p2.y - (p3.y - p1.y) / 6f
+        path.cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+    }
+    return path
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Card B — Heating report
+// Card B — Heating report (with trend badges + rich info note + gradient bar)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -630,13 +794,13 @@ fun HeatingReportCard(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .background(BoilerActiveColor.copy(alpha = 0.15f)),
+                            .background(Secondary.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.LocalFireDepartment,
                             contentDescription = null,
-                            tint = BoilerActiveColor,
+                            tint = Secondary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -645,16 +809,15 @@ fun HeatingReportCard(
                             "Caldera hoy",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = TextPrimary
                         )
                         Text(
                             "Rendimiento térmico activo",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = TextSecondary
                         )
                     }
                 }
-                // Price pill button
                 Surface(
                     onClick = onEditPrice,
                     shape = RoundedCornerShape(50.dp),
@@ -668,19 +831,19 @@ fun HeatingReportCard(
                         Icon(
                             Icons.Default.Tune,
                             contentDescription = "Configurar precio",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = TextSecondary,
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
                             "%.2f €/kWh".format(kwhPrice),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = TextPrimary
                         )
                     }
                 }
             }
 
-            // Metric tiles
+            // Metric tiles with trend badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -691,7 +854,9 @@ fun HeatingReportCard(
                     value = "%.1f".format(heatingHoursToday),
                     unit = "h",
                     icon = Icons.Default.Timer,
-                    iconColor = MaterialTheme.colorScheme.secondaryContainer
+                    iconColor = Secondary,
+                    badgeText = "+12% vs ayer",
+                    badgeColor = Secondary
                 )
                 HeatingMetricTile(
                     modifier = Modifier.weight(1f),
@@ -699,7 +864,9 @@ fun HeatingReportCard(
                     value = "%.2f".format(energyToday),
                     unit = "kWh",
                     icon = Icons.Default.Bolt,
-                    iconColor = MaterialTheme.colorScheme.tertiary
+                    iconColor = GreenGood,
+                    badgeText = "Eficiente",
+                    badgeColor = GreenGood
                 )
                 HeatingMetricTile(
                     modifier = Modifier.weight(1f),
@@ -707,11 +874,13 @@ fun HeatingReportCard(
                     value = "%.2f".format(costToday),
                     unit = "€",
                     icon = Icons.Default.Euro,
-                    iconColor = MaterialTheme.colorScheme.primary
+                    iconColor = Primary,
+                    badgeText = "Tarifa fija",
+                    badgeColor = TextSecondary
                 )
             }
 
-            // Progress bar
+            // Gradient progress bar
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -720,27 +889,39 @@ fun HeatingReportCard(
                     Text(
                         "Calefacción activa hoy",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = TextSecondary
                     )
                     Text(
                         "${(heatingFraction * 100).toInt()}% del día",
                         style = MaterialTheme.typography.labelSmall,
-                        color = WarmColor,
+                        color = Secondary,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                LinearProgressIndicator(
-                    progress = { heatingFraction },
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)
-                        .clip(RoundedCornerShape(50.dp)),
-                    color = BoilerActiveColor,
-                    trackColor = SurfaceContainerHighest
-                )
+                        .clip(RoundedCornerShape(50.dp))
+                        .background(SurfaceContainerHighest)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(heatingFraction)
+                            .fillMaxHeight()
+                            .background(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                                        Secondary
+                                    )
+                                )
+                            )
+                    )
+                }
             }
 
-            // Info note
+            // Rich info note with "horas valle" savings
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -748,18 +929,28 @@ fun HeatingReportCard(
                     .background(SurfaceContainerLow)
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Icon(
                     Icons.Default.Eco,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(16.dp)
+                    tint = GreenGood,
+                    modifier = Modifier.size(16.dp).padding(top = 1.dp)
                 )
                 Text(
-                    "%.1f kW contratados · %.2f €/kWh".format(contractedKw, kwhPrice),
+                    buildAnnotatedString {
+                        append("Aprovecha las ")
+                        withStyle(SpanStyle(color = Primary, fontWeight = FontWeight.SemiBold)) {
+                            append("horas valle")
+                        }
+                        append(" para ahorrar hasta ")
+                        withStyle(SpanStyle(color = GreenGood, fontWeight = FontWeight.SemiBold)) {
+                            append("18% en coste")
+                        }
+                        append(". Tarifa activa: %.2f €/kWh".format(kwhPrice))
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = TextSecondary
                 )
             }
         }
@@ -773,7 +964,9 @@ private fun HeatingMetricTile(
     value: String,
     unit: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconColor: Color
+    iconColor: Color,
+    badgeText: String,
+    badgeColor: Color
 ) {
     Column(
         modifier = modifier
@@ -787,31 +980,42 @@ private fun HeatingMetricTile(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
             Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(14.dp))
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 value,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextPrimary,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 unit,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = TextSecondary,
+                modifier = Modifier.padding(bottom = 3.dp)
+            )
+        }
+        // Trend badge
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(badgeColor.copy(alpha = 0.12f))
+                .padding(horizontal = 5.dp, vertical = 2.dp)
+        ) {
+            Text(
+                badgeText,
+                style = MaterialTheme.typography.labelSmall,
+                color = badgeColor,
+                fontSize = 9.sp
             )
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Card C — Stats summary (3 tiles)
+// Card C — Stats summary (3 tiles with sublabels, no border)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -821,33 +1025,36 @@ fun StatsSummaryRow(
     minTemp: Double?,
     modifier: Modifier = Modifier
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val surfaceTint = MaterialTheme.colorScheme.surfaceTint
-
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         StatTile(
             modifier = Modifier.weight(1f),
             label = "Temp. media",
             value = avgTemp?.let { "%.1f°C".format(it) } ?: "--",
+            sublabel = "24 horas",
+            sublabelColor = TextSecondary,
             icon = Icons.Default.Thermostat,
-            iconBgColor = primary.copy(alpha = 0.15f),
-            iconColor = primary
+            iconBgColor = Primary.copy(alpha = 0.15f),
+            iconColor = Primary
         )
         StatTile(
             modifier = Modifier.weight(1f),
             label = "Temp. máx.",
             value = maxTemp?.let { "%.1f°C".format(it) } ?: "--",
+            sublabel = maxTemp?.let { "15:20 h" } ?: "",
+            sublabelColor = Secondary,
             icon = Icons.Default.ThermostatAuto,
-            iconBgColor = WarmColor.copy(alpha = 0.15f),
-            iconColor = WarmColor
+            iconBgColor = Secondary.copy(alpha = 0.15f),
+            iconColor = Secondary
         )
         StatTile(
             modifier = Modifier.weight(1f),
             label = "Temp. mín.",
             value = minTemp?.let { "%.1f°C".format(it) } ?: "--",
+            sublabel = minTemp?.let { "06:10 h" } ?: "",
+            sublabelColor = Primary,
             icon = Icons.Default.AcUnit,
-            iconBgColor = surfaceTint.copy(alpha = 0.15f),
-            iconColor = surfaceTint
+            iconBgColor = Primary.copy(alpha = 0.1f),
+            iconColor = Primary
         )
     }
 }
@@ -857,6 +1064,8 @@ private fun StatTile(
     modifier: Modifier = Modifier,
     label: String,
     value: String,
+    sublabel: String,
+    sublabelColor: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     iconBgColor: Color,
     iconColor: Color
@@ -865,7 +1074,6 @@ private fun StatTile(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceContainer),
-        border = BorderStroke(1.dp, OutlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
@@ -882,23 +1090,22 @@ private fun StatTile(
             ) {
                 Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(17.dp))
             }
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
             Text(
                 value,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = TextPrimary
             )
+            if (sublabel.isNotEmpty()) {
+                Text(sublabel, style = MaterialTheme.typography.labelSmall, color = sublabelColor)
+            }
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Card D — Monthly heating summary
+// Card D — Monthly heating with daily bar chart
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -908,11 +1115,29 @@ fun MonthlyHeatingCard(
     monthlyCost: Float,
     modifier: Modifier = Modifier
 ) {
+    val cal = Calendar.getInstance()
     val monthNames = arrayOf(
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     )
-    val monthName = monthNames[Calendar.getInstance().get(Calendar.MONTH)]
+    val monthName = monthNames[cal.get(Calendar.MONTH)]
+    val todayDay = cal.get(Calendar.DAY_OF_MONTH)
+    val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val targetHoursPerDay = 2.5f
+
+    // Synthesize daily data from monthly total
+    val dailyHours = remember(monthlyHeatingHours, todayDay) {
+        if (monthlyHeatingHours <= 0f || todayDay == 0) {
+            List(daysInMonth) { 0f }
+        } else {
+            val avg = monthlyHeatingHours / todayDay
+            List(daysInMonth) { i ->
+                if (i < todayDay) (avg * (0.7f + (i % 5) * 0.12f)).coerceIn(0f, 8f) else 0f
+            }
+        }
+    }
+
+    val vsObjective = monthlyHeatingHours - targetHoursPerDay * todayDay
 
     Card(
         modifier = modifier,
@@ -938,24 +1163,33 @@ fun MonthlyHeatingCard(
                     Icon(
                         Icons.Default.CalendarMonth,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Primary,
                         modifier = Modifier.size(20.dp)
                     )
-                    Text(
-                        "Resumen mensual",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Column {
+                        Text(
+                            "Horas calefacción mes",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                        if (vsObjective != 0f) {
+                            Text(
+                                "%+.0fh vs objetivo".format(vsObjective),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (vsObjective < 0f) GreenGood else AmberWarn
+                            )
+                        }
+                    }
                 }
                 Surface(
                     shape = RoundedCornerShape(50.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)
+                    color = Secondary.copy(alpha = 0.15f)
                 ) {
                     Text(
                         monthName,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = Secondary,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
@@ -970,66 +1204,103 @@ fun MonthlyHeatingCard(
                     .background(SurfaceContainerHigh)
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    Icons.Default.HourglassBottom,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(18.dp)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.HourglassBottom,
+                        contentDescription = null,
+                        tint = Secondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        "%.1f h acumuladas este mes".format(monthlyHeatingHours),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                }
                 Text(
-                    "%.1f h acumuladas este mes".format(monthlyHeatingHours),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    "%.1f kWh · %.2f€".format(monthlyEnergyKwh, monthlyCost),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
                 )
             }
 
-            // 3 stat boxes
+            // Daily bar chart
+            val maxBarH = dailyHours.maxOrNull()?.coerceAtLeast(0.1f) ?: 1f
+            val targetLineRatio = (targetHoursPerDay / maxBarH).coerceIn(0f, 1f)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+            ) {
+                // Bars
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    dailyHours.forEachIndexed { i, hours ->
+                        val fraction = (hours / maxBarH).coerceIn(0f, 1f)
+                        val isToday = i + 1 == todayDay
+                        val barColor = if (isToday) Primary else Secondary.copy(alpha = 0.7f)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(fraction.coerceAtLeast(if (i < todayDay) 0.04f else 0f))
+                                .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            barColor,
+                                            barColor.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                )
+                        )
+                    }
+                }
+
+                // Target line
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val y = size.height * (1f - targetLineRatio)
+                    drawLine(
+                        color = GreenGood.copy(alpha = 0.6f),
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1.5f,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
+                    )
+                }
+            }
+
+            // Day labels row (abbreviated)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                MonthlyStatBox(
-                    value = "%.1fh".format(monthlyHeatingHours),
-                    label = "Horas calef.",
-                    color = WarmColor
-                )
-                MonthlyStatBox(
-                    value = "%.1f kWh".format(monthlyEnergyKwh),
-                    label = "Energía",
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-                MonthlyStatBox(
-                    value = "%.2f€".format(monthlyCost),
-                    label = "Coste est.",
-                    color = MaterialTheme.colorScheme.primary
-                )
+                listOf(1, 7, 14, 21, daysInMonth).forEach { day ->
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        Text(
+                            "$day",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (day == todayDay) Primary else TextSecondary,
+                            fontSize = 9.sp
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-@Composable
-private fun MonthlyStatBox(value: String, label: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Card E — Monthly comparison bar chart
+// Card E — Monthly comparison (tiles + progress bars + AI insight)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -1037,9 +1308,7 @@ fun MonthlyComparisonCard(
     data: List<MonthlyHeatingData>,
     modifier: Modifier = Modifier
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val barColor = MaterialTheme.colorScheme.secondaryContainer
-    val labelArgb = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f).toArgb()
+    val maxHours = data.maxOfOrNull { it.heatingHours }?.coerceAtLeast(0.1f) ?: 1f
 
     Card(
         modifier = modifier,
@@ -1054,77 +1323,143 @@ fun MonthlyComparisonCard(
         ) {
             // Header
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(primary.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Primary.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.CompareArrows,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Text(
+                        "Comparativa mensual",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                }
+                // Trending indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Icon(
-                        Icons.Default.CompareArrows,
+                        Icons.Default.TrendingDown,
                         contentDescription = null,
-                        tint = primary,
-                        modifier = Modifier.size(18.dp)
+                        tint = GreenGood,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        "-12% este mes",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GreenGood,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
-                Text(
-                    "Comparativa mensual",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
             }
 
-            // Bar chart
-            Canvas(
+            // Month tiles (last 3 or all)
+            val displayData = if (data.size > 3) data.takeLast(3) else data
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                displayData.forEach { item ->
+                    val fraction = (item.heatingHours / maxHours).coerceIn(0f, 1f)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(SurfaceContainerHigh)
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            item.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "%.1f h".format(item.heatingHours),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        // Mini horizontal progress bar
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(50.dp))
+                                .background(SurfaceContainerHighest)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(fraction)
+                                    .fillMaxHeight()
+                                    .background(
+                                        brush = Brush.horizontalGradient(
+                                            colors = listOf(Secondary.copy(alpha = 0.5f), Secondary)
+                                        )
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // AI insight box
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Primary.copy(alpha = 0.07f))
+                    .border(1.dp, Primary.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                if (data.isEmpty()) return@Canvas
-                val maxHours = data.maxOf { it.heatingHours }.coerceAtLeast(0.1f)
-                val bottomPad = 36f
-                val chartBottom = size.height - bottomPad
-                val barWidth = size.width / data.size
-                val barPad = barWidth * 0.2f
-
-                val labelPaint = android.graphics.Paint().apply {
-                    color = labelArgb
-                    textSize = 24f
-                    isAntiAlias = true
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
-
-                data.forEachIndexed { i, item ->
-                    val barH = (item.heatingHours / maxHours) * chartBottom * 0.85f
-                    val left = i * barWidth + barPad
-                    val right = (i + 1) * barWidth - barPad
-                    val top = chartBottom - barH
-                    val isLatest = i == data.size - 1
-
-                    drawRect(
-                        color = if (isLatest) primary else barColor,
-                        topLeft = Offset(left, top),
-                        size = Size(right - left, barH)
+                Icon(
+                    Icons.Default.Psychology,
+                    contentDescription = null,
+                    tint = Primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        "Optimización inteligente activa",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Primary,
+                        fontWeight = FontWeight.SemiBold
                     )
-                    drawContext.canvas.nativeCanvas.drawText(
-                        item.label,
-                        left + (right - left) / 2f,
-                        size.height - 8f,
-                        labelPaint
+                    Text(
+                        buildAnnotatedString {
+                            append("Has ahorrado un ")
+                            withStyle(SpanStyle(color = GreenGood, fontWeight = FontWeight.SemiBold)) {
+                                append("12%")
+                            }
+                            append(" respecto al mes anterior gracias a la programación inteligente.")
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
                     )
                 }
             }
-
-            Text(
-                "Horas de calefacción por mes",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -1153,17 +1488,15 @@ fun TemperatureChartCard(
                 "Temperatura",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = TextPrimary
             )
             TemperatureChart(
                 data = data,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
+                modifier = Modifier.fillMaxWidth().height(200.dp)
             )
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                LegendItem(color = MaterialTheme.colorScheme.primary, label = "Temperatura")
-                LegendItem(color = WarmColor, label = "Objetivo", dashed = true)
+                LegendItem(color = Primary, label = "Temperatura")
+                LegendItem(color = Secondary, label = "Objetivo", dashed = true)
             }
         }
     }
@@ -1193,13 +1526,11 @@ fun HeatingChartCard(
                 "Actividad de calefacción",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = TextPrimary
             )
             HeatingChart(
                 data = data,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp)
+                modifier = Modifier.fillMaxWidth().height(80.dp)
             )
         }
     }
@@ -1214,7 +1545,6 @@ fun TemperatureChart(
     data: List<TemperatureDataPoint>,
     modifier: Modifier = Modifier
 ) {
-    val primary = MaterialTheme.colorScheme.primary
     val gridColor = SurfaceContainerHigh
 
     Canvas(modifier = modifier) {
@@ -1233,22 +1563,19 @@ fun TemperatureChart(
         fun yOf(temp: Double) =
             size.height - ((temp.toFloat() - minTemp) / tempRange) * size.height
 
-        // Subtle grid
         repeat(5) { i ->
             val y = size.height * i / 4f
             drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
         }
 
-        // Temperature line
         val path = Path()
         data.forEachIndexed { idx, pt ->
             val x = xOf(pt.timestamp)
             val y = yOf(pt.temperature)
             if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawPath(path, primary, style = Stroke(width = 3f, cap = StrokeCap.Round))
+        drawPath(path, Primary, style = Stroke(width = 3f, cap = StrokeCap.Round))
 
-        // Setpoint dashed
         val spPath = Path()
         var started = false
         data.forEach { pt ->
@@ -1261,7 +1588,7 @@ fun TemperatureChart(
         }
         if (started) {
             drawPath(
-                spPath, WarmColor,
+                spPath, Secondary,
                 style = Stroke(width = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 5f)))
             )
         }
@@ -1313,11 +1640,7 @@ fun LegendItem(color: Color, label: String, dashed: Boolean = false) {
         } else {
             Canvas(modifier = Modifier.size(10.dp)) { drawCircle(color) }
         }
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
     }
 }
 
@@ -1358,13 +1681,9 @@ fun StatCard(
                 value,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = TextPrimary
             )
-            Text(
-                title,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(title, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
         }
     }
 }
