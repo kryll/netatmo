@@ -794,7 +794,7 @@ private fun HeatingMetricTile(
             )
             Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(14.dp))
         }
-        Row(verticalAlignment = Alignment.Baseline, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 value,
                 style = MaterialTheme.typography.headlineSmall,

@@ -1,6 +1,6 @@
 package com.arsys.netatmo.ui.screens.settings
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,21 +13,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.ui.components.TemperatureSlider
+import com.arsys.netatmo.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Accent = Color(0xFF0284C7)
-private val TextPrimary = Color(0xFF1E293B)
-
-private fun formatDate(ms: Long): String {
+private fun formatDateVacation(ms: Long): String {
     if (ms == 0L) return "Sin seleccionar"
     val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     return sdf.format(Date(ms))
@@ -54,55 +50,55 @@ fun VacationModeScreen(
 
     val isActive = vacationState.enabled
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .statusBarsPadding()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { navController.popBackStack() }) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = TextPrimary
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Modo Vacaciones",
+                        style = MaterialTheme.typography.titleLarge
                     )
-                }
-                Text(
-                    text = "Modo Vacaciones",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(start = 8.dp)
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowBack,
+                            contentDescription = "Volver"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
                 )
-            }
-        }
-
-        Divider(color = Color(0xFFE2E8F0))
-
-        // Scrollable content
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF8FAFC))
+                .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Active state card or empty state
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Active vacation state card
             if (isActive) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFDCFCE7))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(16.dp)
+                        ),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
@@ -115,45 +111,52 @@ fun VacationModeScreen(
                             Icon(
                                 imageVector = Icons.Filled.CheckCircle,
                                 contentDescription = null,
-                                tint = Color(0xFF16A34A),
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
                                 text = "Modo vacaciones activo",
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF15803D)
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                         Text(
-                            text = "Desde: ${formatDate(vacationState.startMs)}",
-                            color = Color(0xFF166534),
-                            fontSize = 14.sp
+                            text = "Desde: ${formatDateVacation(vacationState.startMs)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Hasta: ${formatDate(vacationState.endMs)}",
-                            color = Color(0xFF166534),
-                            fontSize = 14.sp
+                            text = "Hasta: ${formatDateVacation(vacationState.endMs)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "Temperatura de guardia: %.1f°C".format(vacationState.temperature),
-                            color = Color(0xFF166534),
-                            fontSize = 14.sp
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Button(
+                        TextButton(
                             onClick = { viewModel.deactivate() },
                             enabled = !uiState.isSaving,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (uiState.isSaving) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp,
-                                    color = Color.White
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             } else {
-                                Text("Cancelar modo vacaciones")
+                                Text(
+                                    text = "Cancelar modo vacaciones",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }
@@ -170,92 +173,134 @@ fun VacationModeScreen(
                     Icon(
                         imageVector = Icons.Filled.BeachAccess,
                         contentDescription = null,
-                        tint = Color(0xFF94A3B8),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(48.dp)
                     )
                     Text(
                         text = "Sin vacaciones programadas",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 14.sp
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
             // Date configuration card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                color = SurfaceContainer
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Configurar periodo",
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary,
-                        fontSize = 15.sp
+                        text = "Período de ausencia",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    TextButton(
-                        onClick = { showStartPicker = true },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 0.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        // Start date button
+                        Surface(
+                            onClick = { showStartPicker = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = SurfaceContainerLow
                         ) {
-                            Text("Desde:", color = Color(0xFF64748B))
-                            Text(
-                                text = formatDate(uiState.startMs),
-                                color = if (uiState.startMs > 0L) Accent else Color(0xFF94A3B8),
-                                fontWeight = FontWeight.Medium
-                            )
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "SALIDA",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = formatDateVacation(uiState.startMs),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = if (uiState.startMs > 0L)
+                                        MaterialTheme.colorScheme.onSurface
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
-                    }
-                    Divider(color = Color(0xFFF1F5F9))
-                    TextButton(
-                        onClick = { showEndPicker = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 0.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        // End date button
+                        Surface(
+                            onClick = { showEndPicker = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = SurfaceContainerLow
                         ) {
-                            Text("Hasta:", color = Color(0xFF64748B))
-                            Text(
-                                text = formatDate(uiState.endMs),
-                                color = if (uiState.endMs > 0L) Accent else Color(0xFF94A3B8),
-                                fontWeight = FontWeight.Medium
-                            )
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "REGRESO",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = formatDateVacation(uiState.endMs),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = if (uiState.endMs > 0L)
+                                        MaterialTheme.colorScheme.onSurface
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
             }
 
             // Temperature card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                color = SurfaceContainer
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "Temperatura de guardia",
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary,
-                        fontSize = 15.sp
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Consigna Antihielo",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(50.dp),
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "Ahorro Máx",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = "Rango eco: 7°C – 18°C",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 12.sp
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     TemperatureSlider(
                         value = uiState.temperature,
@@ -268,16 +313,22 @@ fun VacationModeScreen(
             }
 
             // Error message
-            uiState.error?.let { error ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2))
+            uiState.error?.let { errorMsg ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.errorContainer,
+                            RoundedCornerShape(12.dp)
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
                 ) {
                     Text(
-                        text = error,
-                        color = Color(0xFFDC2626),
-                        fontSize = 13.sp,
+                        text = errorMsg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(12.dp)
                     )
                 }
@@ -287,21 +338,27 @@ fun VacationModeScreen(
             Button(
                 onClick = { viewModel.activate() },
                 enabled = uiState.startMs > 0L && uiState.endMs > 0L && !uiState.isSaving,
-                colors = ButtonDefaults.buttonColors(containerColor = Accent),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    disabledContainerColor = SurfaceContainerHigh,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(10.dp)
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 if (uiState.isSaving) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 } else {
                     Text(
                         text = "Activar modo vacaciones",
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                 }

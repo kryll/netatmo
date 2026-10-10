@@ -45,7 +45,7 @@ fun CertificateDetailScreen(
     val context = LocalContext.current
 
     val certText = record?.let { r ->
-        val type = try { MaintenanceType.valueOf(r.type) } catch (e: Exception) { MaintenanceType.OTHER }
+        val maintenanceType = try { MaintenanceType.valueOf(r.type) } catch (e: Exception) { MaintenanceType.OTHER }
         """
 CERTIFICADO DE MANTENIMIENTO
 ==============================
@@ -95,7 +95,7 @@ Documento generado por Netatmo Smart Control
         }
 
         val r = record!!
-        val type = try { MaintenanceType.valueOf(r.type) } catch (e: Exception) { MaintenanceType.OTHER }
+        val maintenanceType = try { MaintenanceType.valueOf(r.type) } catch (e: Exception) { MaintenanceType.OTHER }
 
         Column(
             modifier = Modifier

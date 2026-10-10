@@ -83,16 +83,17 @@ fun AirQualityScreen(
 
             // 2x2 grid of metric cards
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val co2Ppm = state.co2Ppm
                 val co2Color = when {
-                    state.co2Ppm == null -> TextSecondary
-                    state.co2Ppm < 800 -> GreenOk
-                    state.co2Ppm < 1200 -> OrangeWarn
+                    co2Ppm == null -> TextSecondary
+                    co2Ppm < 800 -> GreenOk
+                    co2Ppm < 1200 -> OrangeWarn
                     else -> RedBad
                 }
                 val co2Label = when {
-                    state.co2Ppm == null -> "Sin datos"
-                    state.co2Ppm < 800 -> "Buena"
-                    state.co2Ppm < 1200 -> "Moderada"
+                    co2Ppm == null -> "Sin datos"
+                    co2Ppm < 800 -> "Buena"
+                    co2Ppm < 1200 -> "Moderada"
                     else -> "Mala"
                 }
                 MetricCard(
@@ -134,16 +135,17 @@ fun AirQualityScreen(
             }
 
             // Overall quality
+            val co2PpmOverall = state.co2Ppm
             val overallColor = when {
-                state.co2Ppm == null -> TextSecondary
-                state.co2Ppm < 800 -> GreenOk
-                state.co2Ppm < 1200 -> OrangeWarn
+                co2PpmOverall == null -> TextSecondary
+                co2PpmOverall < 800 -> GreenOk
+                co2PpmOverall < 1200 -> OrangeWarn
                 else -> RedBad
             }
             val overallLabel = when {
-                state.co2Ppm == null -> "Sin datos del sensor"
-                state.co2Ppm < 800 -> "Calidad excelente"
-                state.co2Ppm < 1200 -> "Calidad moderada"
+                co2PpmOverall == null -> "Sin datos del sensor"
+                co2PpmOverall < 800 -> "Calidad excelente"
+                co2PpmOverall < 1200 -> "Calidad moderada"
                 else -> "Calidad deficiente — ventila la habitación"
             }
             Card(
