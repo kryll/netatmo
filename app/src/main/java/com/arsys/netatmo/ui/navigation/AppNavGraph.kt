@@ -36,6 +36,14 @@ import com.arsys.netatmo.ui.screens.statistics.StatisticsScreen
 import com.arsys.netatmo.ui.screens.automations.ScheduleAutomationScreen
 import com.arsys.netatmo.ui.screens.settings.VacationModeScreen
 import com.arsys.netatmo.ui.screens.settings.FamilyManagementScreen
+import com.arsys.netatmo.ui.screens.airquality.AirQualityScreen
+import com.arsys.netatmo.ui.screens.boiler.BoilerStatusScreen
+import com.arsys.netatmo.ui.screens.boiler.HydraulicDiagnosticScreen
+import com.arsys.netatmo.ui.screens.maintenance.MaintenanceHistoryScreen
+import com.arsys.netatmo.ui.screens.maintenance.CertificateDetailScreen
+import com.arsys.netatmo.ui.screens.devices.DevicePairingScreen
+import com.arsys.netatmo.ui.screens.devices.PurgeSystemScreen
+import com.arsys.netatmo.ui.screens.devices.ValveCalibrationScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home : Screen("home", "Inicio", Icons.Default.Home)
@@ -54,6 +62,14 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object VacationMode : Screen("vacation_mode", "Vacaciones", Icons.Default.BeachAccess)
     object FamilyManagement : Screen("family_management", "Familia", Icons.Default.Group)
     object AdvancedAutomation : Screen("advanced_automation/{automationId}", "Automatización avanzada", Icons.Default.AutoAwesome)
+    object AirQuality : Screen("air_quality", "Calidad del Aire", Icons.Default.Air)
+    object BoilerStatus : Screen("boiler_status", "Caldera", Icons.Default.LocalFireDepartment)
+    object HydraulicDiagnostic : Screen("hydraulic_diagnostic", "Diagnóstico", Icons.Default.Build)
+    object MaintenanceHistory : Screen("maintenance_history", "Mantenimiento", Icons.Default.Assignment)
+    object CertificateDetail : Screen("certificate/{recordId}", "Certificado", Icons.Default.Description)
+    object DevicePairing : Screen("device_pairing", "Emparejar", Icons.Default.AddCircle)
+    object PurgeSystem : Screen("purge_system", "Purga", Icons.Default.WaterDrop)
+    object ValveCalibration : Screen("valve_calibration", "Calibración", Icons.Default.Tune)
 }
 
 val bottomNavItems = listOf(
@@ -126,7 +142,7 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                         thickness = 1.dp
                     )
                     NavigationBar(
-                        containerColor = Color.White,
+                        containerColor = Color(0xFF0A0E13),
                         tonalElevation = 0.dp
                     ) {
                         bottomNavItems.forEach { screen ->
@@ -135,9 +151,11 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                                 label = { Text(screen.label) },
                                 selected = currentRoute == screen.route,
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color(0xFF0369A1),
-                                    selectedTextColor = Color(0xFF0369A1),
-                                    indicatorColor = Color(0xFF0EA5E9).copy(alpha = 0.15f)
+                                    selectedIconColor = Color(0xFF93CCFF),
+                                    selectedTextColor = Color(0xFF93CCFF),
+                                    indicatorColor = Color(0xFF93CCFF).copy(alpha = 0.2f),
+                                    unselectedIconColor = Color(0xFF89929B),
+                                    unselectedTextColor = Color(0xFF89929B)
                                 ),
                                 onClick = {
                                     navController.navigate(screen.route) {
@@ -244,6 +262,42 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             }
             composable("vacation_mode") { VacationModeScreen(navController = navController) }
             composable("family_management") { FamilyManagementScreen(navController = navController) }
+            composable(Screen.AirQuality.route) {
+                AirQualityScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.BoilerStatus.route) {
+                BoilerStatusScreen(
+                    onBack = { navController.popBackStack() },
+                    onDiagnostic = { navController.navigate(Screen.HydraulicDiagnostic.route) }
+                )
+            }
+            composable(Screen.HydraulicDiagnostic.route) {
+                HydraulicDiagnosticScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.MaintenanceHistory.route) {
+                MaintenanceHistoryScreen(
+                    onBack = { navController.popBackStack() },
+                    onCertificate = { id -> navController.navigate("certificate/$id") }
+                )
+            }
+            composable(
+                Screen.CertificateDetail.route,
+                arguments = listOf(navArgument("recordId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                CertificateDetailScreen(
+                    recordId = backStackEntry.arguments?.getLong("recordId") ?: 0L,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.DevicePairing.route) {
+                DevicePairingScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.PurgeSystem.route) {
+                PurgeSystemScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Screen.ValveCalibration.route) {
+                ValveCalibrationScreen(onBack = { navController.popBackStack() })
+            }
             composable(
                 route = "advanced_automation/{automationId}",
                 arguments = listOf(navArgument("automationId") { type = NavType.LongType; defaultValue = -1L })
