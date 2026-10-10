@@ -51,7 +51,7 @@ CERTIFICADO DE MANTENIMIENTO
 ==============================
 Número: ${r.certificateRef.ifBlank { "CERT-${r.id}" }}
 Fecha: ${dateFormatter.format(Date(r.date))}
-Tipo: ${type.displayName}
+Tipo: ${maintenanceType.displayName}
 Técnico: ${r.technicianName.ifBlank { "No especificado" }}
 
 Descripción:
@@ -136,7 +136,7 @@ Documento generado por Netatmo Smart Control
                     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         CertField("Número de certificado", r.certificateRef.ifBlank { "CERT-${r.id}" })
                         CertField("Fecha", dateFormatter.format(Date(r.date)))
-                        CertField("Tipo de revisión", type.displayName)
+                        CertField("Tipo de revisión", maintenanceType.displayName)
                         CertField("Técnico", r.technicianName.ifBlank { "No especificado" })
                         CertField("Descripción", r.description)
                         r.warrantyExtendedUntil?.let {
