@@ -112,14 +112,7 @@ fun PurgeSystemScreen(onBack: () -> Unit) {
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor   = SurfaceContLow,
-                contentColor     = Primary,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier  = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        height    = 3.dp,
-                        color     = Primary
-                    )
-                }
+                contentColor     = Primary
             ) {
                 listOf("Purga de Aire", "Purga de Radiador").forEachIndexed { i, label ->
                     Tab(
