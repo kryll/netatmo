@@ -1,6 +1,7 @@
 package com.arsys.netatmo.ui.screens.schedule
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -25,21 +26,22 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.data.api.models.Room
+import com.arsys.netatmo.ui.theme.OutlineVariant
+import com.arsys.netatmo.ui.theme.SurfaceContainer
+import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
+import com.arsys.netatmo.ui.theme.SurfaceContainerHighest
+import com.arsys.netatmo.ui.theme.SurfaceContainerLow
+import com.arsys.netatmo.ui.theme.SurfaceContainerLowest
 
 // ─── Design constants ─────────────────────────────────────────────────────────
 
-private val Accent = Color(0xFF0284C7)
-private val BgSurface = Color(0xFFF4F6F9)
-private val TextPrimary = Color(0xFF1E293B)
-private val TextSecondary = Color(0xFF64748B)
-
 private val ZONE_COLORS = listOf(
-    Color(0xFF1A6BB5),  // 0 Blue  – Noche
-    Color(0xFFD4591E),  // 1 Orange – Mañana
-    Color(0xFF5DB9C5),  // 2 Cyan  – Eco
-    Color(0xFFF5B800),  // 3 Yellow – Confort
-    Color(0xFF8BC34A),  // 4 Green
-    Color(0xFF9C27B0),  // 5 Purple
+    Color(0xFF3B82F6),  // 0 Blue   – Noche
+    Color(0xFFF97316),  // 1 Orange – Mañana
+    Color(0xFF06B6D4),  // 2 Cyan   – Eco
+    Color(0xFFEAB308),  // 3 Yellow – Confort
+    Color(0xFF22C55E),  // 4 Green
+    Color(0xFFA855F7),  // 5 Purple
 )
 
 private val ZONE_ICONS: List<ImageVector>
@@ -52,7 +54,7 @@ private val ZONE_ICONS: List<ImageVector>
         Icons.Default.Thermostat,
     )
 
-private fun zoneColor(zoneId: Int) = ZONE_COLORS.getOrElse(zoneId % ZONE_COLORS.size) { Color.Gray }
+private fun zoneColor(zoneId: Int) = ZONE_COLORS.getOrElse(zoneId % ZONE_COLORS.size) { Color(0xFF89929B) }
 private fun zoneIcon(zoneId: Int) = ZONE_ICONS.getOrElse(zoneId % ZONE_ICONS.size) { Icons.Default.Thermostat }
 private fun formatTime(minuteOfDay: Int) = "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
 
@@ -80,20 +82,21 @@ fun ScheduleEditorScreen(
         uiState.slots.filter { it.dayOfWeek == uiState.selectedDay }.sortedBy { it.minuteOfDay }
     }
 
-    Scaffold(containerColor = BgSurface) { scaffoldPadding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background
+    ) { scaffoldPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(scaffoldPadding)
         ) {
-            // ── Header ───────────────────────────────────────────────────────
+            // ── TopAppBar dark ────────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(SurfaceContainerLowest)
             ) {
                 Column {
-                    // Title bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -102,49 +105,66 @@ fun ScheduleEditorScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver",
-                                tint = Accent)
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "Volver",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
+
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { showNameDialog = true },
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Programación",
-                                color = TextPrimary,
+                                text = uiState.name,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
                             )
                             Text(
-                                text = uiState.name,
-                                color = TextSecondary,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.clickable { showNameDialog = true }
+                                text = "Toca para editar",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall
                             )
                         }
-                        // Zones manager
+
                         IconButton(onClick = { showZoneManager = true }) {
-                            Icon(Icons.Default.Tune, contentDescription = "Gestionar zonas",
-                                tint = Accent)
-                        }
-                        // Save
-                        if (uiState.isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .padding(end = 4.dp),
-                                color = Accent,
-                                strokeWidth = 2.dp
+                            Icon(
+                                Icons.Default.Tune,
+                                contentDescription = "Gestionar zonas",
+                                tint = MaterialTheme.colorScheme.primary
                             )
+                        }
+
+                        if (uiState.isSaving) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .padding(12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 2.dp
+                                )
+                            }
                         } else {
                             IconButton(onClick = { viewModel.save() }) {
-                                Icon(Icons.Default.Check, contentDescription = "Guardar",
-                                    tint = Accent)
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Guardar",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
                     }
 
-                    // Day chips
+                    // ── Day selector chips ────────────────────────────────────
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -160,21 +180,23 @@ fun ScheduleEditorScreen(
                                     .size(40.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (selected) Accent
-                                        else Color(0xFFF1F5F9)
+                                        if (selected) MaterialTheme.colorScheme.primaryContainer
+                                        else SurfaceContainerHigh
                                     )
                                     .clickable { viewModel.selectDay(index) }
                             ) {
                                 Text(
                                     text = label,
-                                    color = if (selected) Color.White else TextSecondary,
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 14.sp
                                 )
                             }
                         }
                     }
-                    HorizontalDivider(color = Color(0xFFE2E8F0))
+
+                    HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
                 }
             }
 
@@ -193,7 +215,7 @@ fun ScheduleEditorScreen(
                     text = it,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
 
@@ -222,12 +244,16 @@ fun ScheduleEditorScreen(
                             .padding(horizontal = 24.dp, vertical = 18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Accent,
-                            modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = "Añadir franja horaria",
-                            color = Accent,
+                            color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
@@ -297,8 +323,8 @@ private fun TimelineBar(
             modifier
                 .fillMaxWidth()
                 .height(18.dp)
-                .clip(CircleShape)
-                .background(Color.LightGray)
+                .clip(RoundedCornerShape(9.dp))
+                .background(SurfaceContainerLow)
         )
         return
     }
@@ -315,24 +341,27 @@ private fun TimelineBar(
     }
 
     Column(modifier = modifier) {
-        // Colored bar
-        Row(
+        // Colored bar over surfaceContainerLow base
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(18.dp)
                 .clip(RoundedCornerShape(9.dp))
+                .background(SurfaceContainerLow)
         ) {
-            segments.forEach { seg ->
-                Box(
-                    Modifier
-                        .weight(seg.weight)
-                        .fillMaxHeight()
-                        .background(seg.color)
-                )
+            Row(modifier = Modifier.fillMaxSize()) {
+                segments.forEach { seg ->
+                    Box(
+                        Modifier
+                            .weight(seg.weight)
+                            .fillMaxHeight()
+                            .background(seg.color.copy(alpha = 0.85f))
+                    )
+                }
             }
         }
         // Time labels aligned to segment starts
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(4.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             segments.forEach { seg ->
                 val showLabel = seg.weight / 1440f > 0.07f
@@ -340,7 +369,7 @@ private fun TimelineBar(
                     text = if (showLabel) formatTime(seg.startMinute) else "",
                     modifier = Modifier.weight(seg.weight),
                     fontSize = 9.sp,
-                    color = Color(0xFF888888),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Start
                 )
             }
@@ -362,98 +391,102 @@ private fun SlotCard(
     val color = zoneColor(slot.zoneId)
     val icon = zoneIcon(slot.zoneId)
 
-    Card(
-        modifier = modifier.clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(SurfaceContainerLow)
+            .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
-                .padding(vertical = 14.dp)
         ) {
-            // Time label
-            Text(
-                text = formatTime(slot.minuteOfDay),
-                modifier = Modifier
-                    .width(68.dp)
-                    .padding(start = 16.dp)
-                    .align(Alignment.Top),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF666666)
-            )
-
-            // Left colored bar
+            // Left colored border 4dp
             Box(
                 modifier = Modifier
                     .width(4.dp)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(2.dp))
+                    .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
                     .background(color)
             )
 
-            Spacer(Modifier.width(14.dp))
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 14.dp, horizontal = 12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                // Time column – 68dp, labelLarge
+                Text(
+                    text = formatTime(slot.minuteOfDay),
+                    modifier = Modifier
+                        .width(68.dp)
+                        .align(Alignment.Top),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            // Zone icon
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(22.dp).align(Alignment.Top)
-            )
+                // Zone icon
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .align(Alignment.Top)
+                )
 
-            Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(12.dp))
 
-            // Room temperatures
-            Column(modifier = Modifier.weight(1f)) {
-                if (zone != null && rooms.isNotEmpty()) {
-                    rooms.forEach { room ->
-                        val temp = zone.roomTemps[room.id] ?: zone.temperature
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                // Room temperatures – bodyMedium
+                Column(modifier = Modifier.weight(1f)) {
+                    if (zone != null && rooms.isNotEmpty()) {
+                        rooms.forEach { room ->
+                            val temp = zone.roomTemps[room.id] ?: zone.temperature
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "%.0f°C".format(temp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.width(44.dp)
+                                )
+                                Text(
+                                    text = room.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(Modifier.height(2.dp))
+                        }
+                    } else {
+                        Text(
+                            text = zone?.name ?: "Zona ${slot.zoneId}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (zone != null) {
                             Text(
-                                text = "%.0f°C".format(temp),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF1C1C1E),
-                                modifier = Modifier.width(44.dp)
-                            )
-                            Text(
-                                text = room.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF1C1C1E)
+                                text = "%.1f°C".format(zone.temperature),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Spacer(Modifier.height(2.dp))
-                    }
-                } else {
-                    Text(
-                        text = zone?.name ?: "Zona ${slot.zoneId}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF1C1C1E)
-                    )
-                    if (zone != null) {
-                        Text(
-                            text = "%.1f°C".format(zone.temperature),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF888888)
-                        )
                     }
                 }
-            }
 
-            // Chevron
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = "Ver detalles",
-                tint = Color(0xFFCCCCCC),
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .padding(end = 12.dp)
-            )
+                // ChevronRight
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = "Ver detalles",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
+            }
         }
     }
 }
@@ -474,7 +507,21 @@ private fun SlotDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val zone = zones.find { it.id == slot.zoneId }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SurfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(OutlineVariant)
+            )
+        }
+    ) {
         Column(
             modifier = Modifier
                 .padding(horizontal = 20.dp)
@@ -496,19 +543,26 @@ private fun SlotDetailSheet(
                     text = formatTime(slot.minuteOfDay),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Eliminar franja",
-                        tint = MaterialTheme.colorScheme.error)
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Eliminar franja",
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // Zone picker
-            Text("Zona activa", style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF888888))
+            // Zone picker chips with dot
+            Text(
+                "Zona activa",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -516,21 +570,35 @@ private fun SlotDetailSheet(
             ) {
                 zones.forEach { z ->
                     val selected = z.id == slot.zoneId
+                    val zColor = zoneColor(z.id)
                     FilterChip(
                         selected = selected,
                         onClick = { onChangeZone(z.id) },
-                        label = { Text(z.name) },
+                        label = {
+                            Text(
+                                z.name,
+                                color = if (selected) zColor else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
                         leadingIcon = {
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
                                     .clip(CircleShape)
-                                    .background(zoneColor(z.id))
+                                    .background(zColor)
                             )
                         },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = zoneColor(z.id).copy(alpha = 0.15f),
-                            selectedLabelColor = zoneColor(z.id)
+                            selectedContainerColor = zColor.copy(alpha = 0.18f),
+                            selectedLabelColor = zColor,
+                            containerColor = SurfaceContainerHigh,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = selected,
+                            selectedBorderColor = zColor.copy(alpha = 0.4f),
+                            borderColor = OutlineVariant
                         )
                     )
                 }
@@ -539,8 +607,11 @@ private fun SlotDetailSheet(
             // Room temperatures
             if (zone != null && rooms.isNotEmpty()) {
                 Spacer(Modifier.height(20.dp))
-                Text("Temperaturas", style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF888888))
+                Text(
+                    "Temperaturas",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.height(8.dp))
                 rooms.forEach { room ->
                     val temp = zone.roomTemps[room.id] ?: zone.temperature
@@ -572,13 +643,19 @@ private fun RoomTempRow(
         Text(
             text = roomName,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
+        // Minus button on surfaceContainerHigh
         IconButton(
             onClick = { onTempChange((temp - 0.5).coerceIn(7.0, 30.0)) },
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceContainerHigh)
         ) {
-            Icon(Icons.Default.Remove, contentDescription = "Bajar", tint = accentColor)
+            Icon(Icons.Default.Remove, contentDescription = "Bajar", tint = accentColor,
+                modifier = Modifier.size(18.dp))
         }
         Text(
             text = "%.1f°C".format(temp),
@@ -588,11 +665,16 @@ private fun RoomTempRow(
             modifier = Modifier.width(60.dp),
             textAlign = TextAlign.Center
         )
+        // Plus button on surfaceContainerHigh
         IconButton(
             onClick = { onTempChange((temp + 0.5).coerceIn(7.0, 30.0)) },
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceContainerHigh)
         ) {
-            Icon(Icons.Default.Add, contentDescription = "Subir", tint = accentColor)
+            Icon(Icons.Default.Add, contentDescription = "Subir", tint = accentColor,
+                modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -611,93 +693,130 @@ private fun AddSlotDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nueva franja horaria") },
+        containerColor = SurfaceContainer,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        title = {
+            Text(
+                "Nueva franja horaria",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Big time display
+                // Big time display – displaySmall
                 Text(
                     text = "%02d:%02d".format(hour, minute),
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
-                    color = Accent,
+                    color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 // Hour slider
                 Column {
-                    Text("Hora: $hour", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        "Hora: $hour",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Slider(
                         value = hour.toFloat(),
                         onValueChange = { hour = it.toInt() },
                         valueRange = 0f..23f,
                         steps = 22,
                         colors = SliderDefaults.colors(
-                            activeTrackColor = Accent,
-                            thumbColor = Accent
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = SurfaceContainerHighest,
+                            thumbColor = MaterialTheme.colorScheme.primary
                         )
                     )
                 }
 
                 // Minute slider (5-min steps)
                 Column {
-                    Text("Minutos: %02d".format(minute), style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        "Minutos: %02d".format(minute),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Slider(
                         value = (minute / 5).toFloat(),
                         onValueChange = { minute = (it.toInt() * 5).coerceIn(0, 55) },
                         valueRange = 0f..11f,
                         steps = 10,
                         colors = SliderDefaults.colors(
-                            activeTrackColor = Accent,
-                            thumbColor = Accent
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = SurfaceContainerHighest,
+                            thumbColor = MaterialTheme.colorScheme.primary
                         )
                     )
                 }
 
-                HorizontalDivider()
+                HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
 
-                // Zone selector
-                Text("Zona:", style = MaterialTheme.typography.labelMedium)
+                // Zone selector – pills with color
+                Text(
+                    "Zona:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     zones.forEach { zone ->
                         val selected = selectedZoneId == zone.id
+                        val zColor = zoneColor(zone.id)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    if (selected) zoneColor(zone.id).copy(alpha = 0.12f)
-                                    else Color.Transparent
+                                    if (selected) zColor.copy(alpha = 0.15f)
+                                    else SurfaceContainerHigh
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (selected) zColor.copy(alpha = 0.4f) else Color.Transparent,
+                                    shape = RoundedCornerShape(10.dp)
                                 )
                                 .clickable { selectedZoneId = zone.id }
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
                                     .size(12.dp)
                                     .clip(CircleShape)
-                                    .background(zoneColor(zone.id))
+                                    .background(zColor)
                             )
                             Spacer(Modifier.width(10.dp))
-                            Icon(zoneIcon(zone.id), contentDescription = null,
-                                tint = zoneColor(zone.id), modifier = Modifier.size(18.dp))
+                            Icon(
+                                zoneIcon(zone.id),
+                                contentDescription = null,
+                                tint = zColor,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = zone.name,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f),
-                                color = if (selected) zoneColor(zone.id) else Color.Unspecified
+                                color = if (selected) zColor else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "%.1f°C".format(zone.temperature),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF888888)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             if (selected) {
                                 Spacer(Modifier.width(4.dp))
-                                Icon(Icons.Default.Check, contentDescription = null,
-                                    tint = zoneColor(zone.id), modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = zColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
                     }
@@ -707,11 +826,19 @@ private fun AddSlotDialog(
         confirmButton = {
             Button(
                 onClick = { onAdd(hour * 60 + minute, selectedZoneId) },
-                colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) { Text("Añadir") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) { Text("Cancelar") }
         }
     )
 }
@@ -727,21 +854,48 @@ private fun NameEditDialog(
     var nameValue by remember { mutableStateOf(currentName) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nombre de la programación") },
+        containerColor = SurfaceContainer,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        title = {
+            Text(
+                "Nombre de la programación",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
         text = {
             OutlinedTextField(
                 value = nameValue,
                 onValueChange = { nameValue = it },
                 label = { Text("Nombre") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = OutlineVariant,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    cursorColor = MaterialTheme.colorScheme.primary
+                )
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(nameValue) }) { Text("Aceptar") }
+            TextButton(
+                onClick = { onConfirm(nameValue) },
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) { Text("Aceptar") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) { Text("Cancelar") }
         }
     )
 }
@@ -759,7 +913,21 @@ private fun ZoneManagerSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SurfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 4.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(OutlineVariant)
+            )
+        }
+    ) {
         Column(
             modifier = Modifier
                 .padding(horizontal = 20.dp)
@@ -768,7 +936,8 @@ private fun ZoneManagerSheet(
             Text(
                 text = "Zonas de temperatura",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.height(16.dp))
 
@@ -786,7 +955,10 @@ private fun ZoneManagerSheet(
             OutlinedButton(
                 onClick = onAddZone,
                 modifier = Modifier.fillMaxWidth(),
-                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
@@ -810,8 +982,9 @@ private fun ZoneManagerRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(color.copy(alpha = 0.08f))
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceContainerLow)
+            .border(1.dp, OutlineVariant, RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -832,17 +1005,23 @@ private fun ZoneManagerRow(
                 focusedBorderColor = color,
                 unfocusedBorderColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedContainerColor = Color.Transparent
+                focusedContainerColor = Color.Transparent,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                cursorColor = color
             )
         )
 
-        // Temp controls
+        // Temp controls – IconButtons on surfaceContainerHigh
         IconButton(
             onClick = { onTempChange((zone.temperature - 0.5).coerceIn(7.0, 30.0)) },
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceContainerHigh)
         ) {
             Icon(Icons.Default.Remove, contentDescription = "Bajar", tint = color,
-                modifier = Modifier.size(18.dp))
+                modifier = Modifier.size(16.dp))
         }
         Text(
             text = "%.1f°".format(zone.temperature),
@@ -854,16 +1033,25 @@ private fun ZoneManagerRow(
         )
         IconButton(
             onClick = { onTempChange((zone.temperature + 0.5).coerceIn(7.0, 30.0)) },
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceContainerHigh)
         ) {
             Icon(Icons.Default.Add, contentDescription = "Subir", tint = color,
-                modifier = Modifier.size(18.dp))
+                modifier = Modifier.size(16.dp))
         }
 
         if (canDelete) {
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f))
+            ) {
                 Icon(Icons.Default.Delete, contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
             }
         }
     }

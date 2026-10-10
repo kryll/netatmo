@@ -5,9 +5,11 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,21 +22,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.BuildConfig
+import com.arsys.netatmo.ui.theme.OutlineVariant
+import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
+import com.arsys.netatmo.ui.theme.SurfaceContainerLow
+import com.arsys.netatmo.ui.theme.SurfaceContainerLowest
 import com.arsys.netatmo.util.AuthDebugLogger
-
-private val Accent = Color(0xFF0284C7)
-private val BgSurface = Color(0xFFF4F6F9)
-private val TextPrimary = Color(0xFF1E293B)
-private val TextSecondary = Color(0xFF64748B)
 
 @Composable
 fun AuthScreen(
@@ -54,7 +53,11 @@ fun AuthScreen(
         if (isLoggedIn) onLoginSuccess()
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(BgSurface)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -62,87 +65,83 @@ fun AuthScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Hero section
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
                     .statusBarsPadding()
                     .padding(horizontal = 24.dp)
-                    .padding(top = 48.dp, bottom = 40.dp),
-                contentAlignment = Alignment.Center
+                    .padding(top = 56.dp, bottom = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                // Air icon in circular surfaceContainerHigh
+                Surface(
+                    modifier = Modifier.size(100.dp),
+                    shape = CircleShape,
+                    color = SurfaceContainerHigh
                 ) {
-                    // Logo
-                    Surface(
-                        modifier = Modifier.size(100.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        color = Accent.copy(alpha = 0.1f)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Air,
-                                contentDescription = null,
-                                modifier = Modifier.size(60.dp),
-                                tint = Accent
-                            )
-                        }
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Air,
+                            contentDescription = null,
+                            modifier = Modifier.size(60.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
+                }
 
-                    Text(
-                        text = "Netatmo Smart",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        textAlign = TextAlign.Center
-                    )
+                Spacer(modifier = Modifier.height(4.dp))
 
-                    Text(
-                        text = "Control inteligente de tu termostato",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TextSecondary,
-                        textAlign = TextAlign.Center
-                    )
+                Text(
+                    text = "Netatmo Smart",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Control inteligente de tu termostato",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
 
-                    // Features list
-                    val features = listOf(
-                        "Automatización por ubicación (geovalla)",
-                        "Integración con Google Calendar",
-                        "Programaciones avanzadas",
-                        "Estadísticas y gráficos",
-                        "Escenarios y accesos directos"
-                    )
-                    features.forEach { feature ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                modifier = Modifier.size(8.dp),
-                                shape = RoundedCornerShape(4.dp),
-                                color = Accent
-                            ) {}
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = feature,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary
-                            )
-                        }
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Feature bullets
+                val features = listOf(
+                    "Automatización por ubicación (geovalla)",
+                    "Integración con Google Calendar",
+                    "Programaciones avanzadas",
+                    "Estadísticas y gráficos",
+                    "Escenarios y accesos directos"
+                )
+                features.forEach { feature ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(8.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary
+                        ) {}
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = feature,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
 
-            // Form section
-            Card(
+            // Bottom card — surfaceContainerLow with top radius 28dp
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                color = SurfaceContainerLow
             ) {
                 Column(
                     modifier = Modifier
@@ -151,15 +150,16 @@ fun AuthScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Credentials warning
+                    // Credentials warning card
                     if (!credentialsConfigured) {
-                        Card(
+                        Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
+                            )
                         ) {
                             Column(
                                 modifier = Modifier.padding(16.dp),
@@ -167,28 +167,40 @@ fun AuthScreen(
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        Icons.Default.Warning,
+                                        Icons.Default.Key,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.tertiary
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         "Configura tus credenciales primero",
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                                 Text(
                                     "Para iniciar sesión necesitas un Client ID y Client Secret de Netatmo. Son gratuitos.",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 OutlinedButton(
                                     onClick = onConfigureCredentials,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)
+                                    ),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    )
                                 ) {
-                                    Icon(Icons.Default.Key, contentDescription = null)
+                                    Icon(
+                                        Icons.Default.Key,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Configurar credenciales")
                                 }
@@ -196,23 +208,38 @@ fun AuthScreen(
                         }
                     }
 
+                    // Error card
                     if (errorMessage != null) {
-                        Card(
+                        Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Text(
-                                text = errorMessage!!,
-                                modifier = Modifier.padding(16.dp),
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.20f),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.error
                             )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = errorMessage!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
                         }
                     }
 
+                    // Connect button — primaryContainer, 56dp
                     Button(
                         onClick = {
                             isLoading = true
@@ -226,19 +253,24 @@ fun AuthScreen(
                             .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         enabled = !isLoading && credentialsConfigured,
-                        colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            disabledContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onSurface,
+                                strokeWidth = 2.dp
                             )
                         } else {
                             Text(
                                 text = "Conectar con Netatmo",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -250,13 +282,15 @@ fun AuthScreen(
                         textAlign = TextAlign.Center
                     )
 
-                    // Panel de debug — visible solo en builds de depuración
+                    // Debug panel — visible only in debug builds
                     if (BuildConfig.DEBUG && debugLogs.isNotEmpty()) {
                         AuthDebugPanel(
                             logs = debugLogs,
                             onCopy = {
                                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("auth_log", AuthDebugLogger.allLogsAsText()))
+                                cm.setPrimaryClip(
+                                    ClipData.newPlainText("auth_log", AuthDebugLogger.allLogsAsText())
+                                )
                             },
                             onClear = { AuthDebugLogger.clear() }
                         )
@@ -273,11 +307,11 @@ private fun AuthDebugPanel(
     onCopy: () -> Unit,
     onClear: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(12.dp),
+        color = SurfaceContainerLowest,
+        border = BorderStroke(1.dp, OutlineVariant)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -294,7 +328,7 @@ private fun AuthDebugPanel(
                     )
                     Text(
                         "v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
-                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -303,14 +337,16 @@ private fun AuthDebugPanel(
                         Icon(
                             Icons.Default.ContentCopy,
                             contentDescription = "Copiar logs",
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Limpiar",
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
