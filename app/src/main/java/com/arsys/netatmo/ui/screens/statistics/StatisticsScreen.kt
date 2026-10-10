@@ -31,6 +31,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -71,6 +73,11 @@ fun StatisticsScreen(
     )
     var selectedPeriod by remember { mutableStateOf(7) }
     var showPriceDialog by remember { mutableStateOf(false) }
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val headerHeightDp by remember(headerHeightPx) {
+        derivedStateOf { with(density) { headerHeightPx.toDp() } }
+    }
 
     LaunchedEffect(selectedPeriod, uiState.selectedRoomId) {
         viewModel.loadStatistics(selectedPeriod)
@@ -96,7 +103,7 @@ fun StatisticsScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                top = 140.dp, // space for fixed header + status row
+                top = headerHeightDp,
                 start = 16.dp,
                 end = 16.dp,
                 bottom = 24.dp
@@ -275,8 +282,9 @@ fun StatisticsScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(BgColor.copy(alpha = 0.85f))
+                .background(BgColor.copy(alpha = 0.95f))
                 .statusBarsPadding()
+                .onSizeChanged { headerHeightPx = it.height }
         ) {
             // Main header row
             Row(
