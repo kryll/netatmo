@@ -22,9 +22,10 @@ import com.arsys.netatmo.data.local.entities.AdvancedAutomationEntity
         HomeCacheEntity::class,
         AutomationLogEntity::class,
         FamilyMemberEntity::class,
-        AdvancedAutomationEntity::class
+        AdvancedAutomationEntity::class,
+        MaintenanceRecordEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -39,8 +40,24 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun automationLogDao(): AutomationLogDao
     abstract fun familyMemberDao(): FamilyMemberDao
     abstract fun advancedAutomationDao(): AdvancedAutomationDao
+    abstract fun maintenanceDao(): MaintenanceDao
 
     companion object {
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS maintenance_records " +
+                    "(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "date INTEGER NOT NULL, " +
+                    "type TEXT NOT NULL, " +
+                    "description TEXT NOT NULL, " +
+                    "technicianName TEXT NOT NULL DEFAULT '', " +
+                    "certificateRef TEXT NOT NULL DEFAULT '', " +
+                    "warrantyExtendedUntil INTEGER)"
+                )
+            }
+        }
+
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

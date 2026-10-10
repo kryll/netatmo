@@ -33,7 +33,12 @@ data class ModuleState(
     val batteryLevel: Int?,
     val rfStrength: Int?,
     val wifiStrength: Int?,
-    val boilerStatus: Boolean?
+    val boilerStatus: Boolean?,
+    val co2Level: Int? = null,        // NAMain: nivel CO2 en ppm
+    val noise: Int? = null,           // NAMain: ruido en dB
+    val humidity: Int? = null,        // NAMain: humedad relativa %
+    val pressure: Double? = null,     // NAMain: presión atmosférica en mbar
+    val modulationLevel: Int? = null, // NAPlug: modulación caldera 0-100%
 )
 
 enum class ThermostatMode(val apiValue: String, val displayName: String) {
@@ -143,4 +148,38 @@ data class CalendarInfo(
     val name: String,
     val accountName: String,
     val color: Int
+)
+
+data class MaintenanceRecord(
+    val id: Long = 0,
+    val date: Long,
+    val type: MaintenanceType,
+    val description: String,
+    val technicianName: String = "",
+    val certificateRef: String = "",
+    val warrantyExtendedUntil: Long? = null
+)
+
+enum class MaintenanceType(val displayName: String) {
+    ANNUAL_REVISION("Revisión anual"),
+    PURGE("Purga sistema"),
+    PRESSURE_CHECK("Control de presión"),
+    VALVE_CALIBRATION("Calibración válvula"),
+    OTHER("Otro")
+}
+
+data class BoilerHealth(
+    val pressureBar: Double?,
+    val modulationPct: Int?,
+    val impulsionTempC: Double?,
+    val isModulating: Boolean,
+    val healthScore: Int,
+    val healthLabel: String
+)
+
+data class WeatherInfo(
+    val outdoorTemp: Double?,
+    val humidity: Int?,
+    val windKmh: Double?,
+    val condition: String
 )
