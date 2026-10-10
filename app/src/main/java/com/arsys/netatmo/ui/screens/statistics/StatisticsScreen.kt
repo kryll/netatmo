@@ -145,36 +145,6 @@ fun StatisticsScreen(
                 }
             }
 
-            // Period chips
-            item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    contentPadding = PaddingValues(vertical = 2.dp)
-                ) {
-                    items(periods) { (label, days) ->
-                        val selected = selectedPeriod == days
-                        FilterChip(
-                            selected = selected,
-                            onClick = { selectedPeriod = days },
-                            label = {
-                                Text(
-                                    label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            shape = RoundedCornerShape(50.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = SurfaceContainer,
-                                labelColor = TextSecondary,
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                            )
-                        )
-                    }
-                }
-            }
-
             // Draggable cards
             items(uiState.cardOrder) { cardKey ->
                 DraggableCardWrapper(
@@ -349,6 +319,34 @@ fun StatisticsScreen(
 
             // Sub-header status row
             StatusSubHeader()
+
+            // Period filter chips — always visible in header
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(periods) { (label, days) ->
+                    val selected = selectedPeriod == days
+                    FilterChip(
+                        selected = selected,
+                        onClick = { selectedPeriod = days },
+                        label = {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        shape = RoundedCornerShape(50.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = SurfaceContainer,
+                            labelColor = TextSecondary,
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
+                }
+            }
 
             HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
         }
