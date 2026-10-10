@@ -1,15 +1,12 @@
 package com.arsys.netatmo.ui.screens.maintenance
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
@@ -25,10 +23,30 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private val BgColor = Color(0xFF101419)
+private val CardColor = Color(0xFF1C2025)
+private val BorderColor = Color(0xFF3F4850)
+private val TextPrimary = Color(0xFFE0E2EA)
+private val TextSecondary = Color(0xFFBFC7D2)
+private val BlueAccent = Color(0xFF93CCFF)
+private val GreenOk = Color(0xFF62DF7D)
+private val OrangeWarn = Color(0xFFFFB599)
+
+private val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale("es", "ES"))
+
+private fun MaintenanceType.chipColor() = when (this) {
+    MaintenanceType.ANNUAL_REVISION -> GreenOk
+    MaintenanceType.PURGE -> BlueAccent
+    MaintenanceType.PRESSURE_CHECK -> OrangeWarn
+    MaintenanceType.VALVE_CALIBRATION -> Color(0xFFBFC7D2)
+    MaintenanceType.OTHER -> Color(0xFF89929B)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceHistoryScreen(
     onBack: () -> Unit,
+    onCertificate: (Long) -> Unit,
     viewModel: MaintenanceViewModel = hiltViewModel()
 ) {
     val records by viewModel.records.collectAsStateWithLifecycle()
@@ -37,64 +55,59 @@ fun MaintenanceHistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Historial de Mantenimiento") },
+                title = { Text("Historial de Mantenimiento", color = TextPrimary, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E13))
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddSheet = true }) {
+            FloatingActionButton(
+                onClick = { showAddSheet = true },
+                containerColor = BlueAccent,
+                contentColor = Color(0xFF001D31)
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Añadir registro")
             }
-        }
-    ) { innerPadding ->
+        },
+        containerColor = BgColor
+    ) { padding ->
         if (records.isEmpty()) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "🔧",
-                        style = MaterialTheme.typography.displayLarge
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Sin registros de mantenimiento",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Icon(Icons.Default.Assignment, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
+                    Text("Sin registros de mantenimiento", color = TextSecondary, fontSize = 16.sp)
+                    Text("Pulsa + para añadir el primer registro", color = Color(0xFF89929B), fontSize = 13.sp)
                 }
             }
         } else {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(records, key = { it.id }) { record ->
-                    SwipeToDeleteContainer(
+                    MaintenanceRecordCard(
+                        record = record,
+                        onCertificate = { onCertificate(record.id) },
                         onDelete = { viewModel.deleteRecord(record) }
-                    ) {
-                        MaintenanceRecordCard(record = record)
-                    }
+                    )
                 }
             }
         }
     }
 
     if (showAddSheet) {
-        AddMaintenanceBottomSheet(
+        AddMaintenanceSheet(
             onDismiss = { showAddSheet = false },
-            onAdd = { type, description, techName, certRef ->
-                viewModel.addRecord(type, description, techName, certRef)
+            onConfirm = { type, desc, tech, cert ->
+                viewModel.addRecord(type, desc, tech, cert)
                 showAddSheet = false
             }
         )
@@ -102,181 +115,130 @@ fun MaintenanceHistoryScreen(
 }
 
 @Composable
-private fun SwipeToDeleteContainer(
-    onDelete: () -> Unit,
-    content: @Composable () -> Unit
+private fun MaintenanceRecordCard(
+    record: MaintenanceRecordEntity,
+    onCertificate: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                onDelete()
-                true
-            } else false
-        }
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            val color by animateColorAsState(
-                targetValue = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart)
-                    MaterialTheme.colorScheme.errorContainer
-                else Color.Transparent,
-                label = "swipe_color"
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(color, shape = RoundedCornerShape(12.dp))
-                    .padding(end = 16.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-    ) {
-        content()
-    }
-}
-
-@Composable
-private fun MaintenanceRecordCard(record: MaintenanceRecordEntity) {
-    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
-    val formattedDate = remember(record.date) { dateFormat.format(Date(record.date)) }
-    val type = remember(record.type) {
-        runCatching { MaintenanceType.valueOf(record.type) }.getOrNull()
-    }
+    val type = try { MaintenanceType.valueOf(record.type) } catch (e: Exception) { MaintenanceType.OTHER }
+    val chipColor = type.chipColor()
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = CardColor),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, BorderColor)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = formattedDate,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                type?.let { MaintenanceTypeChip(it) }
+                Surface(
+                    color = chipColor.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(999.dp),
+                    border = BorderStroke(1.dp, chipColor.copy(alpha = 0.5f))
+                ) {
+                    Text(type.displayName, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        color = chipColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Text(dateFormatter.format(Date(record.date)), color = TextSecondary, fontSize = 12.sp)
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = record.description,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            if (!record.technicianName.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Técnico: ${record.technicianName}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+            Text(record.description, color = TextPrimary, fontSize = 14.sp)
+
+            if (record.technicianName.isNotBlank()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
+                    Text(record.technicianName, color = TextSecondary, fontSize = 12.sp)
+                }
             }
-            if (!record.certificateRef.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Certificado: ${record.certificateRef}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
-                )
+
+            if (record.certificateRef.isNotBlank()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Description, contentDescription = null, tint = BlueAccent, modifier = Modifier.size(14.dp))
+                    Text(record.certificateRef, color = BlueAccent, fontSize = 12.sp)
+                }
+            }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onCertificate,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BlueAccent),
+                    border = BorderStroke(1.dp, BlueAccent.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Certificado", fontSize = 12.sp)
+                }
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color(0xFFFFB4AB))
+                }
             }
         }
     }
-}
 
-@Composable
-private fun MaintenanceTypeChip(type: MaintenanceType) {
-    val (backgroundColor, contentColor) = when (type) {
-        MaintenanceType.PREVENTIVE -> Pair(Color(0xFF4CAF50), Color.White)
-        MaintenanceType.CORRECTIVE -> Pair(Color(0xFFF44336), Color.White)
-        MaintenanceType.INSPECTION -> Pair(Color(0xFF2196F3), Color.White)
-        MaintenanceType.CLEANING -> Pair(Color(0xFF9C27B0), Color.White)
-        else -> Pair(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
-    }
-    val label = when (type) {
-        MaintenanceType.PREVENTIVE -> "Preventivo"
-        MaintenanceType.CORRECTIVE -> "Correctivo"
-        MaintenanceType.INSPECTION -> "Inspección"
-        MaintenanceType.CLEANING -> "Limpieza"
-        else -> type.name
-    }
-    Surface(
-        color = backgroundColor,
-        shape = RoundedCornerShape(50),
-    ) {
-        Text(
-            text = label,
-            color = contentColor,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Eliminar registro", color = TextPrimary) },
+            text = { Text("¿Eliminar este registro de mantenimiento?", color = TextSecondary) },
+            confirmButton = {
+                TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
+                    Text("Eliminar", color = Color(0xFFFFB4AB))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancelar", color = TextSecondary) }
+            },
+            containerColor = CardColor
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddMaintenanceBottomSheet(
+private fun AddMaintenanceSheet(
     onDismiss: () -> Unit,
-    onAdd: (MaintenanceType, String, String, String) -> Unit
+    onConfirm: (MaintenanceType, String, String, String) -> Unit
 ) {
-    var selectedType by remember { mutableStateOf(MaintenanceType.PREVENTIVE) }
+    var selectedType by remember { mutableStateOf(MaintenanceType.ANNUAL_REVISION) }
     var description by remember { mutableStateOf("") }
     var techName by remember { mutableStateOf("") }
     var certRef by remember { mutableStateOf("") }
-    var typeDropdownExpanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1C2025)
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+            modifier = Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Nuevo Registro de Mantenimiento",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Nuevo registro", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
 
-            // Type dropdown
-            ExposedDropdownMenuBox(
-                expanded = typeDropdownExpanded,
-                onExpandedChange = { typeDropdownExpanded = it }
-            ) {
+            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                 OutlinedTextField(
-                    value = selectedType.name,
+                    value = selectedType.displayName,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Tipo de mantenimiento") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeDropdownExpanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                    label = { Text("Tipo", color = TextSecondary) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = BlueAccent, unfocusedBorderColor = BorderColor,
+                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                    )
                 )
-                ExposedDropdownMenu(
-                    expanded = typeDropdownExpanded,
-                    onDismissRequest = { typeDropdownExpanded = false }
-                ) {
+                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = Color(0xFF262A30)) {
                     MaintenanceType.entries.forEach { type ->
                         DropdownMenuItem(
-                            text = { Text(type.name) },
-                            onClick = {
-                                selectedType = type
-                                typeDropdownExpanded = false
-                            }
+                            text = { Text(type.displayName, color = TextPrimary) },
+                            onClick = { selectedType = type; expanded = false }
                         )
                     }
                 }
@@ -285,35 +247,43 @@ private fun AddMaintenanceBottomSheet(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Descripción") },
+                label = { Text("Descripción", color = TextSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 2
+                minLines = 2,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BlueAccent, unfocusedBorderColor = BorderColor,
+                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                )
             )
-
             OutlinedTextField(
                 value = techName,
                 onValueChange = { techName = it },
-                label = { Text("Técnico (opcional)") },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("Técnico (opcional)", color = TextSecondary) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BlueAccent, unfocusedBorderColor = BorderColor,
+                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                )
             )
-
             OutlinedTextField(
                 value = certRef,
                 onValueChange = { certRef = it },
-                label = { Text("Referencia certificado (opcional)") },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("Ref. certificado (opcional)", color = TextSecondary) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BlueAccent, unfocusedBorderColor = BorderColor,
+                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary
+                )
             )
 
             Button(
-                onClick = {
-                    if (description.isNotBlank()) {
-                        onAdd(selectedType, description, techName, certRef)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = description.isNotBlank()
+                onClick = { if (description.isNotBlank()) onConfirm(selectedType, description, techName, certRef) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                enabled = description.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = BlueAccent, contentColor = Color(0xFF001D31)),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Guardar registro")
+                Text("Guardar registro", fontWeight = FontWeight.SemiBold)
             }
         }
     }

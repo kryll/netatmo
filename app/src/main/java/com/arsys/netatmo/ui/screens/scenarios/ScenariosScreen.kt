@@ -18,19 +18,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.MainActivity
 import com.arsys.netatmo.R
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
-
-private val Accent = Color(0xFF0284C7)
-private val TextPrimary = Color(0xFF1E293B)
+import com.arsys.netatmo.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,150 +41,194 @@ fun ScenariosScreen(
     val context = LocalContext.current
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { navController.navigate("scenario/-1") },
-                containerColor = Accent,
-                contentColor = Color.White
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Nuevo escenario")
             }
         }
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(paddingValues),
+            contentPadding = PaddingValues(bottom = 88.dp)
         ) {
             // Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 20.dp)
-            ) {
-                Text(
-                    "Escenarios",
-                    color = TextPrimary,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            HorizontalDivider(color = Color(0xFFE2E8F0))
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Quick actions row
-                item {
-                    Text(
-                        "Accesos rápidos",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    QuickActionsRow(onAction = { viewModel.executeQuickAction(it) })
-                }
-
-                item {
-                    Text(
-                        "Mis escenarios",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
-                if (uiState.scenarios.isEmpty()) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(2.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 20.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = "Control Global",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = androidx.compose.ui.unit.TextUnit(
+                                0.1f,
+                                androidx.compose.ui.unit.TextUnitType.Em
                             )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .padding(32.dp)
-                                    .fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(64.dp),
-                                    tint = Accent
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    "Sin escenarios",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "Crea escenarios para aplicar múltiples ajustes de temperatura con un toque",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    items(uiState.scenarios, key = { it.id }) { scenario ->
-                        ScenarioCard(
-                            scenario = scenario,
-                            isRunning = uiState.runningScenarioId == scenario.id,
-                            onRun = { viewModel.runScenario(scenario) },
-                            onEdit = { navController.navigate("scenario/${scenario.id}") },
-                            onDelete = { viewModel.deleteScenario(scenario) },
-                            onPin = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    val sm = context.getSystemService(ShortcutManager::class.java)
-                                    if (sm.isRequestPinShortcutSupported) {
-                                        val intent = Intent(context, MainActivity::class.java).apply {
-                                            action = "com.arsys.netatmo.OPEN_SCENARIOS"
-                                            putExtra("scenario_id", scenario.id)
-                                        }
-                                        val info = ShortcutInfo.Builder(context, "sc_${scenario.id}")
-                                            .setShortLabel(scenario.name)
-                                            .setLongLabel(scenario.name)
-                                            .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
-                                            .setIntent(intent)
-                                            .build()
-                                        sm.requestPinShortcut(info, null)
-                                    }
-                                }
-                            }
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Escenarios",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
+                HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
+            }
 
-                uiState.successMessage?.let { msg ->
-                    item {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(2.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                            )
-                        ) {
-                            Row(modifier = Modifier.padding(16.dp)) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.tertiary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(msg)
+            // Quick actions section
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 20.dp)
+                ) {
+                    Text(
+                        text = "Accesos rápidos",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    QuickActionsRow(onAction = { viewModel.executeQuickAction(it) })
+                }
+            }
+
+            // Success message
+            uiState.successMessage?.let { msg ->
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f))
+                            .border(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                }
+            }
+
+            // Scenarios section header
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Mis escenarios",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (uiState.scenarios.isNotEmpty()) {
+                        Text(
+                            text = "${uiState.scenarios.size} guardados",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            if (uiState.scenarios.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(SurfaceContainer)
+                            .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            modifier = Modifier.size(56.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Sin escenarios",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "Crea escenarios para aplicar múltiples ajustes de temperatura con un toque",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                items(uiState.scenarios, key = { it.id }) { scenario ->
+                    ScenarioCard(
+                        scenario = scenario,
+                        isRunning = uiState.runningScenarioId == scenario.id,
+                        onRun = { viewModel.runScenario(scenario) },
+                        onEdit = { navController.navigate("scenario/${scenario.id}") },
+                        onDelete = { viewModel.deleteScenario(scenario) },
+                        onPin = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                val sm = context.getSystemService(ShortcutManager::class.java)
+                                if (sm.isRequestPinShortcutSupported) {
+                                    val intent = Intent(context, MainActivity::class.java).apply {
+                                        action = "com.arsys.netatmo.OPEN_SCENARIOS"
+                                        putExtra("scenario_id", scenario.id)
+                                    }
+                                    val info = ShortcutInfo.Builder(context, "sc_${scenario.id}")
+                                        .setShortLabel(scenario.name)
+                                        .setLongLabel(scenario.name)
+                                        .setIcon(Icon.createWithResource(context, R.mipmap.ic_launcher))
+                                        .setIntent(intent)
+                                        .build()
+                                    sm.requestPinShortcut(info, null)
+                                }
                             }
                         }
-                    }
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
         }
@@ -194,30 +237,50 @@ fun ScenariosScreen(
 
 @Composable
 fun QuickActionsRow(onAction: (String) -> Unit) {
-    val actions = listOf(
-        Triple("Confort", Icons.Default.Thermostat, "comfort"),
-        Triple("Eco", Icons.Default.EnergySavingsLeaf, "eco"),
-        Triple("Ausente", Icons.Default.DirectionsWalk, "away"),
-        Triple("Apagado", Icons.Default.PowerOff, "off")
+    data class QuickAction(
+        val label: String,
+        val icon: ImageVector,
+        val action: String,
+        val activeColor: Color
     )
+
+    val actions = listOf(
+        QuickAction("Confort", Icons.Default.Thermostat, "comfort", ComfortColor),
+        QuickAction("Eco", Icons.Default.EnergySavingsLeaf, "eco", MaterialTheme.colorScheme.primary),
+        QuickAction("Ausente", Icons.Default.DirectionsWalk, "away", AwayColor),
+        QuickAction("Apagado", Icons.Default.PowerOff, "off", MaterialTheme.colorScheme.onSurfaceVariant)
+    )
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        actions.forEach { (label, icon, action) ->
+        actions.forEach { action ->
             OutlinedButton(
-                onClick = { onAction(action) },
+                onClick = { onAction(action.action) },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Accent
+                    containerColor = SurfaceContainerLow,
+                    contentColor = action.activeColor
                 ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Accent)
+                border = androidx.compose.foundation.BorderStroke(1.dp, OutlineVariant)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
-                    Text(label, fontSize = 11.sp)
+                    Icon(
+                        action.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = action.activeColor
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        action.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
@@ -238,123 +301,154 @@ fun ScenarioCard(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Eliminar escenario") },
-            text = { Text("¿Eliminar \"${scenario.name}\"?") },
+            containerColor = SurfaceContainerHigh,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    "Eliminar escenario",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            },
+            text = {
+                Text(
+                    "¿Eliminar \"${scenario.name}\"?",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { showDeleteDialog = false; onDelete() }) {
                     Text("Eliminar", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         )
     }
 
-    Card(
+    val scenarioColor = try {
+        Color(android.graphics.Color.parseColor(scenario.color))
+    } catch (e: Exception) {
+        MaterialTheme.colorScheme.primaryContainer
+    }
+
+    val cardBorderColor = if (isRunning)
+        scenarioColor.copy(alpha = 0.5f)
+    else
+        OutlineVariant
+
+    val cardBackground = if (isRunning)
+        scenarioColor.copy(alpha = 0.08f)
+    else
+        SurfaceContainer
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (isRunning) Modifier.border(2.dp, Accent, RoundedCornerShape(16.dp))
-                else Modifier
-            ),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isRunning)
-                Accent.copy(alpha = 0.06f)
-            else
-                MaterialTheme.colorScheme.surface
-        )
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(cardBackground)
+            .border(1.dp, cardBorderColor, RoundedCornerShape(16.dp)),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Color strip (4dp left)
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(76.dp)
+                .background(
+                    scenarioColor,
+                    RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                )
+        )
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Accent strip on the left
+            // Color icon square 48dp
             Box(
                 modifier = Modifier
-                    .width(4.dp)
-                    .height(72.dp)
-                    .background(
-                        Accent,
-                        RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
-                    )
-            )
-
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(scenarioColor),
+                contentAlignment = Alignment.Center
             ) {
-                Surface(
-                    modifier = Modifier.size(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = try {
-                        Color(android.graphics.Color.parseColor(scenario.color))
-                    } catch (e: Exception) {
-                        Accent
-                    }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        scenario.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        "Toca ▶ para aplicar",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (isRunning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Accent
-                    )
-                } else {
-                    IconButton(onClick = onRun) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = "Ejecutar",
-                            tint = Accent
-                        )
-                    }
-                }
-                if (onPin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    IconButton(onClick = onPin) {
-                        Icon(
-                            Icons.Default.AddToHomeScreen,
-                            contentDescription = "Añadir al inicio",
-                            tint = Accent
-                        )
-                    }
-                }
-                IconButton(onClick = onEdit) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    scenario.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    "Toca ▶ para aplicar",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Action buttons
+            if (isRunning) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                IconButton(onClick = onRun) {
                     Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Editar",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Ejecutar",
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
-                IconButton(onClick = { showDeleteDialog = true }) {
+            }
+
+            if (onPin != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                IconButton(onClick = onPin) {
                     Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Eliminar",
-                        tint = MaterialTheme.colorScheme.error
+                        Icons.Default.AddToHomeScreen,
+                        contentDescription = "Añadir al inicio",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
+            }
+
+            IconButton(onClick = onEdit) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Editar",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            IconButton(onClick = { showDeleteDialog = true }) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Eliminar",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

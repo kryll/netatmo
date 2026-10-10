@@ -8,8 +8,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.arsys.netatmo.data.local.dao.*
 import com.arsys.netatmo.data.local.dao.AdvancedAutomationDao
 import com.arsys.netatmo.data.local.dao.FamilyMemberDao
+import com.arsys.netatmo.data.local.dao.MaintenanceDao
 import com.arsys.netatmo.data.local.entities.*
 import com.arsys.netatmo.data.local.entities.AdvancedAutomationEntity
+import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
 
 @Database(
     entities = [

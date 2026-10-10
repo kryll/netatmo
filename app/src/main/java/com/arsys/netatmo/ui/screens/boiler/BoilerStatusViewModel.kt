@@ -15,9 +15,8 @@ import javax.inject.Inject
 data class BoilerUiState(
     val isBoilerOn: Boolean = false,
     val modulationPct: Int? = null,
-    val pressureBar: Double? = null,
-    val heatingActive: Boolean = false,
-    val roomCount: Int = 0,
+    val roomsHeating: Int = 0,
+    val totalRooms: Int = 0,
     val isLoading: Boolean = true,
     val error: String? = null
 )
@@ -39,6 +38,14 @@ class BoilerStatusViewModel @Inject constructor(
         }
     }
 
+    fun refresh() {
+        viewModelScope.launch {
+            authRepository.selectedHomeId.collect { homeId ->
+                homeId?.let { loadData(it) }
+            }
+        }
+    }
+
     private fun loadData(homeId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -46,30 +53,20 @@ class BoilerStatusViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val state = result.data
                     val plug = state.modules.firstOrNull { it.type == "NAPlug" }
-                    val mainModule = state.modules.firstOrNull { it.type == "NAMain" }
                     val heatingRooms = state.rooms.count { it.heatingActive }
                     _uiState.update {
-                        BoilerUiState(
+                        it.copy(
                             isBoilerOn = plug?.boilerStatus == true,
                             modulationPct = plug?.modulationLevel,
-                            pressureBar = mainModule?.pressure,
-                            heatingActive = heatingRooms > 0,
-                            roomCount = heatingRooms,
+                            roomsHeating = heatingRooms,
+                            totalRooms = state.rooms.size,
                             isLoading = false
                         )
                     }
                 }
-                is ApiResult.Error -> {
-                    _uiState.update { it.copy(isLoading = false, error = result.message) }
-                }
+                is ApiResult.Error -> _uiState.update { it.copy(isLoading = false, error = result.message) }
                 ApiResult.Loading -> {}
             }
-        }
-    }
-
-    fun refresh() {
-        viewModelScope.launch {
-            authRepository.selectedHomeId.value?.let { loadData(it) }
         }
     }
 }

@@ -2,6 +2,7 @@ package com.arsys.netatmo.ui.screens.settings
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,19 +15,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-
-private val Accent = Color(0xFF0284C7)
-private val TextPrimary = Color(0xFF1E293B)
+import com.arsys.netatmo.ui.theme.OutlineVariant
+import com.arsys.netatmo.ui.theme.SurfaceContainer
+import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
+import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,8 +46,15 @@ fun NetatmoCredentialsScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
+            containerColor = SurfaceContainerHigh,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             title = { Text("Eliminar credenciales") },
-            text = { Text("Se eliminarán las credenciales guardadas. La próxima vez que inicies sesión necesitarás introducirlas de nuevo.") },
+            text = {
+                Text(
+                    "Se eliminarán las credenciales guardadas. La próxima vez que inicies sesión necesitarás introducirlas de nuevo."
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     showClearDialog = false
@@ -56,77 +63,81 @@ fun NetatmoCredentialsScreen(
                 }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 20.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { navController.popBackStack() },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = Accent
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "Credenciales Netatmo",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Credenciales Netatmo",
-                    color = TextPrimary,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.primary
                 )
-            }
-        }
-        HorizontalDivider(color = Color(0xFFE2E8F0))
-
-        // Content
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Info card
-            Card(
+
+            // ── Info card: borde primary al 30% ───────────────────────
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(2.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
+                color = SurfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.Info,
                             contentDescription = null,
-                            tint = Accent
+                            tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "¿Por qué necesito esto?",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Text(
                         "Para conectar la app a tu cuenta Netatmo necesitas unas credenciales de desarrollador. " +
-                        "Son gratuitas y se obtienen en el portal de Netatmo en menos de 2 minutos.",
-                        style = MaterialTheme.typography.bodySmall
+                            "Son gratuitas y se obtienen en el portal de Netatmo en menos de 2 minutos.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedButton(
                         onClick = {
@@ -137,7 +148,11 @@ fun NetatmoCredentialsScreen(
                                 )
                             )
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        border = BorderStroke(1.dp, OutlineVariant)
                     ) {
                         Icon(Icons.Default.OpenInBrowser, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -146,14 +161,24 @@ fun NetatmoCredentialsScreen(
                 }
             }
 
-            // Steps card
-            Card(
+            // ── Steps card ────────────────────────────────────────────
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(2.dp)
+                color = SurfaceContainer,
+                border = BorderStroke(1.dp, OutlineVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Pasos", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(4.dp))
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Pasos",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
                     listOf(
                         "Entra en dev.netatmo.com e inicia sesión",
                         "Pulsa \"Create an app\"",
@@ -161,27 +186,42 @@ fun NetatmoCredentialsScreen(
                         "Copia el Client ID y el Client secret",
                         "Pégalos aquí abajo y guarda"
                     ).forEachIndexed { i, step ->
-                        Row(verticalAlignment = Alignment.Top) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(22.dp),
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        "${i + 1}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                "${i + 1}. ",
+                                step,
                                 style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Accent
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(step, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
             }
 
-            // Current status card
+            // ── Status card (credenciales guardadas) ───────────────────
             if (uiState.hasStoredCredentials) {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(2.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = SurfaceContainerLow,
+                    border = BorderStroke(1.dp, OutlineVariant)
                 ) {
                     Row(
                         modifier = Modifier
@@ -194,14 +234,15 @@ fun NetatmoCredentialsScreen(
                             Icon(
                                 Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = Accent
+                                tint = MaterialTheme.colorScheme.tertiary
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
                                     "Credenciales guardadas",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     "Client ID: ${uiState.storedClientIdPreview}",
@@ -210,25 +251,33 @@ fun NetatmoCredentialsScreen(
                                 )
                             }
                         }
-                        TextButton(onClick = { showClearDialog = true }) {
-                            Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                        TextButton(
+                            onClick = { showClearDialog = true },
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Eliminar")
                         }
                     }
                 }
             }
 
-            HorizontalDivider()
+            HorizontalDivider(color = OutlineVariant, thickness = 0.5.dp)
 
             Text(
                 if (uiState.hasStoredCredentials) "Actualizar credenciales" else "Introducir credenciales",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            // Input fields card
-            Card(
+            // ── Input fields ──────────────────────────────────────────
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(2.dp)
+                color = SurfaceContainer,
+                border = BorderStroke(1.dp, OutlineVariant)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -241,7 +290,24 @@ fun NetatmoCredentialsScreen(
                         placeholder = { Text("ej: tu_client_id") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) }
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Key,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = OutlineVariant,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                            unfocusedContainerColor = SurfaceContainerLow,
+                            focusedContainerColor = SurfaceContainerLow
+                        )
                     )
 
                     OutlinedTextField(
@@ -250,17 +316,37 @@ fun NetatmoCredentialsScreen(
                         label = { Text("Client Secret") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        visualTransformation = if (secretVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation = if (secretVisible) VisualTransformation.None
+                                               else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
                         trailingIcon = {
                             IconButton(onClick = { secretVisible = !secretVisible }) {
                                 Icon(
-                                    if (secretVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (secretVisible) "Ocultar" else "Mostrar"
+                                    if (secretVisible) Icons.Default.VisibilityOff
+                                    else Icons.Default.Visibility,
+                                    contentDescription = if (secretVisible) "Ocultar" else "Mostrar",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                        }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = OutlineVariant,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                            unfocusedContainerColor = SurfaceContainerLow,
+                            focusedContainerColor = SurfaceContainerLow
+                        )
                     )
                 }
             }
@@ -273,17 +359,24 @@ fun NetatmoCredentialsScreen(
                 )
             }
 
+            // ── Save button ────────────────────────────────────────────
             Button(
                 onClick = { viewModel.save() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Accent)
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             ) {
                 Icon(Icons.Default.Save, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Guardar credenciales")
+                Text("Guardar credenciales", fontWeight = FontWeight.SemiBold)
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

@@ -1,46 +1,17 @@
 package com.arsys.netatmo.ui.screens.airquality
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Air
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.Co2
-import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -50,34 +21,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private val BgColor = Color(0xFF101419)
-private val SurfaceColor = Color(0xFF1C2025)
+private val CardColor = Color(0xFF1C2025)
 private val BorderColor = Color(0xFF3F4850)
-private val PrimaryText = Color(0xFFE0E2EA)
-private val SecondaryText = Color(0xFFBFC7D2)
-private val GreenGood = Color(0xFF4CAF50)
-private val OrangeModerate = Color(0xFFFF9800)
-private val RedBad = Color(0xFFF44336)
-private val AccentBlue = Color(0xFF4FC3F7)
-
-private enum class Co2Quality(val label: String, val color: Color) {
-    GOOD("Buena", GreenGood),
-    MODERATE("Moderada", OrangeModerate),
-    BAD("Mala", RedBad)
-}
-
-private fun co2Quality(ppm: Int?): Co2Quality = when {
-    ppm == null -> Co2Quality.GOOD
-    ppm < 800 -> Co2Quality.GOOD
-    ppm <= 1200 -> Co2Quality.MODERATE
-    else -> Co2Quality.BAD
-}
-
-private fun overallQuality(state: AirQualityUiState): Co2Quality {
-    val co2 = co2Quality(state.co2Ppm)
-    return if (co2 == Co2Quality.BAD) Co2Quality.BAD
-    else if (co2 == Co2Quality.MODERATE) Co2Quality.MODERATE
-    else Co2Quality.GOOD
-}
+private val TextPrimary = Color(0xFFE0E2EA)
+private val TextSecondary = Color(0xFFBFC7D2)
+private val GreenOk = Color(0xFF62DF7D)
+private val OrangeWarn = Color(0xFFFFB599)
+private val RedBad = Color(0xFFFFB4AB)
+private val BlueAccent = Color(0xFF93CCFF)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,59 +36,30 @@ fun AirQualityScreen(
     onBack: () -> Unit,
     viewModel: AirQualityViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Calidad del Aire",
-                        color = PrimaryText,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                },
+                title = { Text("Calidad del Aire", color = TextPrimary, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = PrimaryText
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BgColor
-                )
+                actions = {
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Actualizar", tint = BlueAccent)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E13))
             )
         },
         containerColor = BgColor
-    ) { innerPadding ->
-
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = AccentBlue)
-            }
-            return@Scaffold
-        }
-
-        if (uiState.error != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Error: ${uiState.error}",
-                    color = RedBad,
-                    fontSize = 14.sp
-                )
+    ) { padding ->
+        if (state.isLoading) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = BlueAccent)
             }
             return@Scaffold
         }
@@ -145,93 +67,119 @@ fun AirQualityScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            state.error?.let { err ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF93000A)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(err, modifier = Modifier.padding(16.dp), color = Color(0xFFFFDAD6))
+                }
+            }
+
             // 2x2 grid of metric cards
-            val co2Quality = co2Quality(uiState.co2Ppm)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val co2Color = when {
+                    state.co2Ppm == null -> TextSecondary
+                    state.co2Ppm < 800 -> GreenOk
+                    state.co2Ppm < 1200 -> OrangeWarn
+                    else -> RedBad
+                }
+                val co2Label = when {
+                    state.co2Ppm == null -> "Sin datos"
+                    state.co2Ppm < 800 -> "Buena"
+                    state.co2Ppm < 1200 -> "Moderada"
+                    else -> "Mala"
+                }
                 MetricCard(
                     modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.Air,
-                    label = "CO2",
-                    value = uiState.co2Ppm?.toString() ?: "--",
+                    icon = Icons.Default.Air,
+                    iconTint = co2Color,
+                    value = state.co2Ppm?.toString() ?: "--",
                     unit = "ppm",
-                    accentColor = co2Quality.color,
-                    badge = co2Quality.label
+                    label = "CO₂",
+                    sublabel = co2Label,
+                    sublabelColor = co2Color
                 )
                 MetricCard(
                     modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.WaterDrop,
-                    label = "Humedad",
-                    value = uiState.humidity?.toString() ?: "--",
+                    icon = Icons.Default.WaterDrop,
+                    iconTint = BlueAccent,
+                    value = state.humidity?.toString() ?: "--",
                     unit = "%",
-                    accentColor = AccentBlue
+                    label = "Humedad"
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricCard(
                     modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.VolumeUp,
-                    label = "Ruido",
-                    value = uiState.noiseDb?.toString() ?: "--",
+                    icon = Icons.Default.VolumeUp,
+                    iconTint = OrangeWarn,
+                    value = state.noiseDb?.toString() ?: "--",
                     unit = "dB",
-                    accentColor = OrangeModerate
+                    label = "Ruido"
                 )
                 MetricCard(
                     modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.Compress,
-                    label = "Presión",
-                    value = uiState.pressureMbar?.let { "%.1f".format(it) } ?: "--",
+                    icon = Icons.Default.Compress,
+                    iconTint = TextSecondary,
+                    value = state.pressureMbar?.let { "%.0f".format(it) } ?: "--",
                     unit = "mbar",
-                    accentColor = Color(0xFFCE93D8)
+                    label = "Presión"
                 )
             }
 
-            // Overall quality section
-            val overall = overallQuality(uiState)
+            // Overall quality
+            val overallColor = when {
+                state.co2Ppm == null -> TextSecondary
+                state.co2Ppm < 800 -> GreenOk
+                state.co2Ppm < 1200 -> OrangeWarn
+                else -> RedBad
+            }
+            val overallLabel = when {
+                state.co2Ppm == null -> "Sin datos del sensor"
+                state.co2Ppm < 800 -> "Calidad excelente"
+                state.co2Ppm < 1200 -> "Calidad moderada"
+                else -> "Calidad deficiente — ventila la habitación"
+            }
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor)
+                colors = CardDefaults.cardColors(containerColor = CardColor),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = "Calidad general",
-                        color = SecondaryText,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        QualityChip(label = overall.label, color = overall.color)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = when (overall) {
-                                Co2Quality.GOOD -> "El aire interior es saludable."
-                                Co2Quality.MODERATE -> "Niveles de CO2 moderados. Ventile."
-                                Co2Quality.BAD -> "CO2 elevado. Ventile urgentemente."
-                            },
-                            color = SecondaryText,
-                            fontSize = 13.sp
-                        )
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = overallColor, modifier = Modifier.size(32.dp))
+                    Column {
+                        Text("Calidad general", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text(overallLabel, color = overallColor, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            if (state.co2Ppm == null && state.humidity == null && state.noiseDb == null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardColor),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = BlueAccent)
+                        Text("Estación meteorológica necesaria", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Los datos de CO₂, humedad y ruido requieren una estación Netatmo NAMain conectada al sistema.",
+                            color = TextSecondary, fontSize = 13.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -240,82 +188,27 @@ fun AirQualityScreen(
 private fun MetricCard(
     modifier: Modifier = Modifier,
     icon: ImageVector,
-    label: String,
+    iconTint: Color,
     value: String,
     unit: String,
-    accentColor: Color,
-    badge: String? = null
+    label: String,
+    sublabel: String? = null,
+    sublabelColor: Color = TextSecondary
 ) {
     Card(
-        modifier = modifier
-            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor)
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = CardColor),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = accentColor,
-                    modifier = Modifier.size(20.dp)
-                )
-                if (badge != null) {
-                    QualityChip(label = badge, color = accentColor, small = true)
-                }
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(value, color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text(unit, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = value,
-                    color = PrimaryText,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 30.sp
-                )
-                Spacer(modifier = Modifier.width(3.dp))
-                Text(
-                    text = unit,
-                    color = SecondaryText,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-            }
-            Text(
-                text = label,
-                color = SecondaryText,
-                fontSize = 12.sp
-            )
+            Text(label, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            sublabel?.let { Text(it, color = sublabelColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
         }
-    }
-}
-
-@Composable
-private fun QualityChip(
-    label: String,
-    color: Color,
-    small: Boolean = false
-) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = color.copy(alpha = 0.15f)
-    ) {
-        Text(
-            text = label,
-            color = color,
-            fontSize = if (small) 10.sp else 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(
-                horizontal = if (small) 6.dp else 10.dp,
-                vertical = if (small) 2.dp else 4.dp
-            )
-        )
     }
 }

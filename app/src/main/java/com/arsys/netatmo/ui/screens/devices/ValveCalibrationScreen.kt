@@ -1,503 +1,185 @@
 package com.arsys.netatmo.ui.screens.devices
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-private val CalBgColor = Color(0xFF101419)
-private val CalCardColor = Color(0xFF1C2025)
-private val CalPrimaryColor = Color(0xFF93CCFF)
-private val CalTextPrimary = Color(0xFFE8EDF2)
-private val CalTextSecondary = Color(0xFF8A9BB0)
-private val CalSuccessColor = Color(0xFF4CAF50)
+private val BgColor = Color(0xFF101419)
+private val CardColor = Color(0xFF1C2025)
+private val BorderColor = Color(0xFF3F4850)
+private val TextPrimary = Color(0xFFE0E2EA)
+private val TextSecondary = Color(0xFFBFC7D2)
+private val BlueAccent = Color(0xFF93CCFF)
+private val GreenOk = Color(0xFF62DF7D)
 
-private val rooms = listOf("Salón", "Dormitorio", "Cocina", "Baño")
+private val ROOMS = listOf("Salón", "Dormitorio principal", "Cocina", "Dormitorio 2", "Baño")
 
-private val calibrationSteps = listOf(
-    "Cerrando válvula...",
+private val CAL_STEPS = listOf(
+    "Cerrando válvula completamente...",
     "Detectando rango de movimiento...",
     "Estableciendo posición óptima...",
-    "Calibración completada"
+    "Verificando respuesta térmica...",
+    "Guardando calibración..."
 )
-
-private const val CAL_STEP_DURATION_MS = 3000L
-
-enum class CalibrationState { IDLE, CALIBRATING, COMPLETE }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ValveCalibrationScreen(onBack: () -> Unit = {}) {
+fun ValveCalibrationScreen(onBack: () -> Unit) {
     var selectedRoom by remember { mutableStateOf<String?>(null) }
-    var calibrationState by remember { mutableStateOf(CalibrationState.IDLE) }
-    var currentStepIndex by remember { mutableStateOf(-1) }
-    var completedSteps by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    var valvePosition by remember { mutableStateOf(45f) }
-    var calibrationProgress by remember { mutableStateOf(0f) }
-
-    LaunchedEffect(calibrationState) {
-        if (calibrationState == CalibrationState.CALIBRATING) {
-            completedSteps = emptySet()
-            currentStepIndex = -1
-            calibrationProgress = 0f
-
-            for (i in calibrationSteps.indices) {
-                currentStepIndex = i
-                val startTime = System.currentTimeMillis()
-
-                while (System.currentTimeMillis() - startTime < CAL_STEP_DURATION_MS) {
-                    val elapsed = System.currentTimeMillis() - startTime
-                    val stepFraction = elapsed.toFloat() / CAL_STEP_DURATION_MS
-                    calibrationProgress = (i + stepFraction) / calibrationSteps.size
-                    val targetPosition = 75f
-                    valvePosition = 45f + (targetPosition - 45f) * calibrationProgress
-                    delay(50)
-                }
-
-                completedSteps = completedSteps + i
-                calibrationProgress = (i + 1f) / calibrationSteps.size
-            }
-
-            valvePosition = 75f
-            calibrationState = CalibrationState.COMPLETE
-        }
-    }
+    var isCalibrating by remember { mutableStateOf(false) }
+    var isCalibrated by remember { mutableStateOf(false) }
+    var currentStep by remember { mutableIntStateOf(-1) }
+    var valvePosition by remember { mutableFloatStateOf(50f) }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Calibración de Válvula",
-                        color = CalTextPrimary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                },
+                title = { Text("Calibración de Válvula", color = TextPrimary, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = CalPrimaryColor
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CalCardColor
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0E13))
             )
         },
-        containerColor = CalBgColor
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            RoomSelectorCard(
-                selectedRoom = selectedRoom,
-                onRoomSelected = { room ->
-                    if (room != selectedRoom) {
-                        selectedRoom = room
-                        calibrationState = CalibrationState.IDLE
-                        completedSteps = emptySet()
-                        currentStepIndex = -1
-                        valvePosition = 45f
-                        calibrationProgress = 0f
-                    }
-                }
-            )
+        containerColor = BgColor
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Selecciona una zona", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
 
-            if (selectedRoom != null) {
-                ValveStatusCard(
-                    roomName = selectedRoom!!,
-                    valvePosition = valvePosition,
-                    calibrationState = calibrationState,
-                    currentStepIndex = currentStepIndex,
-                    completedSteps = completedSteps,
-                    calibrationProgress = calibrationProgress,
-                    onCalibrate = {
-                        if (calibrationState == CalibrationState.IDLE) {
-                            calibrationState = CalibrationState.CALIBRATING
-                        }
-                    }
-                )
-
-                if (calibrationState == CalibrationState.COMPLETE) {
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically()
-                    ) {
-                        CalibrationSuccessCard()
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun RoomSelectorCard(
-    selectedRoom: String?,
-    onRoomSelected: (String) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CalCardColor)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "Seleccionar habitación",
-                color = CalTextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "Elige la habitación cuya válvula deseas calibrar",
-                color = CalTextSecondary,
-                fontSize = 13.sp
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                rooms.forEach { room ->
-                    RoomItem(
-                        name = room,
-                        isSelected = room == selectedRoom,
-                        onClick = { onRoomSelected(room) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RoomItem(name: String, isSelected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (isSelected) CalPrimaryColor.copy(alpha = 0.15f)
-                else Color(0xFF252D35)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(if (isSelected) CalPrimaryColor else CalTextSecondary)
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Text(
-            text = name,
-            color = if (isSelected) CalPrimaryColor else CalTextPrimary,
-            fontSize = 14.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.weight(1f)
-        )
-
-        Icon(
-            imageVector = Icons.Default.KeyboardArrowRight,
-            contentDescription = null,
-            tint = if (isSelected) CalPrimaryColor else CalTextSecondary,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-}
-
-@Composable
-private fun ValveStatusCard(
-    roomName: String,
-    valvePosition: Float,
-    calibrationState: CalibrationState,
-    currentStepIndex: Int,
-    completedSteps: Set<Int>,
-    calibrationProgress: Float,
-    onCalibrate: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CalCardColor)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Válvula - $roomName",
-                    color = CalTextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            when (calibrationState) {
-                                CalibrationState.IDLE -> Color(0xFF252D35)
-                                CalibrationState.CALIBRATING -> CalPrimaryColor.copy(alpha = 0.2f)
-                                CalibrationState.COMPLETE -> CalSuccessColor.copy(alpha = 0.2f)
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(ROOMS) { room ->
+                    val isSelected = room == selectedRoom
+                    Card(
+                        onClick = {
+                            if (!isCalibrating) {
+                                selectedRoom = room
+                                isCalibrated = false
+                                currentStep = -1
+                                valvePosition = 50f
                             }
-                        )
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = when (calibrationState) {
-                            CalibrationState.IDLE -> "Sin calibrar"
-                            CalibrationState.CALIBRATING -> "Calibrando"
-                            CalibrationState.COMPLETE -> "Calibrada"
                         },
-                        color = when (calibrationState) {
-                            CalibrationState.IDLE -> CalTextSecondary
-                            CalibrationState.CALIBRATING -> CalPrimaryColor
-                            CalibrationState.COMPLETE -> CalSuccessColor
-                        },
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "Posición actual: ${valvePosition.toInt()}%",
-                color = CalTextSecondary,
-                fontSize = 13.sp
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Slider(
-                value = valvePosition,
-                onValueChange = {},
-                valueRange = 0f..100f,
-                enabled = false,
-                modifier = Modifier.fillMaxWidth(),
-                colors = SliderDefaults.colors(
-                    disabledThumbColor = CalPrimaryColor,
-                    disabledActiveTrackColor = CalPrimaryColor,
-                    disabledInactiveTrackColor = Color(0xFF252D35)
-                )
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Cerrada (0%)", color = CalTextSecondary, fontSize = 11.sp)
-                Text(text = "Abierta (100%)", color = CalTextSecondary, fontSize = 11.sp)
-            }
-
-            if (calibrationState == CalibrationState.CALIBRATING) {
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Progreso",
-                        color = CalTextSecondary,
-                        fontSize = 13.sp
-                    )
-                    Text(
-                        text = "${(calibrationProgress * 100).toInt()}%",
-                        color = CalPrimaryColor,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                LinearProgressIndicator(
-                    progress = { calibrationProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = CalPrimaryColor,
-                    trackColor = Color(0xFF252D35),
-                    strokeCap = StrokeCap.Round
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    calibrationSteps.forEachIndexed { index, step ->
-                        AnimatedVisibility(
-                            visible = index <= currentStepIndex,
-                            enter = fadeIn() + slideInVertically()
+                        colors = CardDefaults.cardColors(containerColor = if (isSelected) BlueAccent.copy(alpha = 0.1f) else CardColor),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, if (isSelected) BlueAccent else BorderColor)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CalibrationStepRow(
-                                text = step,
-                                isComplete = index in completedSteps,
-                                isActive = index == currentStepIndex && index !in completedSteps
-                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Tune, contentDescription = null, tint = if (isSelected) BlueAccent else TextSecondary, modifier = Modifier.size(22.dp))
+                                Text(room, color = if (isSelected) BlueAccent else TextPrimary, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal)
+                            }
+                            if (isSelected) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = BlueAccent)
+                        }
+                    }
+
+                    if (isSelected) {
+                        Spacer(Modifier.height(8.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CardColor),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, BorderColor)
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text("Válvula — $room", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Posición", color = TextSecondary, fontSize = 13.sp)
+                                        Text("${valvePosition.toInt()}%", color = TextPrimary, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = valvePosition,
+                                        onValueChange = { if (!isCalibrating) valvePosition = it },
+                                        valueRange = 0f..100f,
+                                        enabled = !isCalibrating,
+                                        colors = SliderDefaults.colors(
+                                            activeTrackColor = BlueAccent,
+                                            thumbColor = BlueAccent,
+                                            inactiveTrackColor = BorderColor
+                                        )
+                                    )
+                                }
+
+                                if (isCalibrating) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        LinearProgressIndicator(
+                                            progress = { (currentStep + 1).toFloat() / CAL_STEPS.size },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = BlueAccent,
+                                            trackColor = BorderColor
+                                        )
+                                        CAL_STEPS.take(currentStep + 1).forEach { step ->
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = GreenOk, modifier = Modifier.size(16.dp))
+                                                Text(step, color = TextSecondary, fontSize = 12.sp)
+                                            }
+                                        }
+                                        if (currentStep + 1 < CAL_STEPS.size) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = BlueAccent)
+                                                Text(CAL_STEPS[currentStep + 1], color = TextSecondary, fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (isCalibrated) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = GreenOk, modifier = Modifier.size(24.dp))
+                                        Text("Válvula calibrada correctamente", color = GreenOk, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+
+                                if (!isCalibrating && !isCalibrated) {
+                                    Button(
+                                        onClick = {
+                                            isCalibrating = true
+                                            currentStep = -1
+                                            scope.launch {
+                                                CAL_STEPS.forEachIndexed { i, _ ->
+                                                    currentStep = i - 1
+                                                    valvePosition = when (i) {
+                                                        0 -> 0f; 1 -> 30f; 2 -> 65f; 3 -> 72f; else -> 70f
+                                                    }
+                                                    delay(3000)
+                                                }
+                                                currentStep = CAL_STEPS.size - 1
+                                                delay(1000)
+                                                isCalibrating = false
+                                                isCalibrated = true
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = BlueAccent, contentColor = Color(0xFF001D31)),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text("Calibrar válvula", fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            }
-
-            if (calibrationState == CalibrationState.IDLE) {
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Button(
-                    onClick = onCalibrate,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = CalPrimaryColor)
-                ) {
-                    Text(
-                        text = "CALIBRAR",
-                        color = Color(0xFF101419),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CalibrationStepRow(text: String, isComplete: Boolean, isActive: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "cal_step_pulse")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(500),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "cal_step_alpha"
-    )
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Box(
-            modifier = Modifier
-                .size(22.dp)
-                .clip(CircleShape)
-                .background(
-                    when {
-                        isComplete -> CalSuccessColor
-                        isActive -> CalPrimaryColor.copy(alpha = alpha)
-                        else -> Color(0xFF252D35)
-                    }
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isComplete) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Text(
-            text = text,
-            color = when {
-                isComplete -> CalTextPrimary
-                isActive -> CalPrimaryColor
-                else -> CalTextSecondary
-            },
-            fontSize = 13.sp,
-            fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal
-        )
-    }
-}
-
-@Composable
-private fun CalibrationSuccessCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2E1A))
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = CalSuccessColor,
-                modifier = Modifier.size(40.dp)
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column {
-                Text(
-                    text = "Válvula calibrada correctamente",
-                    color = CalSuccessColor,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "La válvula ha sido calibrada y configurada en su posición óptima de funcionamiento.",
-                    color = Color(0xFF81C784),
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp
-                )
             }
         }
     }

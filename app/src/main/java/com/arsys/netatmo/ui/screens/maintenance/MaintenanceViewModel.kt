@@ -19,7 +19,9 @@ class MaintenanceViewModel @Inject constructor(
 ) : ViewModel() {
 
     val records = dao.getAll().stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList()
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptyList()
     )
 
     private val _selectedRecord = MutableStateFlow<MaintenanceRecordEntity?>(null)
@@ -31,15 +33,22 @@ class MaintenanceViewModel @Inject constructor(
         }
     }
 
-    fun addRecord(type: MaintenanceType, description: String, techName: String, certRef: String) {
+    fun addRecord(
+        type: MaintenanceType,
+        description: String,
+        techName: String = "",
+        certRef: String = ""
+    ) {
         viewModelScope.launch {
-            dao.insert(MaintenanceRecordEntity(
-                date = System.currentTimeMillis(),
-                type = type.name,
-                description = description,
-                technicianName = techName,
-                certificateRef = certRef
-            ))
+            dao.insert(
+                MaintenanceRecordEntity(
+                    date = System.currentTimeMillis(),
+                    type = type.name,
+                    description = description,
+                    technicianName = techName,
+                    certificateRef = certRef
+                )
+            )
         }
     }
 
