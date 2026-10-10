@@ -112,7 +112,7 @@ dependencies {
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
 
-    implementation("androidx.compose.ui:ui-text-google-fonts")
+    // implementation("androidx.compose.ui:ui-text-google-fonts") // removed: downloadable fonts require font_certs.xml
 
     implementation(libs.security.crypto)
 
