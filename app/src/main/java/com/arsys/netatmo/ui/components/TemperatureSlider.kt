@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.arsys.netatmo.ui.theme.OutlineVariant
 import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemperatureSlider(
     value: Double,
