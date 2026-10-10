@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.arsys.netatmo.ui.theme.OutlineVariant
 import com.arsys.netatmo.ui.theme.SurfaceContainer
 import com.arsys.netatmo.ui.theme.SurfaceContainerLow
@@ -45,7 +44,7 @@ private val GaugeTrack      = Color(0xFF3F4850)        // outlineVariant
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AirQualityScreen(
-    navController: NavController,
+    onBack: () -> Unit,
     viewModel: AirQualityViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -61,7 +60,7 @@ fun AirQualityScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Volver",
@@ -186,9 +185,10 @@ fun AirQualityScreen(
             }
 
             // ── Outdoor section ──────────────────────────────────────────
-            if (state.outdoorTemp != null) {
+            val outdoorTemp = state.outdoorTemp
+            if (outdoorTemp != null) {
                 OutdoorCard(
-                    temp = state.outdoorTemp,
+                    temp = outdoorTemp,
                     condition = state.weatherCondition
                 )
             }
