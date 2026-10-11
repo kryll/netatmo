@@ -40,6 +40,7 @@ class GeofenceTransitionService : Service() {
     @Inject lateinit var thermostatRepository: ThermostatRepository
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var dataStore: DataStore<Preferences>
+    @Inject lateinit var geofenceStateStore: GeofenceStateStore
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -102,9 +103,11 @@ class GeofenceTransitionService : Service() {
         val geofenceEntity = geofences.find { it.id == geofenceId } ?: return
         val automation = automationRepository.getAutomationById(geofenceEntity.automationId) ?: return
 
-        if (!automation.enabled) return
-
         val now = System.currentTimeMillis()
+        // Always record the state, even for a disabled automation, so it stays accurate.
+        val stateChanged = geofenceStateStore.registerTransition(geofenceId, transition, now)
+        if (!automation.enabled || !stateChanged) return
+
         when (transition) {
             Geofence.GEOFENCE_TRANSITION_ENTER -> {
                 if (geofenceEntity.triggerOnEnter) {

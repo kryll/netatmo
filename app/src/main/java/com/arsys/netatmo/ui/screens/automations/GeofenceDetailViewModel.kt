@@ -11,6 +11,7 @@ import com.arsys.netatmo.data.repository.AutomationRepository
 import com.arsys.netatmo.data.repository.AuthRepository
 import com.arsys.netatmo.data.repository.ThermostatRepository
 import com.arsys.netatmo.service.GeofenceManager
+import com.arsys.netatmo.service.GeofenceStateStore
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -52,7 +53,8 @@ class GeofenceDetailViewModel @Inject constructor(
     private val automationRepository: AutomationRepository,
     private val authRepository: AuthRepository,
     private val thermostatRepository: ThermostatRepository,
-    private val geofenceManager: GeofenceManager
+    private val geofenceManager: GeofenceManager,
+    private val geofenceStateStore: GeofenceStateStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GeofenceDetailUiState())
@@ -192,6 +194,7 @@ class GeofenceDetailViewModel @Inject constructor(
                     notificationsDisabled = !state.notificationsEnabled
                 )
                 automationRepository.saveGeofence(geofence)
+                geofenceStateStore.reset(geofence.id)
                 if (state.isAutomationActive) {
                     geofenceManager.registerGeofence(geofence)
                 } else {
