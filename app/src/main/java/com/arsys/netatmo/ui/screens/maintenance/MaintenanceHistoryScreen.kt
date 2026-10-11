@@ -1,12 +1,6 @@
 package com.arsys.netatmo.ui.screens.maintenance
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -129,46 +123,24 @@ fun MaintenanceHistoryScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            "Historial De Mantenimiento",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 17.sp
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
-                        }
-                    },
-                    actions = {
-                        // Blue circle user avatar
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(BluePrimary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Person,
-                                contentDescription = "Usuario",
-                                tint = Color(0xFF001D31),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = SurfaceLowest.copy(alpha = 0.80f)
+            TopAppBar(
+                title = {
+                    Text(
+                        "Historial De Mantenimiento",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 17.sp
                     )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = SurfaceLowest.copy(alpha = 0.80f)
                 )
-                // Breadcrumb sub-header
-                BreadcrumbSubHeader()
-            }
+            )
         },
         containerColor = BgColor,
         floatingActionButton = {
@@ -187,13 +159,17 @@ fun MaintenanceHistoryScreen(
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 32.dp)
         ) {
-            // Section 1: Equipment & Warranty Banner
-            item {
-                EquipmentSummaryBanner(
-                    totalCount = uiState.totalCount,
-                    certCount = uiState.certCount,
-                    annualCount = uiState.annualCount
-                )
+            // Section 1: Summary banner
+            if (uiState.totalCount > 0) {
+                item {
+                    SummaryBanner(
+                        totalCount = uiState.totalCount,
+                        certCount = uiState.certCount,
+                        lastRevisionDate = uiState.records
+                            .filter { it.type == MaintenanceType.ANNUAL_REVISION.name }
+                            .maxOfOrNull { it.date }
+                    )
+                }
             }
 
             // Section 2: Filter Chips
@@ -242,66 +218,10 @@ fun MaintenanceHistoryScreen(
 }
 
 // ---------------------------------------------------------------------------
-//  Breadcrumb Sub-Header
+//  Summary Banner (counts computed from real records)
 // ---------------------------------------------------------------------------
 @Composable
-private fun BreadcrumbSubHeader() {
-    val infiniteTransition = rememberInfiniteTransition(label = "sync_pulse")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dot_alpha"
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(SurfaceLowest.copy(alpha = 0.80f))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            "Ajustes > Historial de Mantenimiento",
-            color = TextSecondary,
-            fontSize = 12.sp
-        )
-        // SYNC ACTIVA pill
-        Surface(
-            color = SurfaceContHigh,
-            shape = RoundedCornerShape(999.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(GreenTertiary.copy(alpha = alpha))
-                )
-                Text(
-                    "SYNC ACTIVA",
-                    color = GreenTertiary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-//  Equipment & Warranty Summary Banner
-// ---------------------------------------------------------------------------
-@Composable
-private fun EquipmentSummaryBanner(totalCount: Int, certCount: Int, annualCount: Int) {
+private fun SummaryBanner(totalCount: Int, certCount: Int, lastRevisionDate: Long?) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -309,138 +229,19 @@ private fun EquipmentSummaryBanner(totalCount: Int, certCount: Int, annualCount:
         color = SurfaceContLow,
         shape = RoundedCornerShape(16.dp)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            // Ambient glow top-right
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .align(Alignment.TopEnd)
-                    .offset(x = 16.dp, y = (-16).dp)
-                    .blur(24.dp)
-                    .clip(CircleShape)
-                    .background(BluePrimary.copy(alpha = 0.10f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            StatCell(value = totalCount.toString(), label = "Intervenciones\nregistradas", color = BluePrimary)
+            StatCell(value = certCount.toString(), label = "Con\nreferencia", color = OrangeSecondary)
+            StatCell(
+                value = lastRevisionDate?.let { dateShort.format(Date(it)) } ?: "—",
+                label = "Última\nrevisión",
+                color = GreenTertiary
             )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Device header row
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Surface(
-                        color = SurfaceContHigh,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.Thermostat,
-                                contentDescription = null,
-                                tint = BluePrimary,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Caldera Saunier Duval IsoFast V3",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
-                        )
-                        Text(
-                            "Circuito Hidráulico Primario · Modulante",
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
-                    }
-                    // Status chip: 1.35 bar
-                    Surface(
-                        color = SurfaceContHigh,
-                        shape = RoundedCornerShape(999.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = GreenTertiary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text("1.35 bar", color = GreenTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                // Warranty pill
-                Surface(
-                    color = SurfaceContHigh.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Verified, contentDescription = null, tint = GreenTertiary, modifier = Modifier.size(16.dp))
-                        Text(
-                            "Garantía Oficial Activa hasta Octubre 2029",
-                            color = GreenTertiary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                // Quick stats — no dividers
-                Surface(
-                    color = SurfaceCont.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatCell(value = totalCount.toString(), label = "Intervenciones\nregistradas", color = BluePrimary)
-                        StatCell(value = certCount.toString(), label = "Con\nreferencia", color = OrangeSecondary)
-                        StatCell(value = "Oct 2025", label = "Revisión RITE", color = GreenTertiary)
-                    }
-                }
-
-                // eIDAS link row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Cloud, contentDescription = null, tint = BluePrimary, modifier = Modifier.size(14.dp))
-                        Text("Libro Digital del Edificio (Sincronizado eIDAS)", color = TextSecondary, fontSize = 11.sp)
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Consultar", color = BluePrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        Icon(Icons.Default.ArrowForward, contentDescription = null, tint = BluePrimary, modifier = Modifier.size(12.dp))
-                    }
-                }
-            }
         }
     }
 }
@@ -567,7 +368,7 @@ private fun EmptyMaintenanceState(hasRecords: Boolean) {
                 }
             }
             Text(
-                if (hasRecords) "Sin registros para este filtro" else "Sin registros de mantenimiento",
+                if (hasRecords) "Sin registros para este filtro" else "Aún no hay registros",
                 color = TextSecondary,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium
@@ -863,7 +664,7 @@ fun AddMaintenanceSheet(
     var modelo by remember { mutableStateOf("") }
     var numSerie by remember { mutableStateOf("") }
     var version by remember { mutableStateOf("") }
-    var combustible by remember { mutableStateOf("GASNAT.") }
+    var combustible by remember { mutableStateOf("") }
 
     // Combustion readings
     var rendimiento by remember { mutableStateOf("") }
