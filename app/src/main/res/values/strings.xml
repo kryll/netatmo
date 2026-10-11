@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Netatmo Smart</string>
+    <string name="app_name">Netatmo</string>
     <string name="title_home">Inicio</string>
     <string name="title_automations">Automatizaciones</string>
     <string name="title_statistics">Estadísticas</string>
