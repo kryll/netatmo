@@ -23,6 +23,9 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
 
+// Longest gap between two samples that still counts as "same state"; longer gaps are missing data.
+private const val MAX_SAMPLE_GAP_MS = 30L * 60 * 1000
+
 data class MonthlyHeatingData(val label: String, val heatingHours: Float)
 
 data class StatisticsUiState(
@@ -232,7 +235,7 @@ class StatisticsViewModel @Inject constructor(
         var heatingMs = 0L
         for (i in 0 until points.size - 1) {
             if (points[i].heatingActive) {
-                heatingMs += points[i + 1].timestamp - points[i].timestamp
+                heatingMs += minOf(points[i + 1].timestamp - points[i].timestamp, MAX_SAMPLE_GAP_MS)
             }
         }
         return heatingMs / 3_600_000f
@@ -292,6 +295,13 @@ class StatisticsViewModel @Inject constructor(
                 else -> "1week"
             }
             val dateBegin = (System.currentTimeMillis() / 1000) - (days * 24 * 60 * 60L)
+            // Netatmo's measure only gives temperature: the boiler state comes from our own samples.
+            val localHistory = try {
+                temperatureHistoryDao.getHistory(homeId, roomId, dateBegin * 1000L).first()
+                    .sortedBy { it.timestamp }
+            } catch (e: Exception) {
+                emptyList()
+            }
             val response = apiService.getRoomMeasure(
                 homeId = homeId,
                 roomId = roomId,
@@ -307,7 +317,11 @@ class StatisticsViewModel @Inject constructor(
                     body.value.forEachIndexed { index, vals ->
                         val temp = vals.firstOrNull() ?: return@forEachIndexed
                         val tsMs = (body.beginTime + index.toLong() * step) * 1000L
-                        data.add(TemperatureDataPoint(timestamp = tsMs, temperature = temp, setpoint = null, heatingActive = false))
+                        val stepMs = step * 1000L
+                        val heating = localHistory.any {
+                            it.heatingActive && it.timestamp >= tsMs && it.timestamp < tsMs + stepMs
+                        }
+                        data.add(TemperatureDataPoint(timestamp = tsMs, temperature = temp, setpoint = null, heatingActive = heating))
                     }
                 }
                 val temps = data.map { it.temperature }
@@ -321,7 +335,7 @@ class StatisticsViewModel @Inject constructor(
                         minTemp = if (temps.isNotEmpty()) temps.min() else null,
                         maxTempTime = maxPoint?.timestamp,
                         minTempTime = minPoint?.timestamp,
-                        heatingHours = null,
+                        heatingHours = if (localHistory.size > 1) Math.round(calculateHeatingHours(localHistory)) else null,
                         isLoading = false
                     )
                 }

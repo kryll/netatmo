@@ -9,6 +9,7 @@ import androidx.work.Configuration
 import com.arsys.netatmo.service.AdvancedAutomationWorker
 import com.arsys.netatmo.service.LocalScheduleManager
 import com.arsys.netatmo.service.TemperatureAnomalyWorker
+import com.arsys.netatmo.worker.DataSyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -32,6 +33,7 @@ class NetatmoApp : Application(), Configuration.Provider {
         AdvancedAutomationWorker.schedule(this)
         localScheduleManager.scheduleAll()
         TemperatureAnomalyWorker.schedule(this)
+        DataSyncWorker.schedule(this)
     }
 
     private fun createNotificationChannels() {

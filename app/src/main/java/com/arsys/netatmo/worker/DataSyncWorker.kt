@@ -7,7 +7,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.work.HiltWorker
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.arsys.netatmo.NetatmoApp
 import com.arsys.netatmo.data.api.models.ModuleStatus
@@ -17,6 +22,7 @@ import com.arsys.netatmo.data.repository.ThermostatRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
+import java.util.concurrent.TimeUnit
 
 @HiltWorker
 class DataSyncWorker @AssistedInject constructor(
@@ -25,6 +31,24 @@ class DataSyncWorker @AssistedInject constructor(
     private val thermostatRepository: ThermostatRepository,
     private val authRepository: AuthRepository
 ) : CoroutineWorker(context, params) {
+
+    companion object {
+        private const val WORK_NAME = "data_sync"
+
+        // Every run stores a temperature/boiler sample used by the statistics, so it must
+        // be scheduled whenever the app starts, not only after a reboot.
+        fun schedule(context: Context) {
+            val request = PeriodicWorkRequestBuilder<DataSyncWorker>(15, TimeUnit.MINUTES)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build()
+                )
+                .build()
+            WorkManager.getInstance(context)
+                .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        }
+    }
 
     override suspend fun doWork(): Result {
         val homeId = authRepository.selectedHomeId.first() ?: return Result.success()

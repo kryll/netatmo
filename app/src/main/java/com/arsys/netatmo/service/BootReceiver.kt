@@ -34,20 +34,7 @@ class BootReceiver : BroadcastReceiver() {
 
         val workManager = WorkManager.getInstance(context)
 
-        // Periodic data sync every 15 minutes
-        val syncRequest = PeriodicWorkRequestBuilder<DataSyncWorker>(15, TimeUnit.MINUTES)
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
-            .build()
-
-        workManager.enqueueUniquePeriodicWork(
-            "data_sync",
-            ExistingPeriodicWorkPolicy.UPDATE,
-            syncRequest
-        )
+        DataSyncWorker.schedule(context)
 
         // Calendar check every 15 minutes
         val calendarRequest = PeriodicWorkRequestBuilder<CalendarWorker>(15, TimeUnit.MINUTES)
