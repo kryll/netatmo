@@ -142,7 +142,8 @@ class SettingsViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { file ->
-                    _uiState.update { it.copy(updateStatus = UpdateStatus.Installing) }
+                    val sizeMb = file.length().toFloat() / 1_048_576f
+                    _uiState.update { it.copy(updateStatus = UpdateStatus.Installing(apkSizeMb = sizeMb, apkPath = file.absolutePath)) }
                     updateRepository.installApk(file)
                 },
                 onFailure = { error ->

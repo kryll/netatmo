@@ -22,7 +22,7 @@ sealed class UpdateStatus {
     data class UpdateAvailable(val release: GitHubRelease) : UpdateStatus()
     object UpToDate : UpdateStatus()
     data class Downloading(val progress: Float) : UpdateStatus()
-    object Installing : UpdateStatus()
+    data class Installing(val apkSizeMb: Float = 0f, val apkPath: String = "") : UpdateStatus()
     data class Error(val message: String) : UpdateStatus()
 }
 
@@ -111,7 +111,12 @@ class UpdateRepository @Inject constructor(
                 connection.disconnect()
                 if (BuildConfig.DEBUG) Log.d(TAG, "downloadApk: descarga completa. descargado=$downloaded bytes")
             }
-            if (BuildConfig.DEBUG) Log.d(TAG, "downloadApk: descarga OK. Procediendo a instalar")
+            val sizeBytes = apkFile.length()
+            if (BuildConfig.DEBUG) Log.d(TAG, "downloadApk: tamaño final=${sizeBytes} bytes (${sizeBytes/1024/1024} MB)")
+            if (sizeBytes < 500_000L) {
+                return Result.failure(Exception("APK inválido: solo ${sizeBytes / 1024} KB. Descarga incompleta o error en el servidor."))
+            }
+            if (BuildConfig.DEBUG) Log.d(TAG, "downloadApk: OK. path=${apkFile.absolutePath}")
             Result.success(apkFile)
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) Log.e(TAG, "downloadApk: excepción durante descarga", e)

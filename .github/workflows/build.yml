@@ -40,6 +40,25 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Restore persistent debug keystore
+        uses: actions/cache@v4
+        id: keystore-cache
+        with:
+          path: debug.keystore
+          key: netatmo-debug-keystore-v1
+
+      - name: Create debug keystore if not cached
+        if: steps.keystore-cache.outputs.cache-hit != 'true'
+        run: |
+          keytool -genkey -v -keystore debug.keystore -alias netatmo -keyalg RSA -keysize 2048 \
+            -validity 36500 -dname "CN=Netatmo,O=ARSYS,C=ES" \
+            -storepass android -keypass android -noprompt
+
+      - name: Install debug keystore for Gradle
+        run: |
+          mkdir -p "$HOME/.android"
+          cp debug.keystore "$HOME/.android/debug.keystore"
+
       - name: Build debug APK
         run: ./gradlew assembleDebug -PversionCode=${{ github.run_number }} --no-daemon
 
