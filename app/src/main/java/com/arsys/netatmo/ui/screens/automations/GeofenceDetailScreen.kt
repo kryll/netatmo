@@ -263,13 +263,16 @@ fun GeofenceDetailScreen(
                     val radius = uiState.radius
                     val mapHtml = buildMapHtml(lat, lng, radius)
 
-                    @SuppressLint("SetJavaScriptEnabled")
                     AndroidView(
                         modifier = Modifier.matchParentSize(),
                         factory = { ctx ->
+                            @SuppressLint("SetJavaScriptEnabled")
                             WebView(ctx).apply {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
+                                settings.useWideViewPort = true
+                                settings.loadWithOverviewMode = true
+                                isScrollContainer = false
                                 webViewClient = WebViewClient()
                                 addJavascriptInterface(
                                     MapBridge { newLat, newLng ->
@@ -1042,10 +1045,12 @@ private fun buildMapHtml(lat: Double, lng: Double, radiusMeters: Float): String 
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <style>
-html,body,#map{margin:0;padding:0;width:100%;height:100%;background:#101419}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100vh;overflow:hidden;background:#101419}
+#map{width:100%;height:100vh}
 </style>
 </head>
 <body>
@@ -1069,6 +1074,7 @@ map.on('click',function(e){
 });
 function zoomIn(){map.zoomIn();}
 function zoomOut(){map.zoomOut();}
+window.addEventListener('load',function(){setTimeout(function(){map.invalidateSize();},100);});
 </script>
 </body>
 </html>
