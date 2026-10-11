@@ -250,7 +250,14 @@ fun GeofenceDetailScreen(
 
             // --- MAP SECTION ---
             val webViewRef = remember { mutableStateOf<WebView?>(null) }
-            key(uiState.latitude, uiState.longitude, uiState.radius) {
+            val mapLat = uiState.latitude.toDoubleOrNull() ?: 40.4168
+            val mapLng = uiState.longitude.toDoubleOrNull() ?: -3.7038
+            val mapRadius = uiState.radius
+
+            // key() only on lat/lng: radius changes are handled via evaluateJavascript
+            // without destroying the WebView (which would restart the CDN download)
+            key(uiState.latitude, uiState.longitude) {
+                val initialHtml = buildMapHtml(mapLat, mapLng, mapRadius)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -258,22 +265,51 @@ fun GeofenceDetailScreen(
                         .clip(RoundedCornerShape(16.dp))
                         .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
                 ) {
-                    val lat = uiState.latitude.toDoubleOrNull() ?: 40.4168
-                    val lng = uiState.longitude.toDoubleOrNull() ?: -3.7038
-                    val radius = uiState.radius
-                    val mapHtml = buildMapHtml(lat, lng, radius)
-
                     AndroidView(
                         modifier = Modifier.matchParentSize(),
                         factory = { ctx ->
-                            @SuppressLint("SetJavaScriptEnabled")
                             WebView(ctx).apply {
+                                @SuppressLint("SetJavaScriptEnabled")
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
                                 settings.useWideViewPort = true
                                 settings.loadWithOverviewMode = true
                                 isScrollContainer = false
-                                webViewClient = WebViewClient()
+                                webViewClient = object : WebViewClient() {
+                                    override fun onReceivedError(
+                                        view: WebView?,
+                                        request: android.webkit.WebResourceRequest?,
+                                        error: android.webkit.WebResourceError?
+                                    ) {
+                                        super.onReceivedError(view, request, error)
+                                        android.util.Log.e("MapWebView",
+                                            "Resource error: ${request?.url} - ${error?.description}")
+                                    }
+                                    override fun onReceivedSslError(
+                                        view: WebView?,
+                                        handler: android.webkit.SslErrorHandler?,
+                                        error: android.net.http.SslError?
+                                    ) {
+                                        android.util.Log.e("MapWebView", "SSL error: $error")
+                                        handler?.cancel()
+                                    }
+                                    override fun onPageFinished(view: WebView?, url: String?) {
+                                        super.onPageFinished(view, url)
+                                        view?.evaluateJavascript(
+                                            "if(typeof map!=='undefined'){map.invalidateSize();}",
+                                            null
+                                        )
+                                    }
+                                }
+                                webChromeClient = object : android.webkit.WebChromeClient() {
+                                    override fun onConsoleMessage(
+                                        msg: android.webkit.ConsoleMessage?
+                                    ): Boolean {
+                                        android.util.Log.d("MapJS",
+                                            "[${msg?.messageLevel()}] ${msg?.message()} (line ${msg?.lineNumber()})")
+                                        return true
+                                    }
+                                }
                                 addJavascriptInterface(
                                     MapBridge { newLat, newLng ->
                                         viewModel.updateLatitude(newLat)
@@ -283,13 +319,19 @@ fun GeofenceDetailScreen(
                                 )
                                 loadDataWithBaseURL(
                                     "https://openstreetmap.org",
-                                    mapHtml,
+                                    initialHtml,
                                     "text/html",
                                     "UTF-8",
                                     null
                                 )
                                 webViewRef.value = this
                             }
+                        },
+                        update = { webView ->
+                            webView.evaluateJavascript(
+                                "if(typeof updateRadius==='function'){updateRadius($mapRadius);}",
+                                null
+                            )
                         }
                     )
 
@@ -1074,7 +1116,8 @@ map.on('click',function(e){
 });
 function zoomIn(){map.zoomIn();}
 function zoomOut(){map.zoomOut();}
-window.addEventListener('load',function(){setTimeout(function(){map.invalidateSize();},100);});
+function updateRadius(r){if(typeof circle!=='undefined'&&circle!==null){circle.setRadius(r);}}
+window.addEventListener('load',function(){setTimeout(function(){if(typeof map!=='undefined'){map.invalidateSize();}},100);});
 </script>
 </body>
 </html>
