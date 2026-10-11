@@ -55,7 +55,9 @@ data class StatisticsUiState(
     val monthlyCost: Float = 0f,
     // Latest boiler revision
     val latestRevision: MaintenanceRecordEntity? = null,
-    val thermostatType: ThermostatType = ThermostatType.STANDARD
+    val thermostatType: ThermostatType = ThermostatType.STANDARD,
+    val maxTempTime: Long? = null,
+    val minTempTime: Long? = null
 )
 
 @HiltViewModel
@@ -75,6 +77,7 @@ class StatisticsViewModel @Inject constructor(
     val uiState: StateFlow<StatisticsUiState> = _uiState.asStateFlow()
 
     private var historyJob: Job? = null
+    private var statsJob: Job? = null
 
     init {
         // Load thermostat type
@@ -237,7 +240,8 @@ class StatisticsViewModel @Inject constructor(
 
     /** Load multi-day aggregate statistics for the period selector. */
     fun loadStatistics(days: Int) {
-        viewModelScope.launch {
+        statsJob?.cancel()
+        statsJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val homeId = authRepository.selectedHomeId.first() ?: run {
                 _uiState.update { it.copy(isLoading = false, error = "No hay hogar seleccionado") }
@@ -245,7 +249,7 @@ class StatisticsViewModel @Inject constructor(
             }
             val roomId = _uiState.value.selectedRoomId
 
-            if (days >= 30) {
+            if (days > 1) {
                 loadStatisticsFromApi(homeId, roomId, days)
             } else {
                 getTemperatureHistory(homeId, roomId, days)
@@ -256,12 +260,16 @@ class StatisticsViewModel @Inject constructor(
                         val heatingHours = if (data.size > 1)
                             (heatingPoints * (days * 24.0 / data.size)).toInt()
                         else 0
+                        val maxPoint = data.maxByOrNull { it.temperature }
+                        val minPoint = data.minByOrNull { it.temperature }
                         _uiState.update {
                             it.copy(
                                 temperatureData = data,
                                 avgTemp = if (temps.isNotEmpty()) temps.average() else null,
                                 maxTemp = if (temps.isNotEmpty()) temps.max() else null,
                                 minTemp = if (temps.isNotEmpty()) temps.min() else null,
+                                maxTempTime = maxPoint?.timestamp,
+                                minTempTime = minPoint?.timestamp,
                                 heatingHours = heatingHours,
                                 isLoading = false
                             )
@@ -278,6 +286,7 @@ class StatisticsViewModel @Inject constructor(
     private suspend fun loadStatisticsFromApi(homeId: String, roomId: String, days: Int) {
         try {
             val scale = when {
+                days <= 7 -> "1hour"
                 days <= 30 -> "3hours"
                 days <= 90 -> "1day"
                 else -> "1week"
@@ -302,12 +311,16 @@ class StatisticsViewModel @Inject constructor(
                     }
                 }
                 val temps = data.map { it.temperature }
+                val maxPoint = data.maxByOrNull { it.temperature }
+                val minPoint = data.minByOrNull { it.temperature }
                 _uiState.update {
                     it.copy(
                         temperatureData = data,
                         avgTemp = if (temps.isNotEmpty()) temps.average() else null,
                         maxTemp = if (temps.isNotEmpty()) temps.max() else null,
                         minTemp = if (temps.isNotEmpty()) temps.min() else null,
+                        maxTempTime = maxPoint?.timestamp,
+                        minTempTime = minPoint?.timestamp,
                         heatingHours = null,
                         isLoading = false
                     )

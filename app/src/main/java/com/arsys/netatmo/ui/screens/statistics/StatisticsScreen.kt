@@ -234,10 +234,13 @@ fun StatisticsScreen(
                 }
             }
 
-            items(uiState.cardOrder) { cardKey ->
+            val effectiveCardOrder = uiState.cardOrder.filter { key ->
+                key != "tempChart" || selectedPeriod == 1
+            }
+            items(effectiveCardOrder) { cardKey ->
                 DraggableCardWrapper(
                     cardKey = cardKey,
-                    cardOrder = uiState.cardOrder,
+                    cardOrder = effectiveCardOrder,
                     isEditMode = uiState.isEditMode,
                     onMove = { from, to -> viewModel.moveCard(from, to) }
                 ) {
@@ -253,6 +256,26 @@ fun StatisticsScreen(
                                 periodLabel = periods.firstOrNull { it.second == selectedPeriod }?.first ?: "${selectedPeriod}d",
                                 modifier = Modifier.fillMaxWidth()
                             )
+                        } else if (!uiState.isLoading) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = SurfaceContainer),
+                                border = BorderStroke(1.dp, OutlineVariant)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(120.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "Sin datos para el período seleccionado",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
                         }
                         "heating" -> HeatingReportCard(
                             heatingHoursToday = uiState.totalHeatingHoursToday,
@@ -267,6 +290,9 @@ fun StatisticsScreen(
                             avgTemp = uiState.avgTemp,
                             maxTemp = uiState.maxTemp,
                             minTemp = uiState.minTemp,
+                            periodLabel = periods.firstOrNull { it.second == selectedPeriod }?.first ?: "${selectedPeriod}d",
+                            maxTempTime = uiState.maxTempTime,
+                            minTempTime = uiState.minTempTime,
                             modifier = Modifier.fillMaxWidth()
                         )
                         "monthly" -> MonthlyHeatingCard(
@@ -615,6 +641,25 @@ fun TemperatureHistory24hCard(
                 LegendItem(color = Secondary.copy(alpha = 0.85f), label = "Consigna", dashed = true)
             }
 
+            val xAxisLabels = remember(points) {
+                if (points.size < 2) emptyList<Pair<String, Long>>()
+                else {
+                    val cal = Calendar.getInstance()
+                    cal.timeInMillis = points.first().timestamp
+                    cal.set(Calendar.HOUR_OF_DAY, (cal.get(Calendar.HOUR_OF_DAY) / 4) * 4)
+                    cal.set(Calendar.MINUTE, 0)
+                    cal.set(Calendar.SECOND, 0)
+                    cal.set(Calendar.MILLISECOND, 0)
+                    val endTs = points.last().timestamp
+                    val result = mutableListOf<Pair<String, Long>>()
+                    while (cal.timeInMillis <= endTs + 3_600_000L) {
+                        result.add("%02d:00".format(cal.get(Calendar.HOUR_OF_DAY)) to cal.timeInMillis)
+                        cal.add(Calendar.HOUR_OF_DAY, 4)
+                    }
+                    result
+                }
+            }
+
             // Chart canvas — cubic spline + gradient area fill
             Canvas(
                 modifier = Modifier
@@ -727,18 +772,21 @@ fun TemperatureHistory24hCard(
                     drawCircle(SurfaceContainer, radius = 3f, center = last)
                 }
 
-                // X-axis labels — 7 labels (00:00 to 23:59 / 24:00)
+                // X-axis labels — derived from actual data timestamps, every 4 hours
                 val xPaint = android.graphics.Paint().apply {
                     color = labelArgb
                     textSize = 22f
                     isAntiAlias = true
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
-                listOf("00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00")
-                    .forEachIndexed { i, lbl ->
-                        val x = chartLeft + i.toFloat() / 6f * chartWidth
+                if (points.size >= 2) {
+                    val startTs2 = points.first().timestamp
+                    val durationMs2 = (points.last().timestamp - startTs2).coerceAtLeast(1L)
+                    xAxisLabels.forEach { (lbl, ts) ->
+                        val x = xOf(ts, startTs2, durationMs2)
                         drawContext.canvas.nativeCanvas.drawText(lbl, x, size.height - 6f, xPaint)
                     }
+                }
             }
         }
     }
@@ -1036,14 +1084,24 @@ fun StatsSummaryRow(
     avgTemp: Double?,
     maxTemp: Double?,
     minTemp: Double?,
+    periodLabel: String = "24 horas",
+    maxTempTime: Long? = null,
+    minTempTime: Long? = null,
     modifier: Modifier = Modifier
 ) {
+    fun formatTime(ts: Long?): String {
+        if (ts == null) return ""
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = ts
+        return "%02d:%02d h".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
+    }
+
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         StatTile(
             modifier = Modifier.weight(1f),
             label = "Temp. media",
             value = avgTemp?.let { "%.1f°C".format(it) } ?: "--",
-            sublabel = "24 horas",
+            sublabel = periodLabel,
             sublabelColor = TextSecondary,
             icon = Icons.Default.Thermostat,
             iconBgColor = Primary.copy(alpha = 0.15f),
@@ -1053,7 +1111,7 @@ fun StatsSummaryRow(
             modifier = Modifier.weight(1f),
             label = "Temp. máx.",
             value = maxTemp?.let { "%.1f°C".format(it) } ?: "--",
-            sublabel = maxTemp?.let { "15:20 h" } ?: "",
+            sublabel = formatTime(maxTempTime),
             sublabelColor = Secondary,
             icon = Icons.Default.ThermostatAuto,
             iconBgColor = Secondary.copy(alpha = 0.15f),
@@ -1063,7 +1121,7 @@ fun StatsSummaryRow(
             modifier = Modifier.weight(1f),
             label = "Temp. mín.",
             value = minTemp?.let { "%.1f°C".format(it) } ?: "--",
-            sublabel = minTemp?.let { "06:10 h" } ?: "",
+            sublabel = formatTime(minTempTime),
             sublabelColor = Primary,
             icon = Icons.Default.AcUnit,
             iconBgColor = Primary.copy(alpha = 0.1f),
@@ -1138,14 +1196,14 @@ fun MonthlyHeatingCard(
     val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
     val targetHoursPerDay = 2.5f
 
-    // Synthesize daily data from monthly total
+    // Distribute monthly total evenly across elapsed days
     val dailyHours = remember(monthlyHeatingHours, todayDay) {
         if (monthlyHeatingHours <= 0f || todayDay == 0) {
             List(daysInMonth) { 0f }
         } else {
             val avg = monthlyHeatingHours / todayDay
             List(daysInMonth) { i ->
-                if (i < todayDay) (avg * (0.7f + (i % 5) * 0.12f)).coerceIn(0f, 8f) else 0f
+                if (i < todayDay) avg.coerceIn(0f, 24f) else 0f
             }
         }
     }
@@ -1365,23 +1423,32 @@ fun MonthlyComparisonCard(
                         color = TextPrimary
                     )
                 }
-                // Trending indicator
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Icon(
-                        Icons.Default.TrendingDown,
-                        contentDescription = null,
-                        tint = GreenGood,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        "-12% este mes",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = GreenGood,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                // Trending indicator — computed from last two months
+                if (data.size >= 2) {
+                    val prev = data[data.size - 2].heatingHours
+                    val curr = data.last().heatingHours
+                    val pct = if (prev > 0f) ((curr - prev) / prev * 100f) else 0f
+                    val trendDown = pct <= 0f
+                    val trendColor = if (trendDown) GreenGood else Secondary
+                    val trendIcon = if (trendDown) Icons.Default.TrendingDown else Icons.Default.TrendingUp
+                    val sign = if (pct >= 0f) "+" else ""
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Icon(
+                            trendIcon,
+                            contentDescription = null,
+                            tint = trendColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            "$sign%.0f%% vs mes ant.".format(pct),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = trendColor,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 
@@ -1668,7 +1735,7 @@ fun TemperatureChart(
         }
         yTicks.forEach { t ->
             drawContext.canvas.nativeCanvas.drawText(
-                "${t.toInt()}°", chartLeft - 4f, yOf(t.toDouble()) + 8f, yPaint
+                if (niceStep < 1f) "%.1f°".format(t) else "${t.toInt()}°", chartLeft - 4f, yOf(t.toDouble()) + 8f, yPaint
             )
         }
 
@@ -1724,15 +1791,14 @@ fun HeatingChart(
 ) {
     Canvas(modifier = modifier) {
         if (data.isEmpty()) return@Canvas
-        val minTime = data.first().timestamp.toFloat()
-        val maxTime = data.last().timestamp.toFloat()
-        val timeRange = maxTime - minTime
-        if (timeRange == 0f) return@Canvas
+        val minTs = data.first().timestamp
+        val maxTs = data.last().timestamp
+        val timeRange = (maxTs - minTs).toFloat().coerceAtLeast(1f)
 
         data.zipWithNext().forEach { (a, b) ->
             if (a.heatingActive) {
-                val x1 = ((a.timestamp - minTime) / timeRange) * size.width
-                val x2 = ((b.timestamp - minTime) / timeRange) * size.width
+                val x1 = (a.timestamp - minTs).toFloat() / timeRange * size.width
+                val x2 = (b.timestamp - minTs).toFloat() / timeRange * size.width
                 drawRect(
                     color = BoilerActiveColor.copy(alpha = 0.6f),
                     topLeft = Offset(x1, 0f),

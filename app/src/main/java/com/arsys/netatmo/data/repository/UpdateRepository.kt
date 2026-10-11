@@ -132,7 +132,6 @@ class UpdateRepository @Inject constructor(
             data = uri
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
             putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-            putExtra(Intent.EXTRA_RETURN_RESULT, true)
         }
         // Grant read permission to every app that could handle the install intent
         val resolvers = context.packageManager.queryIntentActivities(intent, 0)
