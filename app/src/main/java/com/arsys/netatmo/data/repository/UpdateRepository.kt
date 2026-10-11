@@ -87,6 +87,13 @@ class UpdateRepository @Inject constructor(
             val apkFile = File(context.cacheDir, "updates/update_${release.tagName}.apk")
             if (BuildConfig.DEBUG) Log.d(TAG, "downloadApk: exists=${apkFile.exists()}, parentExists=${apkFile.parentFile?.exists()}")
             apkFile.parentFile?.mkdirs()
+
+            if (apkFile.exists() && apkFile.length() >= 500_000L) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "downloadApk: APK ya cacheado, reutilizando. size=${apkFile.length()}")
+                onProgress(1f)
+                return Result.success(apkFile)
+            }
+
             withContext(Dispatchers.IO) {
                 val connection = URL(downloadUrl).openConnection() as HttpURLConnection
                 connection.instanceFollowRedirects = true
@@ -136,7 +143,8 @@ class UpdateRepository @Inject constructor(
         val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
             data = uri
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, context.packageName)
         }
         // Grant read permission to every app that could handle the install intent
         val resolvers = context.packageManager.queryIntentActivities(intent, 0)

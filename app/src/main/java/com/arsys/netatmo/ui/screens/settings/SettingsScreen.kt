@@ -1042,7 +1042,7 @@ fun UpdateSection(
                         }
                         if (updateStatus.apkSizeMb > 0f) {
                             Text(
-                                "APK: ${"%.1f".format(updateStatus.apkSizeMb)} MB · Si dice \"no instalada\", desinstala la app actual e instala de nuevo.",
+                                "APK: ${"%.1f".format(updateStatus.apkSizeMb)} MB",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
