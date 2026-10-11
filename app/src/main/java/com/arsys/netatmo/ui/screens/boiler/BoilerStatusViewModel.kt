@@ -11,8 +11,6 @@ import com.arsys.netatmo.domain.model.ThermostatType
 import com.arsys.netatmo.domain.usecase.GetThermostatStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,14 +35,6 @@ data class DiagnosticResult(
     val recommendations: List<String>
 )
 
-val DIAGNOSTIC_CHECK_LABELS = listOf(
-    "Presión hidráulica",
-    "Circulación del circuito",
-    "Válvulas de zona",
-    "Nivel de modulación",
-    "Conectividad RF"
-)
-
 // ── UI state ──────────────────────────────────────────────────────────────────
 
 data class BoilerStatusUiState(
@@ -59,12 +49,6 @@ data class BoilerStatusUiState(
     val modules: List<ModuleState> = emptyList(),
     val isLoading: Boolean = true,
     val error: String? = null,
-    // Diagnostic — populated when launchDiagnostic() is called
-    val isDiagnosticRunning: Boolean = false,
-    val diagnosticProgress: Float = 0f,
-    val diagnosticSecondsLeft: Int = 60,
-    val diagnosticCompletedChecks: List<String> = emptyList(),
-    val diagnosticResult: DiagnosticResult? = null,
     // Cached so refresh() works without re-collecting the flow
     val cachedHomeId: String? = null,
     val thermostatType: ThermostatType = ThermostatType.STANDARD
@@ -81,8 +65,6 @@ class BoilerStatusViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(BoilerStatusUiState())
     val uiState: StateFlow<BoilerStatusUiState> = _uiState.asStateFlow()
-
-    private var diagnosticJob: Job? = null
 
     init {
         val prefs = context.getSharedPreferences(ThermostatType.PREFS_NAME, Context.MODE_PRIVATE)
@@ -153,117 +135,66 @@ class BoilerStatusViewModel @Inject constructor(
         )
     }
 
-    /**
-     * Simulates a 60-second hydraulic diagnostic.
-     * Both BoilerStatusScreen and HydraulicDiagnosticScreen must share this ViewModel instance
-     * (scope to the parent NavGraph back-stack entry) for the state to be visible in both screens.
-     */
-    fun launchDiagnostic() {
-        if (_uiState.value.isDiagnosticRunning) return
-        diagnosticJob?.cancel()
-        diagnosticJob = viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isDiagnosticRunning = true,
-                    diagnosticProgress = 0f,
-                    diagnosticSecondsLeft = 60,
-                    diagnosticCompletedChecks = emptyList(),
-                    diagnosticResult = null
-                )
-            }
+    fun dismissError() = _uiState.update { it.copy(error = null) }
+}
 
-            val totalSteps = DIAGNOSTIC_CHECK_LABELS.size   // 5 checks
-            val secondsPerStep = 60 / totalSteps             // 12s each
+/**
+ * Builds a status snapshot from real NAPlug data only. Returns null when there is no
+ * boiler module data, so no result is ever invented.
+ */
+fun buildStatusReport(state: BoilerStatusUiState): DiagnosticResult? {
+    val plug = state.modules.firstOrNull { it.type == "NAPlug" } ?: return null
+    val health = state.boilerHealth
+    val rfStrength = plug.rfStrength
+    val rfOk = rfStrength == null || rfStrength >= 40
+    val modPct = health.modulationPct
 
-            repeat(60) { tick ->
-                delay(1_000L)
-                val elapsed = tick + 1
-                val doneCount = (elapsed / secondsPerStep).coerceAtMost(totalSteps)
-                _uiState.update {
-                    it.copy(
-                        diagnosticProgress = elapsed / 60f,
-                        diagnosticSecondsLeft = 60 - elapsed,
-                        diagnosticCompletedChecks = DIAGNOSTIC_CHECK_LABELS.take(doneCount)
-                    )
-                }
-            }
-
-            val result = buildDiagnosticResult(_uiState.value)
-            _uiState.update {
-                it.copy(
-                    isDiagnosticRunning = false,
-                    diagnosticProgress = 1f,
-                    diagnosticSecondsLeft = 0,
-                    diagnosticCompletedChecks = DIAGNOSTIC_CHECK_LABELS,
-                    diagnosticResult = result
-                )
-            }
-        }
-    }
-
-    private fun buildDiagnosticResult(state: BoilerStatusUiState): DiagnosticResult {
-        val health = state.boilerHealth
-        val plug = state.modules.firstOrNull { it.type == "NAPlug" }
-        val reachable = plug?.reachable ?: true
-        val rfStrength = plug?.rfStrength ?: 90
-        val rfOk = rfStrength >= 40
-        val modPct = health.modulationPct
-
-        val checks = listOf(
+    val checks = buildList {
+        add(
             DiagnosticCheckResult(
-                label = "Presión hidráulica",
-                status = if (reachable) CheckStatus.OK else CheckStatus.WARNING,
-                detail = if (reachable) "Sin anomalías detectadas (sensor no expuesto por API)"
-                         else "Módulo inalcanzable — presión no verificable"
-            ),
-            DiagnosticCheckResult(
-                label = "Circulación del circuito",
-                status = if (reachable) CheckStatus.OK else CheckStatus.WARNING,
-                detail = if (reachable) "Bomba de circulación respondiendo" else "Sin confirmación de bomba"
-            ),
-            DiagnosticCheckResult(
-                label = "Válvulas de zona",
-                status = CheckStatus.OK,
-                detail = "Todas las válvulas operativas"
-            ),
-            DiagnosticCheckResult(
-                label = "Nivel de modulación",
-                status = CheckStatus.OK,
-                detail = modPct?.let { "Modulación al $it%" } ?: "Sin datos de modulación"
-            ),
-            DiagnosticCheckResult(
-                label = "Conectividad RF",
-                status = if (rfOk) CheckStatus.OK else CheckStatus.WARNING,
-                detail = "Señal RF: $rfStrength dBm"
+                label = "Conexión del módulo",
+                status = if (plug.reachable) CheckStatus.OK else CheckStatus.WARNING,
+                detail = if (plug.reachable) "Módulo NAPlug alcanzable" else "Módulo NAPlug inalcanzable"
             )
         )
-
-        val grade = when {
-            health.healthScore >= 95 -> "A+"
-            health.healthScore >= 85 -> "A"
-            health.healthScore >= 70 -> "B"
-            health.healthScore >= 55 -> "C"
-            else -> "F"
+        if (rfStrength != null) {
+            add(
+                DiagnosticCheckResult(
+                    label = "Conectividad RF",
+                    status = if (rfOk) CheckStatus.OK else CheckStatus.WARNING,
+                    detail = "Señal RF: $rfStrength"
+                )
+            )
         }
-
-        val recommendations = buildList {
-            if (!reachable) add("Comprueba la conexión WiFi del módulo NAPlug")
-            if (!rfOk) add("Acerca el termostato al relay NAPlug para mejorar la señal RF (actual: $rfStrength dBm)")
-            if (health.healthScore < 75) add("Considera programar una revisión técnica anual de la caldera")
+        if (modPct != null) {
+            add(
+                DiagnosticCheckResult(
+                    label = "Nivel de modulación",
+                    status = CheckStatus.OK,
+                    detail = "Modulación al $modPct%"
+                )
+            )
         }
-
-        return DiagnosticResult(
-            grade = grade,
-            gradeScore = health.healthScore,
-            checks = checks,
-            recommendations = recommendations
-        )
     }
 
-    fun dismissError() = _uiState.update { it.copy(error = null) }
-
-    override fun onCleared() {
-        super.onCleared()
-        diagnosticJob?.cancel()
+    val grade = when {
+        health.healthScore >= 95 -> "A+"
+        health.healthScore >= 85 -> "A"
+        health.healthScore >= 70 -> "B"
+        health.healthScore >= 55 -> "C"
+        else -> "F"
     }
+
+    val recommendations = buildList {
+        if (!plug.reachable) add("Comprueba la conexión WiFi del módulo NAPlug")
+        if (!rfOk) add("Acerca el termostato al relay NAPlug para mejorar la señal RF (actual: $rfStrength)")
+        if (health.healthScore < 75) add("Considera programar una revisión técnica anual de la caldera")
+    }
+
+    return DiagnosticResult(
+        grade = grade,
+        gradeScore = health.healthScore,
+        checks = checks,
+        recommendations = recommendations
+    )
 }

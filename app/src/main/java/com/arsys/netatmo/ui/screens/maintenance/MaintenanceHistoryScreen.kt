@@ -145,12 +145,6 @@ fun MaintenanceHistoryScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { }) {
-                            Icon(Icons.Default.FilterList, contentDescription = "Filtrar", tint = TextSecondary)
-                        }
-                        IconButton(onClick = { }) {
-                            Icon(Icons.Default.Download, contentDescription = "Descargar reporte", tint = TextSecondary)
-                        }
                         // Blue circle user avatar
                         Box(
                             modifier = Modifier
@@ -241,11 +235,6 @@ fun MaintenanceHistoryScreen(
                             isOldest = isLast
                         )
                     }
-                }
-
-                // Section 4: Bottom CTAs
-                item {
-                    BottomCtaSection()
                 }
             }
         }
@@ -604,7 +593,6 @@ private fun MaintenanceRecordCard(
     }
     val chipColor = type.chipColor()
     val typeIcon = type.icon()
-    val isPurge = type == MaintenanceType.PURGE || type == MaintenanceType.PRESSURE_CHECK
     val hasCertificate = record.certificateRef.isNotBlank()
 
     Box(modifier = modifier.fillMaxWidth()) {
@@ -686,7 +674,7 @@ private fun MaintenanceRecordCard(
                         // Expediente subtitle if cert ref present
                         if (record.certificateRef.isNotBlank()) {
                             Text(
-                                "Expediente #${record.certificateRef} · Sello TSA RFC 3161",
+                                "Expediente #${record.certificateRef}",
                                 color = BluePrimary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium
@@ -707,16 +695,6 @@ private fun MaintenanceRecordCard(
                         // Combustion analysis data (when present)
                         if (record.rendimiento != null || record.co != null || record.temperaturaHumos != null) {
                             CombustionAnalysisStrip(record)
-                        }
-
-                        // Telemetry chips for certified/SAT cards without combustion data
-                        if (isMostRecentCertified && hasCertificate && record.rendimiento == null) {
-                            TelemetryChipStrip()
-                        }
-
-                        // Delta metric box for purge-type cards
-                        if (isPurge && record.presionDinamica == null) {
-                            DeltaMetricBox()
                         }
                     }
 
@@ -745,24 +723,7 @@ private fun MaintenanceRecordCard(
                                 ) {
                                     Icon(Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text("Ver Certificado PDF (244 KB)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    TextButton(
-                                        onClick = { },
-                                        contentPadding = PaddingValues(0.dp)
-                                    ) {
-                                        Text("Acuse de Recibo", color = TextSecondary, fontSize = 12.sp)
-                                    }
-                                    TextButton(
-                                        onClick = { },
-                                        contentPadding = PaddingValues(0.dp)
-                                    ) {
-                                        Text("Detalles", color = TextSecondary, fontSize = 12.sp)
-                                    }
+                                    Text("Ver Certificado", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                                 }
                             }
                         }
@@ -843,125 +804,6 @@ private fun CombustionChip(label: String, color: Color) {
             fontSize = 10.sp,
             fontWeight = FontWeight.Medium
         )
-    }
-}
-
-// ---------------------------------------------------------------------------
-//  Telemetry Chip Strip
-// ---------------------------------------------------------------------------
-@Composable
-private fun TelemetryChipStrip() {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        TelemetryChip(label = "Cavitación 0%")
-        TelemetryChip(label = "ΔT 18°C")
-        TelemetryChip(label = "Presión 1.35 bar")
-    }
-}
-
-@Composable
-private fun TelemetryChip(label: String) {
-    Surface(
-        color = SurfaceContHigh,
-        shape = RoundedCornerShape(6.dp)
-    ) {
-        Text(
-            label,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = TextSecondary,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-//  Delta Metric Box (purge cards)
-// ---------------------------------------------------------------------------
-@Composable
-private fun DeltaMetricBox() {
-    Surface(
-        color = SurfaceContHigh,
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("0.85 bar", color = TextSecondary, fontSize = 12.sp)
-            Icon(Icons.Default.ArrowForward, contentDescription = null, tint = GreenTertiary, modifier = Modifier.size(14.dp))
-            Text("1.35 bar", color = GreenTertiary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            Text("Aire evacuado", color = TextSecondary, fontSize = 11.sp)
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-//  Bottom CTA Section
-// ---------------------------------------------------------------------------
-@Composable
-private fun BottomCtaSection() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Button(
-            onClick = { },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BluePrimary,
-                contentColor = Color(0xFF001D31)
-            ),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                "Exportar Historial Completo (PDF Acreditativo)",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp
-            )
-        }
-
-        Button(
-            onClick = { },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = SurfaceContHigh,
-                contentColor = TextPrimary
-            ),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                "Solicitar Cita con Servicio Técnico Oficial",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp
-            )
-        }
-
-        // Cryptographic footnote
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Lock, contentDescription = null, tint = GreenTertiary, modifier = Modifier.size(12.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(
-                "Registro inmutable respaldado en Legrand Cloud Security",
-                color = TextSecondary,
-                fontSize = 11.sp
-            )
-        }
     }
 }
 

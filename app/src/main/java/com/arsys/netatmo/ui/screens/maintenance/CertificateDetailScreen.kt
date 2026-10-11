@@ -122,7 +122,7 @@ fun CertificateDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Certificado Oficial #Nd 84920 Ok",
+                        "Certificado #$certNumber",
                         color = TextPrimary,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
@@ -136,9 +136,6 @@ fun CertificateDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Outlined.Print, contentDescription = "Imprimir", tint = TextPrimary)
-                    }
                     IconButton(onClick = {
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
@@ -251,17 +248,17 @@ private fun BottomActions(
                     putExtra(Intent.EXTRA_TEXT, certText)
                     putExtra(Intent.EXTRA_SUBJECT, "Certificado de mantenimiento Netatmo #$certNumber")
                 }
-                context.startActivity(Intent.createChooser(intent, "Descargar/Compartir certificado"))
+                context.startActivity(Intent.createChooser(intent, "Compartir certificado"))
             },
             modifier = Modifier.fillMaxWidth().height(54.dp),
             colors = ButtonDefaults.buttonColors(containerColor = BluePrimary, contentColor = BlueOnPrimary),
             shape = RoundedCornerShape(12.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
         ) {
-            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(
-                "Descargar Documento PDF Completo (Págs. 1 y 2) · 244 KB",
+                "Compartir certificado",
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
                 maxLines = 1,
@@ -275,9 +272,7 @@ private fun BottomActions(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             listOf(
-                Triple(Icons.Default.ChevronLeft, "Pág. Anterior") { onBack() },
-                Triple(Icons.Outlined.Build, "Servicio Téc.") { },
-                Triple(Icons.Outlined.Print, "Imprimir") { }
+                Triple(Icons.Default.ChevronLeft, "Pág. Anterior") { onBack() }
             ).forEach { (icon, label, action) ->
                 Surface(
                     onClick = action,
