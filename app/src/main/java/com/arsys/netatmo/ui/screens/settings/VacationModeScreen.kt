@@ -28,6 +28,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.ui.theme.*
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import java.util.*
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
@@ -46,15 +50,30 @@ private val OrangeColor        = Color(0xFFF66018)
 private val OutlineVariantColor = Color(0xFF3F4850)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+private val SPAIN_ZONE: ZoneId = ZoneId.of("Europe/Madrid")
+
+// DatePicker works with the selected day as midnight UTC; the vacation must start/end at
+// midnight in Spain (UTC+1 / UTC+2 with daylight saving).
+private fun pickerToSpainMidnight(pickerUtcMs: Long): Long =
+    Instant.ofEpochMilli(pickerUtcMs).atZone(ZoneOffset.UTC).toLocalDate()
+        .atStartOfDay(SPAIN_ZONE).toInstant().toEpochMilli()
+
+private fun spainToPickerUtc(ms: Long): Long =
+    Instant.ofEpochMilli(ms).atZone(SPAIN_ZONE).toLocalDate()
+        .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
 private fun formatDateFull(ms: Long): String {
     if (ms == 0L) return "Sin seleccionar"
     val sdf = SimpleDateFormat("d MMM yyyy", Locale("es", "ES"))
+    sdf.timeZone = TimeZone.getTimeZone(SPAIN_ZONE)
     return sdf.format(Date(ms))
 }
 
 private fun daysBetween(startMs: Long, endMs: Long): Int {
     if (startMs == 0L || endMs == 0L || endMs <= startMs) return 0
-    return ((endMs - startMs) / (1000L * 60 * 60 * 24)).toInt()
+    val start = Instant.ofEpochMilli(startMs).atZone(SPAIN_ZONE).toLocalDate()
+    val end = Instant.ofEpochMilli(endMs).atZone(SPAIN_ZONE).toLocalDate()
+    return ChronoUnit.DAYS.between(start, end).toInt()
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -70,10 +89,10 @@ fun VacationModeScreen(
     var showEndPicker   by remember { mutableStateOf(false) }
 
     val startPickerState = rememberDatePickerState(
-        initialSelectedDateMillis = if (uiState.startMs > 0L) uiState.startMs else null
+        initialSelectedDateMillis = if (uiState.startMs > 0L) spainToPickerUtc(uiState.startMs) else null
     )
     val endPickerState = rememberDatePickerState(
-        initialSelectedDateMillis = if (uiState.endMs > 0L) uiState.endMs else null
+        initialSelectedDateMillis = if (uiState.endMs > 0L) spainToPickerUtc(uiState.endMs) else null
     )
 
     val daysCount = daysBetween(uiState.startMs, uiState.endMs)
@@ -268,7 +287,7 @@ fun VacationModeScreen(
             onDismissRequest = { showStartPicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    startPickerState.selectedDateMillis?.let { viewModel.updateStart(it) }
+                    startPickerState.selectedDateMillis?.let { viewModel.updateStart(pickerToSpainMidnight(it)) }
                     showStartPicker = false
                 }) { Text("Aceptar") }
             },
@@ -286,7 +305,7 @@ fun VacationModeScreen(
             onDismissRequest = { showEndPicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    endPickerState.selectedDateMillis?.let { viewModel.updateEnd(it) }
+                    endPickerState.selectedDateMillis?.let { viewModel.updateEnd(pickerToSpainMidnight(it)) }
                     showEndPicker = false
                 }) { Text("Aceptar") }
             },
@@ -592,12 +611,12 @@ private fun CalendarStrip(startMs: Long, endMs: Long) {
 
     fun startDay(): Int {
         if (startMs == 0L) return -1
-        val cal = Calendar.getInstance(); cal.timeInMillis = startMs
+        val cal = Calendar.getInstance(TimeZone.getTimeZone(SPAIN_ZONE)); cal.timeInMillis = startMs
         return cal.get(Calendar.DAY_OF_MONTH)
     }
     fun endDay(): Int {
         if (endMs == 0L) return -1
-        val cal = Calendar.getInstance(); cal.timeInMillis = endMs
+        val cal = Calendar.getInstance(TimeZone.getTimeZone(SPAIN_ZONE)); cal.timeInMillis = endMs
         return cal.get(Calendar.DAY_OF_MONTH)
     }
 
