@@ -29,6 +29,7 @@ import com.arsys.netatmo.BuildConfig
 import com.arsys.netatmo.data.api.models.Home
 import com.arsys.netatmo.data.model.GitHubRelease
 import com.arsys.netatmo.data.repository.UpdateStatus
+import com.arsys.netatmo.domain.model.ThemeMode
 import com.arsys.netatmo.ui.theme.OutlineVariant
 import com.arsys.netatmo.ui.theme.SurfaceContainer
 import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
@@ -210,6 +211,74 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                // ── Apariencia ─────────────────────────────────────────
+                item { SettingSectionHeader("Apariencia") }
+
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = SurfaceContainer,
+                        border = BorderStroke(1.dp, OutlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(SurfaceContainerHigh),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Brightness4,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Tema",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        "Apariencia de la aplicación",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                SegmentedButton(
+                                    selected = uiState.themeMode == ThemeMode.SYSTEM,
+                                    onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) },
+                                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                                    label = { Text("Sistema") }
+                                )
+                                SegmentedButton(
+                                    selected = uiState.themeMode == ThemeMode.LIGHT,
+                                    onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) },
+                                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                                    label = { Text("Claro") }
+                                )
+                                SegmentedButton(
+                                    selected = uiState.themeMode == ThemeMode.DARK,
+                                    onClick = { viewModel.setThemeMode(ThemeMode.DARK) },
+                                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                                    label = { Text("Oscuro") }
+                                )
                             }
                         }
                     }

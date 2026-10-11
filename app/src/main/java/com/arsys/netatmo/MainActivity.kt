@@ -6,15 +6,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.arsys.netatmo.domain.model.ThemeMode
 import com.arsys.netatmo.ui.navigation.AppNavGraph
 import com.arsys.netatmo.ui.screens.auth.AuthViewModel
+import com.arsys.netatmo.ui.screens.settings.SettingsViewModel
 import com.arsys.netatmo.ui.theme.NetatmoTheme
 import com.arsys.netatmo.util.AuthDebugLogger
 import dagger.hilt.android.AndroidEntryPoint
@@ -23,6 +27,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val authViewModel: AuthViewModel by viewModels()
+    private val settingsViewModel: SettingsViewModel by viewModels()
     private var pendingRoute by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,7 +36,14 @@ class MainActivity : ComponentActivity() {
         handleAuthIntent(intent)
         resolveShortcutIntent(intent)
         setContent {
-            NetatmoTheme {
+            val settingsState by settingsViewModel.uiState.collectAsState()
+            val systemDark = isSystemInDarkTheme()
+            val isDark = when (settingsState.themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> systemDark
+            }
+            NetatmoTheme(darkTheme = isDark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

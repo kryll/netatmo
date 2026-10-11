@@ -4,6 +4,38 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+private val LightColorScheme = lightColorScheme(
+    primary = Color(0xFF006398),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFCEE5FF),
+    onPrimaryContainer = Color(0xFF001E31),
+    secondary = Color(0xFF8B3A00),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFFFDBCC),
+    onSecondaryContainer = Color(0xFF311200),
+    tertiary = Color(0xFF006D32),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFF9DF4AA),
+    onTertiaryContainer = Color(0xFF00210D),
+    error = Color(0xFFBA1A1A),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002),
+    background = Color(0xFFF0F4F8),
+    onBackground = Color(0xFF181C22),
+    surface = Color(0xFFF0F4F8),
+    onSurface = Color(0xFF181C22),
+    surfaceVariant = Color(0xFFDDE3EA),
+    onSurfaceVariant = Color(0xFF41484F),
+    surfaceTint = Color(0xFF006398),
+    inverseSurface = Color(0xFF2D3136),
+    inverseOnSurface = Color(0xFFE0E2EA),
+    inversePrimary = Color(0xFF93CCFF),
+    outline = Color(0xFF71787F),
+    outlineVariant = Color(0xFFC1C8CF),
+    scrim = Color(0xFF000000),
+)
+
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFF93CCFF),
     onPrimary = Color(0xFF003351),
@@ -42,7 +74,7 @@ fun NetatmoTheme(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = DarkColorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = AppTypography,
         content = content
     )

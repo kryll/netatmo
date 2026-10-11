@@ -1,8 +1,12 @@
 package com.arsys.netatmo.ui.screens.automations
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Build
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -31,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.ui.theme.OutlineVariant
@@ -244,164 +249,151 @@ fun GeofenceDetailScreen(
             }
 
             // --- MAP SECTION ---
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF121822))
-                    .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
-            ) {
-                // Map center: geofence ring + home pin
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            val webViewRef = remember { mutableStateOf<WebView?>(null) }
+            key(uiState.latitude, uiState.longitude, uiState.radius) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(192.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                            .border(
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Home,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(20.dp)
+                    val lat = uiState.latitude.toDoubleOrNull() ?: 40.4168
+                    val lng = uiState.longitude.toDoubleOrNull() ?: -3.7038
+                    val radius = uiState.radius
+                    val mapHtml = buildMapHtml(lat, lng, radius)
+
+                    @SuppressLint("SetJavaScriptEnabled")
+                    AndroidView(
+                        modifier = Modifier.matchParentSize(),
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                webViewClient = WebViewClient()
+                                addJavascriptInterface(
+                                    MapBridge { newLat, newLng ->
+                                        viewModel.updateLatitude(newLat)
+                                        viewModel.updateLongitude(newLng)
+                                    },
+                                    "Android"
                                 )
+                                loadDataWithBaseURL(
+                                    "https://openstreetmap.org",
+                                    mapHtml,
+                                    "text/html",
+                                    "UTF-8",
+                                    null
+                                )
+                                webViewRef.value = this
                             }
-                            Surface(
-                                color = Color(0xDD1C2025),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text(
-                                    text = uiState.locationName.ifBlank { "Mi Casa" },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        }
+                    )
+
+                    // Floating controls top-right
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SurfaceContainer.copy(alpha = 0.9f))
+                                .clickable {
+                                    val fineGranted = ContextCompat.checkSelfPermission(
+                                        context, Manifest.permission.ACCESS_FINE_LOCATION
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                    val coarseGranted = ContextCompat.checkSelfPermission(
+                                        context, Manifest.permission.ACCESS_COARSE_LOCATION
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                    if (fineGranted || coarseGranted) {
+                                        viewModel.useCurrentLocation()
+                                    } else {
+                                        locationPermissionLauncher.launch(
+                                            arrayOf(
+                                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            )
+                                        )
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (uiState.isLoadingLocation) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.MyLocation,
+                                    contentDescription = "Mi ubicación",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
-                    }
-                }
-
-                // Floating controls top-right
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(SurfaceContainer.copy(alpha = 0.9f))
-                            .clickable {
-                                val fineGranted = ContextCompat.checkSelfPermission(
-                                    context, Manifest.permission.ACCESS_FINE_LOCATION
-                                ) == PackageManager.PERMISSION_GRANTED
-                                val coarseGranted = ContextCompat.checkSelfPermission(
-                                    context, Manifest.permission.ACCESS_COARSE_LOCATION
-                                ) == PackageManager.PERMISSION_GRANTED
-                                if (fineGranted || coarseGranted) {
-                                    viewModel.useCurrentLocation()
-                                } else {
-                                    locationPermissionLauncher.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        )
-                                    )
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (uiState.isLoadingLocation) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SurfaceContainer.copy(alpha = 0.9f))
+                                .clickable { webViewRef.value?.evaluateJavascript("zoomIn()", null) },
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
-                                Icons.Default.MyLocation,
-                                contentDescription = "Mi ubicación",
+                                Icons.Default.Add,
+                                contentDescription = "Acercar",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SurfaceContainer.copy(alpha = 0.9f))
+                                .clickable { webViewRef.value?.evaluateJavascript("zoomOut()", null) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Remove,
+                                contentDescription = "Alejar",
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(SurfaceContainer.copy(alpha = 0.9f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Acercar",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(SurfaceContainer.copy(alpha = 0.9f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Remove,
-                            contentDescription = "Alejar",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
 
-                // GPS badge bottom-left
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(10.dp),
-                    color = Color(0xCC0A0E13),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    // GPS badge bottom-left
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp),
+                        color = Color(0xCC0A0E13),
+                        shape = RoundedCornerShape(20.dp)
                     ) {
-                        Icon(
-                            Icons.Default.NearMe,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = "${uiState.radius.toInt()} m · GPS Alta precisión (±8m)",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.NearMe,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "${uiState.radius.toInt()} m",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -1037,3 +1029,47 @@ fun GeofenceDetailScreen(
         }
     }
 }
+
+private class MapBridge(private val onLocationChanged: (String, String) -> Unit) {
+    @JavascriptInterface
+    fun onLocationChanged(lat: String, lng: String) {
+        onLocationChanged.invoke(lat, lng)
+    }
+}
+
+private fun buildMapHtml(lat: Double, lng: Double, radiusMeters: Float): String = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+html,body,#map{margin:0;padding:0;width:100%;height:100%;background:#101419}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+var lat=$lat,lng=$lng,radius=$radiusMeters;
+var map=L.map('map',{zoomControl:false,attributionControl:false}).setView([lat,lng],15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+var circle=L.circle([lat,lng],{radius:radius,color:'#93CCFF',fillColor:'#93CCFF',fillOpacity:0.15,weight:2}).addTo(map);
+var marker=L.marker([lat,lng],{draggable:true}).addTo(map);
+marker.on('dragend',function(){
+  var p=marker.getLatLng();
+  circle.setLatLng(p);
+  Android.onLocationChanged(p.lat.toString(),p.lng.toString());
+});
+map.on('click',function(e){
+  marker.setLatLng(e.latlng);
+  circle.setLatLng(e.latlng);
+  Android.onLocationChanged(e.latlng.lat.toString(),e.latlng.lng.toString());
+});
+function zoomIn(){map.zoomIn();}
+function zoomOut(){map.zoomOut();}
+</script>
+</body>
+</html>
+""".trimIndent()

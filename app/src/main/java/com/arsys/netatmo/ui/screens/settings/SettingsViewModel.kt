@@ -5,10 +5,12 @@ import android.net.Uri
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arsys.netatmo.data.api.models.Home
 import com.arsys.netatmo.data.model.GitHubRelease
+import com.arsys.netatmo.domain.model.ThemeMode
 import com.arsys.netatmo.domain.model.ThermostatType
 import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AuthRepository
@@ -37,7 +39,8 @@ data class SettingsUiState(
     val anomalyThreshold: Float = 3.0f,
     val exportedUri: Uri? = null,
     val exportError: String? = null,
-    val thermostatType: ThermostatType = ThermostatType.STANDARD
+    val thermostatType: ThermostatType = ThermostatType.STANDARD,
+    val themeMode: ThemeMode = ThemeMode.DARK
 )
 
 @HiltViewModel
@@ -53,6 +56,7 @@ class SettingsViewModel @Inject constructor(
         val AUTO_REFRESH_KEY = booleanPreferencesKey("auto_refresh")
         val NOTIFICATIONS_KEY = booleanPreferencesKey("notifications_enabled")
         val ANOMALY_THRESHOLD_KEY = floatPreferencesKey("anomaly_threshold")
+        val THEME_KEY = stringPreferencesKey("theme_mode")
     }
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -75,7 +79,8 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         autoRefresh = prefs[AUTO_REFRESH_KEY] ?: true,
                         notificationsEnabled = prefs[NOTIFICATIONS_KEY] ?: true,
-                        anomalyThreshold = prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f
+                        anomalyThreshold = prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f,
+                        themeMode = ThemeMode.fromString(prefs[THEME_KEY])
                     )
                 }
             }
@@ -197,6 +202,12 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
             )
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            context.dataStore.edit { prefs -> prefs[THEME_KEY] = mode.name }
         }
     }
 
