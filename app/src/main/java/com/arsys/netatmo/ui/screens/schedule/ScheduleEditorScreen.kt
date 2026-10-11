@@ -99,8 +99,6 @@ fun ScheduleEditorScreen(
     var showSlotDetail by remember { mutableStateOf<SlotUi?>(null) }
     var showNameDialog by remember { mutableStateOf(false) }
     var showZoneManager by remember { mutableStateOf(false) }
-    var autoAdaptEnabled by remember { mutableStateOf(true) }
-    var openWindowEnabled by remember { mutableStateOf(true) }
 
     LaunchedEffect(scheduleId) { viewModel.loadSchedule(scheduleId) }
     LaunchedEffect(uiState.saved) { if (uiState.saved) navController.popBackStack() }
@@ -149,7 +147,6 @@ fun ScheduleEditorScreen(
                     ActivePresetCard(
                         name = uiState.name,
                         slotCount = daySlots.size,
-                        autoAdaptEnabled = autoAdaptEnabled,
                         onClick = { showNameDialog = true }
                     )
                 }
@@ -254,15 +251,6 @@ fun ScheduleEditorScreen(
                             fontWeight = FontWeight.Medium
                         )
                     }
-                }
-
-                item {
-                    SmartTogglesCard(
-                        autoAdaptEnabled = autoAdaptEnabled,
-                        openWindowEnabled = openWindowEnabled,
-                        onAutoAdaptChange = { autoAdaptEnabled = it },
-                        onOpenWindowChange = { openWindowEnabled = it }
-                    )
                 }
             }
         }
@@ -395,7 +383,6 @@ private fun TopBar(
 private fun ActivePresetCard(
     name: String,
     slotCount: Int,
-    autoAdaptEnabled: Boolean,
     onClick: () -> Unit
 ) {
     Row(
@@ -452,31 +439,6 @@ private fun ActivePresetCard(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-
-        // Auto-Adapt chip
-        if (autoAdaptEnabled) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Bolt,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = "Auto",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
         }
     }
 }
@@ -815,175 +777,6 @@ private fun SlotExpandedCard(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-// ─── SmartTogglesCard ─────────────────────────────────────────────────────────
-
-@Composable
-private fun SmartTogglesCard(
-    autoAdaptEnabled: Boolean,
-    openWindowEnabled: Boolean,
-    onAutoAdaptChange: (Boolean) -> Unit,
-    onOpenWindowChange: (Boolean) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(SurfaceContainerLow)
-            .border(1.dp, OutlineVariant, RoundedCornerShape(16.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Text(
-            text = "Funciones inteligentes",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(12.dp))
-
-        // Auto-Adapt toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (autoAdaptEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        else SurfaceContainerHigh
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Bolt,
-                    contentDescription = null,
-                    tint = if (autoAdaptEnabled) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Auto-Adapt",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Ajuste predictivo de temperatura",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = autoAdaptEnabled,
-                onCheckedChange = onAutoAdaptChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = MaterialTheme.colorScheme.primary,
-                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    uncheckedTrackColor = SurfaceContainerHigh
-                )
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-        HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
-        Spacer(Modifier.height(8.dp))
-
-        // Open Window toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (openWindowEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        else SurfaceContainerHigh
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Thermostat,
-                    contentDescription = null,
-                    tint = if (openWindowEnabled) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Detección ventana abierta",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Pausa automática al abrir ventana",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = openWindowEnabled,
-                onCheckedChange = onOpenWindowChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = MaterialTheme.colorScheme.primary,
-                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    uncheckedTrackColor = SurfaceContainerHigh
-                )
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-        HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
-        Spacer(Modifier.height(8.dp))
-
-        // Weather integration row (informational)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFF97316).copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.WbSunny,
-                    contentDescription = null,
-                    tint = Color(0xFFF97316),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(
-                    text = "Integración meteorológica",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Activa · Conectada con estación exterior",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFF97316)
-                )
             }
         }
     }
