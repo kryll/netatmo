@@ -53,6 +53,11 @@ class AutomationRepository @Inject constructor(
     suspend fun getGeofenceByAutomation(automationId: Long): GeofenceEntity? =
         geofenceDao.getGeofenceByAutomation(automationId)
 
+    suspend fun getEnabledGeofences(): List<GeofenceEntity> =
+        automationDao.getEnabledAutomations()
+            .filter { it.type == "GEOFENCE" }
+            .mapNotNull { geofenceDao.getGeofenceByAutomation(it.id) }
+
     suspend fun saveGeofence(geofence: GeofenceEntity) = geofenceDao.insertGeofence(geofence)
 
     suspend fun deleteGeofence(geofence: GeofenceEntity) = geofenceDao.deleteGeofence(geofence)

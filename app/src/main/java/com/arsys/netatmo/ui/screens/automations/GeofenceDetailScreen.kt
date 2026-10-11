@@ -648,11 +648,6 @@ fun GeofenceDetailScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Medium
                             )
-                            Text(
-                                text = "20.5°C · 45% HR",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
