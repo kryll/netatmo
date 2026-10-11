@@ -414,7 +414,7 @@ private fun EquipmentSummaryBanner(totalCount: Int, certCount: Int, annualCount:
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         StatCell(value = totalCount.toString(), label = "Intervenciones\nregistradas", color = BluePrimary)
-                        StatCell(value = certCount.toString(), label = "Certificados PDF\noficiales", color = OrangeSecondary)
+                        StatCell(value = certCount.toString(), label = "Con\nreferencia", color = OrangeSecondary)
                         StatCell(value = "Oct 2025", label = "Revisión RITE", color = GreenTertiary)
                     }
                 }
@@ -467,7 +467,7 @@ private fun FilterChipsRow(
 ) {
     val filters = listOf(
         Triple(MaintenanceFilter.ALL, Icons.Default.ClearAll, "Todos ($totalCount)"),
-        Triple(MaintenanceFilter.CERTIFICATE, Icons.Outlined.VerifiedUser, "Certificados Oficiales ($certCount)"),
+        Triple(MaintenanceFilter.CERTIFICATE, Icons.Outlined.VerifiedUser, "Con referencia ($certCount)"),
         Triple(MaintenanceFilter.PURGE_PRESSURE, Icons.Outlined.Tune, "Purgas y Presión ($purgeCount)"),
         Triple(MaintenanceFilter.ANNUAL, Icons.Outlined.Engineering, "Revisiones SAT ($annualCount)")
     )
@@ -723,7 +723,7 @@ private fun MaintenanceRecordCard(
                                 ) {
                                     Icon(Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text("Ver Certificado", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text("Ver registro", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                                 }
                             }
                         }
