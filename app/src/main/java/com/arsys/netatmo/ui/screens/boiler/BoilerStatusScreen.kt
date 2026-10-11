@@ -165,10 +165,7 @@ fun BoilerStatusScreen(
                     // 7. Footer action buttons
                     FooterButtons(
                         onBack       = onBack,
-                        onDiagnostic = {
-                            viewModel.launchDiagnostic()
-                            onDiagnostic()
-                        }
+                        onDiagnostic = onDiagnostic
                     )
                 }
             }
@@ -1074,7 +1071,7 @@ private fun FooterButtons(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "Ver Historial de Mantenimiento",
+                "Ver estado detallado",
                 style = MaterialTheme.typography.titleMedium
             )
         }

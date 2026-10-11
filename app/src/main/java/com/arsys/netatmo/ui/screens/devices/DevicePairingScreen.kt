@@ -1,5 +1,8 @@
 package com.arsys.netatmo.ui.screens.devices
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
@@ -24,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,6 +79,7 @@ fun DevicePairingScreen(onBack: () -> Unit) {
     var step            by remember { mutableIntStateOf(0) }
     var selectedType    by remember { mutableStateOf<DeviceType?>(null) }
     var confirmed       by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     // Radar pulse animation for step 1
     val infiniteTransition = rememberInfiniteTransition(label = "radar")
@@ -98,11 +103,6 @@ fun DevicePairingScreen(onBack: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Volver", tint = OnSurface)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Outlined.Info, contentDescription = "Información", tint = OnSurfaceVar)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceLowest)
@@ -203,7 +203,7 @@ fun DevicePairingScreen(onBack: () -> Unit) {
                                 }
                             }
 
-                            Text("Modo emparejamiento activo", color = Primary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Sigue las instrucciones en el dispositivo", color = Primary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                         }
                     }
 
@@ -218,7 +218,17 @@ fun DevicePairingScreen(onBack: () -> Unit) {
                         shape  = RoundedCornerShape(12.dp),
                         color  = SurfaceContLow,
                         border = BorderStroke(1.dp, OutlineVar),
-                        modifier = Modifier.clickable { }
+                        modifier = Modifier.clickable {
+                            val search = "Netatmo Home"
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=${Uri.encode(search)}&c=apps")))
+                            } catch (e: ActivityNotFoundException) {
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/search?q=${Uri.encode(search)}&c=apps")))
+                                } catch (e2: ActivityNotFoundException) {
+                                }
+                            }
+                        }
                     ) {
                         Row(
                             modifier = Modifier
@@ -229,7 +239,7 @@ fun DevicePairingScreen(onBack: () -> Unit) {
                         ) {
                             Icon(Icons.Filled.OpenInNew, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Netatmo Home en Play Store", color = OnSurface, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                Text("Buscar Netatmo Home en Play Store", color = OnSurface, fontWeight = FontWeight.Medium, fontSize = 14.sp)
                                 Text("Abre la tienda para descargar la app", color = OnSurfaceVar, fontSize = 12.sp)
                             }
                             Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = OnSurfaceVar)

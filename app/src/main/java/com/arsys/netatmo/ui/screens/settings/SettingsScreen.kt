@@ -45,7 +45,6 @@ fun SettingsScreen(
     onNavigateToBoilerStatus: () -> Unit = {},
     onNavigateToMaintenance: () -> Unit = {},
     onNavigateToDevicePairing: () -> Unit = {},
-    onNavigateToPurge: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -448,7 +447,7 @@ fun SettingsScreen(
                         }
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(2.dp),
+                            shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp, topStart = 2.dp, topEnd = 2.dp),
                             color = SurfaceContainerLow,
                             onClick = onNavigateToDevicePairing
                         ) {
@@ -456,21 +455,6 @@ fun SettingsScreen(
                                 icon = Icons.Default.Devices,
                                 title = "Vincular dispositivo",
                                 subtitle = "Añadir termostato, válvulas o módulos",
-                                trailing = {
-                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            )
-                        }
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp, topStart = 2.dp, topEnd = 2.dp),
-                            color = SurfaceContainerLow,
-                            onClick = onNavigateToPurge
-                        ) {
-                            SettingRow(
-                                icon = Icons.Default.WaterDrop,
-                                title = "Purga del sistema",
-                                subtitle = "Purga de radiadores y calibración de válvulas",
                                 trailing = {
                                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }

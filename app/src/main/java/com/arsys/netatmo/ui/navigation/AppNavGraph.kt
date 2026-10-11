@@ -42,8 +42,6 @@ import com.arsys.netatmo.ui.screens.boiler.HydraulicDiagnosticScreen
 import com.arsys.netatmo.ui.screens.maintenance.MaintenanceHistoryScreen
 import com.arsys.netatmo.ui.screens.maintenance.CertificateDetailScreen
 import com.arsys.netatmo.ui.screens.devices.DevicePairingScreen
-import com.arsys.netatmo.ui.screens.devices.PurgeSystemScreen
-import com.arsys.netatmo.ui.screens.devices.ValveCalibrationScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home : Screen("home", "Inicio", Icons.Default.Home)
@@ -68,8 +66,6 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object MaintenanceHistory : Screen("maintenance_history", "Mantenimiento", Icons.Default.Assignment)
     object CertificateDetail : Screen("certificate/{recordId}", "Certificado", Icons.Default.Description)
     object DevicePairing : Screen("device_pairing", "Emparejar", Icons.Default.AddCircle)
-    object PurgeSystem : Screen("purge_system", "Purga", Icons.Default.WaterDrop)
-    object ValveCalibration : Screen("valve_calibration", "Calibración", Icons.Default.Tune)
 }
 
 val bottomNavItems = listOf(
@@ -254,8 +250,7 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                     onNavigateToAirQuality = { navController.navigate("air_quality") },
                     onNavigateToBoilerStatus = { navController.navigate("boiler_status") },
                     onNavigateToMaintenance = { navController.navigate("maintenance_history") },
-                    onNavigateToDevicePairing = { navController.navigate("device_pairing") },
-                    onNavigateToPurge = { navController.navigate("purge_system") }
+                    onNavigateToDevicePairing = { navController.navigate("device_pairing") }
                 )
             }
             composable(Screen.NetatmoCredentials.route) {
@@ -296,15 +291,6 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             }
             composable(Screen.DevicePairing.route) {
                 DevicePairingScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Screen.PurgeSystem.route) {
-                PurgeSystemScreen(
-                    onBack = { navController.popBackStack() },
-                    onNavigateToCalibration = { navController.navigate(Screen.ValveCalibration.route) }
-                )
-            }
-            composable(Screen.ValveCalibration.route) {
-                ValveCalibrationScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = "advanced_automation/{automationId}",

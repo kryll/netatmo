@@ -1,5 +1,9 @@
 package com.arsys.netatmo.ui.screens.statistics
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -26,6 +30,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
 import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
@@ -44,7 +50,14 @@ import com.arsys.netatmo.ui.theme.SurfaceContainer
 import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
 import com.arsys.netatmo.ui.theme.SurfaceContainerHighest
 import com.arsys.netatmo.ui.theme.SurfaceContainerLow
+import java.io.File
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Design token aliases
 private val BgColor = Color(0xFF101419)
@@ -73,6 +86,8 @@ fun StatisticsScreen(
     )
     var selectedPeriod by remember { mutableStateOf(7) }
     var showPriceDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(selectedPeriod, uiState.selectedRoomId) {
         viewModel.loadStatistics(selectedPeriod)
@@ -356,7 +371,23 @@ fun StatisticsScreen(
 
             item {
                 Button(
-                    onClick = { /* TODO: export */ },
+                    onClick = {
+                        scope.launch {
+                            val uri = exportTemperatureCsv(context, uiState.temperatureData)
+                            if (uri != null) {
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/csv"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    putExtra(Intent.EXTRA_SUBJECT, "Netatmo - temperaturas")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Exportar temperaturas"))
+                            } else {
+                                Toast.makeText(context, "No se pudo exportar el CSV", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    enabled = uiState.temperatureData.isNotEmpty(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -375,7 +406,7 @@ fun StatisticsScreen(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Exportar informe de consumo (CSV/PDF)",
+                        "Exportar temperaturas (CSV)",
                         style = MaterialTheme.typography.labelMedium,
                         color = TextSecondary
                     )
@@ -384,6 +415,24 @@ fun StatisticsScreen(
         }
     }
 }
+
+private suspend fun exportTemperatureCsv(context: Context, data: List<TemperatureDataPoint>): Uri? =
+    withContext(Dispatchers.IO) {
+        try {
+            val dir = File(context.cacheDir, "exports").also { it.mkdirs() }
+            val file = File(dir, "netatmo_temperaturas_${System.currentTimeMillis()}.csv")
+            val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+            file.bufferedWriter().use { w ->
+                w.write("timestamp_ms,fecha,temperatura_c,consigna_c,calefaccion_activa\n")
+                data.forEach { p ->
+                    w.write("${p.timestamp},${fmt.format(Date(p.timestamp))},${p.temperature},${p.setpoint ?: ""},${p.heatingActive}\n")
+                }
+            }
+            FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+        } catch (e: Exception) {
+            null
+        }
+    }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-header status row with animated pulse dot
