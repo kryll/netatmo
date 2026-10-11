@@ -38,6 +38,8 @@ data class GeofenceDetailUiState(
     val tempOnExit: Double = 17.0,
     val rooms: List<Room> = emptyList(),
     val selectedRoomId: String = "",
+    val isAutomationActive: Boolean = true,
+    val notificationsEnabled: Boolean = true,
     val isSaving: Boolean = false,
     val isLoadingLocation: Boolean = false,
     val saved: Boolean = false,
@@ -58,6 +60,7 @@ class GeofenceDetailViewModel @Inject constructor(
 
     private var currentAutomationId: Long = -1L
     private var existingGeofenceId: String? = null
+    private var existingAutomation: AutomationEntity? = null
 
     fun load(automationId: Long) {
         viewModelScope.launch {
@@ -71,6 +74,7 @@ class GeofenceDetailViewModel @Inject constructor(
             val automation = automationRepository.getAutomationById(automationId) ?: return@launch
             val geofence = automationRepository.getGeofenceByAutomation(automationId)
             existingGeofenceId = geofence?.id
+            existingAutomation = automation
             _uiState.update { state ->
                 state.copy(
                     name = automation.name,
@@ -82,7 +86,9 @@ class GeofenceDetailViewModel @Inject constructor(
                     triggerOnExit = geofence?.triggerOnExit ?: true,
                     tempOnEnter = geofence?.temperatureOnEnter ?: 21.0,
                     tempOnExit = geofence?.temperatureOnExit ?: 17.0,
-                    selectedRoomId = automation.roomId
+                    selectedRoomId = automation.roomId,
+                    isAutomationActive = automation.enabled,
+                    notificationsEnabled = geofence?.notificationsEnabled ?: true
                 )
             }
         }
@@ -98,6 +104,8 @@ class GeofenceDetailViewModel @Inject constructor(
     fun updateTempOnEnter(temp: Double) = _uiState.update { it.copy(tempOnEnter = temp) }
     fun updateTempOnExit(temp: Double) = _uiState.update { it.copy(tempOnExit = temp) }
     fun updateRoomId(id: String) = _uiState.update { it.copy(selectedRoomId = id) }
+    fun updateAutomationActive(value: Boolean) = _uiState.update { it.copy(isAutomationActive = value) }
+    fun updateNotificationsEnabled(value: Boolean) = _uiState.update { it.copy(notificationsEnabled = value) }
 
     @SuppressLint("MissingPermission")
     fun useCurrentLocation() {
@@ -151,7 +159,7 @@ class GeofenceDetailViewModel @Inject constructor(
             _uiState.update { it.copy(isSaving = true, error = null) }
             try {
                 val homeId = authRepository.selectedHomeId.first() ?: ""
-                val automation = AutomationEntity(
+                val automation = (existingAutomation ?: AutomationEntity(
                     id = if (currentAutomationId == -1L) 0L else currentAutomationId,
                     name = state.name,
                     type = "GEOFENCE",
@@ -160,6 +168,12 @@ class GeofenceDetailViewModel @Inject constructor(
                     targetTemperature = state.tempOnEnter,
                     mode = "manual",
                     triggerData = "{}"
+                )).copy(
+                    name = state.name,
+                    enabled = state.isAutomationActive,
+                    homeId = homeId,
+                    roomId = state.selectedRoomId,
+                    targetTemperature = state.tempOnEnter
                 )
                 val automationId = automationRepository.saveAutomation(automation)
 
@@ -174,11 +188,30 @@ class GeofenceDetailViewModel @Inject constructor(
                     triggerOnEnter = state.triggerOnEnter,
                     triggerOnExit = state.triggerOnExit,
                     temperatureOnEnter = if (state.triggerOnEnter) state.tempOnEnter else null,
-                    temperatureOnExit = if (state.triggerOnExit) state.tempOnExit else null
+                    temperatureOnExit = if (state.triggerOnExit) state.tempOnExit else null,
+                    notificationsEnabled = state.notificationsEnabled
                 )
                 automationRepository.saveGeofence(geofence)
-                geofenceManager.registerGeofence(geofence)
+                if (state.isAutomationActive) {
+                    geofenceManager.registerGeofence(geofence)
+                } else {
+                    geofenceManager.removeGeofence(geofence.id)
+                }
 
+                _uiState.update { it.copy(isSaving = false, saved = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSaving = false, error = e.message) }
+            }
+        }
+    }
+
+    fun delete() {
+        val automation = existingAutomation ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true, error = null) }
+            try {
+                existingGeofenceId?.let { geofenceManager.removeGeofence(it) }
+                automationRepository.deleteAutomation(automation)
                 _uiState.update { it.copy(isSaving = false, saved = true) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSaving = false, error = e.message) }

@@ -27,7 +27,7 @@ import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
         AdvancedAutomationEntity::class,
         MaintenanceRecordEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -45,6 +45,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun maintenanceDao(): MaintenanceDao
 
     companion object {
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE geofences ADD COLUMN notificationsEnabled INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Add combustion analysis fields to maintenance_records

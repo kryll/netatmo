@@ -122,9 +122,9 @@ class GeofenceTransitionService : Service() {
                         errorMessage = errorMsg
                     ))
                     if (success) {
-                        sendAutomationNotification(automation, transitionType = "Entrada", success = true)
+                        sendAutomationNotification(automation, transitionType = "Entrada", success = true, geofenceNotifications = geofenceEntity.notificationsEnabled)
                     } else {
-                        sendAutomationNotification(automation, transitionType = "Entrada", success = false)
+                        sendAutomationNotification(automation, transitionType = "Entrada", success = false, geofenceNotifications = geofenceEntity.notificationsEnabled)
                     }
                 }
             }
@@ -144,9 +144,9 @@ class GeofenceTransitionService : Service() {
                         errorMessage = errorMsg
                     ))
                     if (success) {
-                        sendAutomationNotification(automation, transitionType = "Salida", success = true)
+                        sendAutomationNotification(automation, transitionType = "Salida", success = true, geofenceNotifications = geofenceEntity.notificationsEnabled)
                     } else {
-                        sendAutomationNotification(automation, transitionType = "Salida", success = false)
+                        sendAutomationNotification(automation, transitionType = "Salida", success = false, geofenceNotifications = geofenceEntity.notificationsEnabled)
                     }
                 }
             }
@@ -156,12 +156,15 @@ class GeofenceTransitionService : Service() {
     private suspend fun sendAutomationNotification(
         automation: AutomationEntity,
         transitionType: String,
-        success: Boolean
+        success: Boolean,
+        geofenceNotifications: Boolean
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
         ) return
+
+        if (!geofenceNotifications) return
 
         val prefs = dataStore.data.first()
         val notificationsEnabled = prefs[NOTIFICATIONS_ENABLED_KEY] ?: true
