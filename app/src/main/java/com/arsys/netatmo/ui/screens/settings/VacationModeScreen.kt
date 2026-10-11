@@ -6,6 +6,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -183,6 +184,10 @@ fun VacationModeScreen(
                 daysCount = daysCount,
                 onStartClick = { showStartPicker = true },
                 onEndClick   = { showEndPicker = true },
+                onRangeChange = { newStartMs, newEndMs ->
+                    viewModel.updateStart(newStartMs)
+                    viewModel.updateEnd(newEndMs)
+                },
                 onDurationSelected = { days ->
                     val now = System.currentTimeMillis()
                     viewModel.updateStart(now)
@@ -443,6 +448,7 @@ private fun DatePeriodCard(
     daysCount: Int,
     onStartClick: () -> Unit,
     onEndClick: () -> Unit,
+    onRangeChange: (startMs: Long, endMs: Long) -> Unit,
     onDurationSelected: (Int) -> Unit
 ) {
     data class DurationChip(val label: String, val days: Int)
@@ -577,7 +583,7 @@ private fun DatePeriodCard(
             }
 
             // Calendar strip
-            CalendarStrip(startMs = startMs, endMs = endMs)
+            CalendarStrip(startMs = startMs, endMs = endMs, onRangeChange = onRangeChange)
 
             // Quick duration chips
             LazyRow(
@@ -609,7 +615,7 @@ private fun DatePeriodCard(
 }
 
 @Composable
-private fun CalendarStrip(startMs: Long, endMs: Long) {
+private fun CalendarStrip(startMs: Long, endMs: Long, onRangeChange: (Long, Long) -> Unit) {
     val locale = Locale("es", "ES")
     val today = LocalDate.now(SPAIN_ZONE)
     val start = if (startMs > 0L) Instant.ofEpochMilli(startMs).atZone(SPAIN_ZONE).toLocalDate() else null
@@ -631,6 +637,18 @@ private fun CalendarStrip(startMs: Long, endMs: Long) {
         scrollState.scrollTo(((index - 1).coerceAtLeast(0)) * cellPx)
     }
 
+    fun dayToMs(day: LocalDate): Long = day.atStartOfDay(SPAIN_ZONE).toInstant().toEpochMilli()
+
+    // Tapping before the start moves the start; after it moves the end; on the start restarts the range.
+    fun onDayTap(day: LocalDate) {
+        if (day.isBefore(today)) return
+        when {
+            start == null || day.isBefore(start) -> onRangeChange(dayToMs(day), if (start == null) 0L else endMs)
+            day == start -> onRangeChange(dayToMs(day), 0L)
+            else -> onRangeChange(startMs, dayToMs(day))
+        }
+    }
+
     val monthLabel = days.first().month.getDisplayName(TextStyle.FULL, locale) + " " + days.first().year
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
@@ -645,6 +663,7 @@ private fun CalendarStrip(startMs: Long, endMs: Long) {
                 val isEndpoint = day == start || day == end
                 val inRange = start != null && end != null && !day.isBefore(start) && !day.isAfter(end)
                 val isToday = day == today
+                val isPast = day.isBefore(today)
                 val bgColor = when {
                     isEndpoint -> PrimaryColor
                     inRange    -> PrimaryColor.copy(alpha = 0.2f)
@@ -653,10 +672,13 @@ private fun CalendarStrip(startMs: Long, endMs: Long) {
                 val textColor = when {
                     isEndpoint -> OnPrimaryColor
                     inRange    -> PrimaryColor
+                    isPast     -> TextSecondaryColor.copy(alpha = 0.4f)
                     else       -> TextSecondaryColor
                 }
                 Column(
-                    modifier            = Modifier.width(cellWidth),
+                    modifier            = Modifier
+                        .width(cellWidth)
+                        .clickable(enabled = !isPast) { onDayTap(day) },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
