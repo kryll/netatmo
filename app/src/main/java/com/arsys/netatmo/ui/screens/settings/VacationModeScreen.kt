@@ -6,6 +6,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -23,14 +24,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.arsys.netatmo.ui.theme.*
 import java.text.SimpleDateFormat
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.*
 
@@ -606,36 +610,41 @@ private fun DatePeriodCard(
 
 @Composable
 private fun CalendarStrip(startMs: Long, endMs: Long) {
-    val days = (14..22).toList()
-    val dayLetters = listOf("L", "M", "X", "J", "V", "S", "D", "L", "M")
+    val locale = Locale("es", "ES")
+    val today = LocalDate.now(SPAIN_ZONE)
+    val start = if (startMs > 0L) Instant.ofEpochMilli(startMs).atZone(SPAIN_ZONE).toLocalDate() else null
+    val end = if (endMs > 0L) Instant.ofEpochMilli(endMs).atZone(SPAIN_ZONE).toLocalDate() else null
 
-    fun startDay(): Int {
-        if (startMs == 0L) return -1
-        val cal = Calendar.getInstance(TimeZone.getTimeZone(SPAIN_ZONE)); cal.timeInMillis = startMs
-        return cal.get(Calendar.DAY_OF_MONTH)
+    val first = if (start != null && start.isBefore(today)) start else today
+    val minLast = first.plusDays(13)
+    val wantedLast = end?.plusDays(2) ?: minLast
+    val last = minOf(maxOf(wantedLast, minLast), first.plusDays(180))
+    val days = generateSequence(first) { it.plusDays(1) }
+        .takeWhile { !it.isAfter(last) }
+        .toList()
+
+    val cellWidth = 36.dp
+    val scrollState = rememberScrollState()
+    val cellPx = with(LocalDensity.current) { cellWidth.roundToPx() }
+    LaunchedEffect(start) {
+        val index = if (start != null) ChronoUnit.DAYS.between(first, start).toInt() else 0
+        scrollState.scrollTo(((index - 1).coerceAtLeast(0)) * cellPx)
     }
-    fun endDay(): Int {
-        if (endMs == 0L) return -1
-        val cal = Calendar.getInstance(TimeZone.getTimeZone(SPAIN_ZONE)); cal.timeInMillis = endMs
-        return cal.get(Calendar.DAY_OF_MONTH)
-    }
 
-    val sDay = startDay()
-    val eDay = endDay()
-
+    val monthLabel = days.first().month.getDisplayName(TextStyle.FULL, locale) + " " + days.first().year
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            text  = "Marzo 2025",
+            text  = monthLabel.replaceFirstChar { it.uppercase() },
             style = MaterialTheme.typography.labelSmall,
             color = TextSecondaryColor
         )
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+            modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState)
         ) {
             days.forEachIndexed { idx, day ->
-                val isEndpoint = sDay > 0 && eDay > 0 && (day == sDay || day == eDay)
-                val inRange    = sDay > 0 && eDay > 0 && day in sDay..eDay
+                val isEndpoint = day == start || day == end
+                val inRange = start != null && end != null && !day.isBefore(start) && !day.isAfter(end)
+                val isToday = day == today
                 val bgColor = when {
                     isEndpoint -> PrimaryColor
                     inRange    -> PrimaryColor.copy(alpha = 0.2f)
@@ -647,25 +656,33 @@ private fun CalendarStrip(startMs: Long, endMs: Long) {
                     else       -> TextSecondaryColor
                 }
                 Column(
-                    modifier              = Modifier.weight(1f),
-                    horizontalAlignment   = Alignment.CenterHorizontally,
-                    verticalArrangement   = Arrangement.spacedBy(2.dp)
+                    modifier            = Modifier.width(cellWidth),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text     = if (idx < dayLetters.size) dayLetters[idx] else "L",
+                        text     = if (idx == 0 || day.dayOfMonth == 1)
+                            day.month.getDisplayName(TextStyle.SHORT, locale).trimEnd('.') else " ",
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = TextSecondaryColor,
+                        fontSize = 9.sp
+                    )
+                    Text(
+                        text     = day.dayOfWeek.getDisplayName(TextStyle.NARROW, locale).uppercase(),
                         style    = MaterialTheme.typography.labelSmall,
                         color    = TextSecondaryColor,
                         fontSize = 9.sp
                     )
                     Box(
-                        modifier          = Modifier
+                        modifier = Modifier
                             .size(26.dp)
                             .clip(CircleShape)
-                            .background(bgColor),
-                        contentAlignment  = Alignment.Center
+                            .background(bgColor)
+                            .then(if (isToday) Modifier.border(1.dp, PrimaryColor, CircleShape) else Modifier),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text       = day.toString(),
+                            text       = day.dayOfMonth.toString(),
                             style      = MaterialTheme.typography.labelSmall,
                             color      = textColor,
                             fontWeight = if (isEndpoint) FontWeight.Bold else FontWeight.Normal,
