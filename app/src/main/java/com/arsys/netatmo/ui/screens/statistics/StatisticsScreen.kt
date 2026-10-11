@@ -31,8 +31,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -75,11 +73,6 @@ fun StatisticsScreen(
     )
     var selectedPeriod by remember { mutableStateOf(7) }
     var showPriceDialog by remember { mutableStateOf(false) }
-    var headerHeightPx by remember { mutableIntStateOf(0) }
-    val density = LocalDensity.current
-    val headerHeightDp by remember(headerHeightPx) {
-        derivedStateOf { with(density) { headerHeightPx.toDp() } }
-    }
 
     LaunchedEffect(selectedPeriod, uiState.selectedRoomId) {
         viewModel.loadStatistics(selectedPeriod)
@@ -97,22 +90,116 @@ fun StatisticsScreen(
         )
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgColor)
     ) {
+        // ── Fixed header (non-scrollable) ─────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(BgColor.copy(alpha = 0.95f))
+                .statusBarsPadding()
+        ) {
+            // Main header row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Primary.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.DeviceThermostat,
+                        contentDescription = null,
+                        tint = Primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Netatmo Smart",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Estadísticas",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = TextPrimary
+                    )
+                }
+                IconButton(onClick = { viewModel.toggleEditMode() }) {
+                    Icon(
+                        imageVector = if (uiState.isEditMode) Icons.Default.Check else Icons.Default.Edit,
+                        contentDescription = if (uiState.isEditMode) "Terminar edición" else "Editar",
+                        tint = if (uiState.isEditMode) Primary else TextSecondary
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50.dp))
+                        .background(SurfaceContainerHigh)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "JA",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            StatusSubHeader()
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(periods) { (label, days) ->
+                    val selected = selectedPeriod == days
+                    FilterChip(
+                        selected = selected,
+                        onClick = { selectedPeriod = days },
+                        label = {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        shape = RoundedCornerShape(50.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = SurfaceContainer,
+                            labelColor = TextSecondary,
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
+                }
+            }
+
+            HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
+        }
+
+        // ── Scrollable content ────────────────────────────────────────────────
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                top = headerHeightDp,
-                start = 16.dp,
-                end = 16.dp,
-                bottom = 24.dp
-            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Room chips
             if (uiState.availableRooms.size > 1) {
                 item {
                     LazyRow(
@@ -147,7 +234,6 @@ fun StatisticsScreen(
                 }
             }
 
-            // Draggable cards
             items(uiState.cardOrder) { cardKey ->
                 DraggableCardWrapper(
                     cardKey = cardKey,
@@ -156,9 +242,6 @@ fun StatisticsScreen(
                     onMove = { from, to -> viewModel.moveCard(from, to) }
                 ) {
                     when (cardKey) {
-                        // When period > 1 day, show the period chart here (first visible chart)
-                        // so it always matches the selected period chip.
-                        // When period == 1 (24h), show the detailed 24h view from local DB.
                         "24h" -> if (selectedPeriod == 1) {
                             TemperatureHistory24hCard(
                                 points = uiState.historyPoints,
@@ -198,7 +281,6 @@ fun StatisticsScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                        // tempChart only shown for 24h period (period > 1 already shown in "24h" slot)
                         "tempChart" -> if (selectedPeriod == 1 && uiState.temperatureData.isNotEmpty()) {
                             TemperatureChartCard(
                                 data = uiState.temperatureData,
@@ -233,14 +315,12 @@ fun StatisticsScreen(
                 }
             }
 
-            // OpenTherm extra metrics banner
             if (uiState.thermostatType == ThermostatType.OPENTHERM) {
                 item {
                     OpenThermMetricsCard(modifier = Modifier.fillMaxWidth())
                 }
             }
 
-            // Latest boiler revision card
             item {
                 BoilerRevisionSummaryCard(
                     revision = uiState.latestRevision,
@@ -248,7 +328,6 @@ fun StatisticsScreen(
                 )
             }
 
-            // Export button
             item {
                 Button(
                     onClick = { /* TODO: export */ },
@@ -276,109 +355,6 @@ fun StatisticsScreen(
                     )
                 }
             }
-        }
-
-        // ── Fixed frosted-glass header ─────────────────────────────────────
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(BgColor.copy(alpha = 0.95f))
-                .statusBarsPadding()
-                .onSizeChanged { headerHeightPx = it.height }
-        ) {
-            // Main header row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Logo circle + title
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Primary.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.DeviceThermostat,
-                        contentDescription = null,
-                        tint = Primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Netatmo Smart",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Estadísticas",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = TextPrimary
-                    )
-                }
-                // Edit icon
-                IconButton(onClick = { viewModel.toggleEditMode() }) {
-                    Icon(
-                        imageVector = if (uiState.isEditMode) Icons.Default.Check else Icons.Default.Edit,
-                        contentDescription = if (uiState.isEditMode) "Terminar edición" else "Editar",
-                        tint = if (uiState.isEditMode) Primary else TextSecondary
-                    )
-                }
-                // Avatar pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50.dp))
-                        .background(SurfaceContainerHigh)
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "JA",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // Sub-header status row
-            StatusSubHeader()
-
-            // Period filter chips — always visible in header
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(periods) { (label, days) ->
-                    val selected = selectedPeriod == days
-                    FilterChip(
-                        selected = selected,
-                        onClick = { selectedPeriod = days },
-                        label = {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        shape = RoundedCornerShape(50.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = SurfaceContainer,
-                            labelColor = TextSecondary,
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    )
-                }
-            }
-
-            HorizontalDivider(color = OutlineVariant, thickness = 1.dp)
         }
     }
 }
@@ -891,7 +867,7 @@ fun HeatingReportCard(
                     unit = "h",
                     icon = Icons.Default.Timer,
                     iconColor = Secondary,
-                    badgeText = "+12% vs ayer",
+                    badgeText = if (heatingHoursToday > 0f) "%.0f%% del día".format((heatingHoursToday / 24f * 100f).coerceIn(0f, 100f)) else null,
                     badgeColor = Secondary
                 )
                 HeatingMetricTile(
@@ -1001,7 +977,7 @@ private fun HeatingMetricTile(
     unit: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     iconColor: Color,
-    badgeText: String,
+    badgeText: String?,
     badgeColor: Color
 ) {
     Column(
@@ -1033,19 +1009,20 @@ private fun HeatingMetricTile(
                 modifier = Modifier.padding(bottom = 3.dp)
             )
         }
-        // Trend badge
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(badgeColor.copy(alpha = 0.12f))
-                .padding(horizontal = 5.dp, vertical = 2.dp)
-        ) {
-            Text(
-                badgeText,
-                style = MaterialTheme.typography.labelSmall,
-                color = badgeColor,
-                fontSize = 9.sp
-            )
+        if (badgeText != null) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(badgeColor.copy(alpha = 0.12f))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    badgeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = badgeColor,
+                    fontSize = 9.sp
+                )
+            }
         }
     }
 }
