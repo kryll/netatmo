@@ -53,8 +53,7 @@ fun GeofenceDetailScreen(
 
     // Local UI states
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = arrive, 1 = leave
-    var isAutomationActive by remember { mutableStateOf(true) }
-    var notificationsEnabled by remember { mutableStateOf(true) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val backgroundLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -114,6 +113,27 @@ fun GeofenceDetailScreen(
         ),
         label = "pulseScale"
     )
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("¿Eliminar esta geovalla?") },
+            text = { Text("Se eliminará la automatización y dejará de ejecutarse. Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.delete()
+                }) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -660,24 +680,6 @@ fun GeofenceDetailScreen(
                             )
                         }
                     }
-                    // Quick-apply chip
-                    if (uiState.rooms.isNotEmpty()) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { /* apply to all zones */ },
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = "Aplicar a toda la vivienda (${uiState.rooms.size} zonas)",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                            )
-                        }
-                    }
                     DropdownMenu(
                         expanded = roomDropdownExpanded,
                         onDismissRequest = { roomDropdownExpanded = false }
@@ -898,8 +900,8 @@ fun GeofenceDetailScreen(
                             )
                         }
                         Switch(
-                            checked = isAutomationActive,
-                            onCheckedChange = { isAutomationActive = it },
+                            checked = uiState.isAutomationActive,
+                            onCheckedChange = { viewModel.updateAutomationActive(it) },
                             colors = SwitchDefaults.colors(
                                 checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
                                 checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
@@ -949,8 +951,8 @@ fun GeofenceDetailScreen(
                             )
                         }
                         Switch(
-                            checked = notificationsEnabled,
-                            onCheckedChange = { notificationsEnabled = it },
+                            checked = uiState.notificationsEnabled,
+                            onCheckedChange = { viewModel.updateNotificationsEnabled(it) },
                             colors = SwitchDefaults.colors(
                                 checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
                                 checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
@@ -981,7 +983,7 @@ fun GeofenceDetailScreen(
             // --- DELETE BUTTON (existing automations only) ---
             if (automationId != -1L) {
                 Button(
-                    onClick = { /* TODO: show delete confirmation dialog */ },
+                    onClick = { showDeleteDialog = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
