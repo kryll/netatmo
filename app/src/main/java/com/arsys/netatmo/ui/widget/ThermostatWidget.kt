@@ -25,6 +25,7 @@ import androidx.glance.unit.ColorProvider
 import com.arsys.netatmo.MainActivity
 import com.arsys.netatmo.data.local.AppDatabase
 import com.arsys.netatmo.data.repository.dataStore
+import com.arsys.netatmo.data.repository.AuthRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -38,18 +39,16 @@ class ThermostatWidget : GlanceAppWidget() {
     @InstallIn(SingletonComponent::class)
     interface ThermostatWidgetEntryPoint {
         fun appDatabase(): AppDatabase
+        fun authRepository(): AuthRepository
     }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // Read selected home ID from DataStore
-        val prefs = context.dataStore.data.first()
-        val selectedHomeId = prefs[stringPreferencesKey("selected_home_id")]
-
         // Access AppDatabase via Hilt EntryPoint (widgets cannot use @Inject)
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             ThermostatWidgetEntryPoint::class.java
         )
+        val selectedHomeId = entryPoint.authRepository().selectedHomeId.first()
         val home = selectedHomeId?.let { entryPoint.appDatabase().homeCacheDao().getHome(it) }
 
         // Parse rooms from roomsJson

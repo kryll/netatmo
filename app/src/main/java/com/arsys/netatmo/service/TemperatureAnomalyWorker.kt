@@ -8,8 +8,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.hilt.work.HiltWorker
+import com.arsys.netatmo.data.repository.AuthRepository
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.arsys.netatmo.NetatmoApp
@@ -25,7 +25,8 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
     @Assisted private val ctx: Context,
     @Assisted params: WorkerParameters,
     private val homeCacheDao: HomeCacheDao,
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val authRepository: AuthRepository
 ) : CoroutineWorker(ctx, params) {
 
     companion object {
@@ -36,7 +37,6 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
         private val VACATION_END_MS_KEY = longPreferencesKey("vacation_end_ms")
         private val VACATION_FROZEN_ALERTS_KEY = booleanPreferencesKey("vacation_frozen_alerts")
         private const val FROST_ALERT_THRESHOLD = 2.0
-        private val SELECTED_HOME_ID_KEY = stringPreferencesKey("selected_home_id")
 
         fun schedule(context: Context) {
             val request = androidx.work.PeriodicWorkRequestBuilder<TemperatureAnomalyWorker>(
@@ -66,7 +66,7 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
             now in (prefs[VACATION_START_MS_KEY] ?: 0L)..(prefs[VACATION_END_MS_KEY] ?: 0L)
 
         val threshold = (prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f).toDouble()
-        val homeId = prefs[SELECTED_HOME_ID_KEY] ?: return Result.success()
+        val homeId = authRepository.selectedHomeId.first() ?: return Result.success()
 
         val homeCache = homeCacheDao.getHome(homeId) ?: return Result.success()
 
