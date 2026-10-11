@@ -1087,37 +1087,332 @@ private fun buildMapHtml(lat: Double, lng: Double, radiusMeters: Float): String 
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100vh;overflow:hidden;background:#101419}
-#map{width:100%;height:100vh}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100vh;overflow:hidden;background:#1a2332;touch-action:none}
+#map{position:relative;width:100%;height:100%;overflow:hidden;cursor:grab}
+#map:active{cursor:grabbing}
+#tiles{position:absolute;top:0;left:0;width:100%;height:100%}
+.tile{position:absolute;width:256px;height:256px;image-rendering:auto}
+.tile img{width:256px;height:256px;display:block;border:none}
+#overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 </style>
 </head>
 <body>
-<div id="map"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<div id="map">
+  <div id="tiles"></div>
+  <svg id="overlay" xmlns="http://www.w3.org/2000/svg">
+    <circle id="cir" fill="#93CCFF" fill-opacity="0.15" stroke="#93CCFF" stroke-width="2"/>
+    <circle id="mkr" r="10" fill="#1A73E8" stroke="#fff" stroke-width="2" style="pointer-events:all;cursor:move"/>
+  </svg>
+</div>
 <script>
+(function(){
+var T=256;
 var lat=$lat,lng=$lng,radius=$radiusMeters;
-var map=L.map('map',{zoomControl:false,attributionControl:false}).setView([lat,lng],15);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-var circle=L.circle([lat,lng],{radius:radius,color:'#93CCFF',fillColor:'#93CCFF',fillOpacity:0.15,weight:2}).addTo(map);
-var marker=L.marker([lat,lng],{draggable:true}).addTo(map);
-marker.on('dragend',function(){
-  var p=marker.getLatLng();
-  circle.setLatLng(p);
-  Android.onLocationChanged(p.lat.toString(),p.lng.toString());
+var zoom=15;
+var cx=0,cy=0; // canvas offset in world pixels
+
+function toWorld(la,lo,z){
+  var n=1<<z;
+  var x=(lo+180)/360*n*T;
+  var s=Math.sin(la*Math.PI/180);
+  var y=(0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n*T;
+  return{x:x,y:y};
+}
+function fromWorld(wx,wy,z){
+  var n=1<<z;
+  var lo=wx/(n*T)*360-180;
+  var lat2=Math.atan(Math.sinh(Math.PI*(1-2*wy/(n*T))))*180/Math.PI;
+  return{lat:lat2,lng:lo};
+}
+function metersToPixels(m,la,z){
+  return m*Math.pow(2,z)*T/(40075016.686*Math.cos(la*Math.PI/180));
+}
+
+var mapDiv=document.getElementById('map');
+var tilesDiv=document.getElementById('tiles');
+var svg=document.getElementById('overlay');
+var cirEl=document.getElementById('cir');
+var mkrEl=document.getElementById('mkr');
+var W=mapDiv.offsetWidth||window.innerWidth;
+var H=mapDiv.offsetHeight||window.innerHeight;
+
+var mla=lat,mlo=lng; // marker lat/lng
+
+var tileCache={};
+
+function tileKey(z,tx,ty){return z+'/'+tx+'/'+ty;}
+
+function loadTiles(){
+  var wp=toWorld(mla,mlo,zoom);
+  // center of viewport in world pixels
+  // cx,cy are the top-left of the viewport in world pixels
+  var n=1<<zoom;
+  var maxPx=n*T;
+  var tx0=Math.floor(cx/T);
+  var ty0=Math.floor(cy/T);
+  var tx1=Math.ceil((cx+W)/T);
+  var ty1=Math.ceil((cy+H)/T);
+
+  // remove tiles outside range
+  var keys={};
+  for(var tx=tx0;tx<=tx1;tx++){
+    for(var ty=ty0;ty<=ty1;ty++){
+      var rtx=((tx%n)+n)%n;
+      var rty=((ty%n)+n)%n;
+      var k=tileKey(zoom,rtx,rty);
+      var dk=tileKey(zoom,tx,ty);
+      keys[dk]=true;
+      if(!tileCache[dk]){
+        (function(tx2,ty2,rtx2,rty2,dk2){
+          var d=document.createElement('div');
+          d.className='tile';
+          d.style.left=(tx2*T-cx)+'px';
+          d.style.top=(ty2*T-cy)+'px';
+          var img=new Image();
+          var sub=['a','b','c'][Math.abs(rtx2+rty2)%3];
+          img.src='https://'+sub+'.tile.openstreetmap.org/'+zoom+'/'+rtx2+'/'+rty2+'.png';
+          img.crossOrigin='anonymous';
+          img.onerror=function(){img.style.opacity='0';};
+          d.appendChild(img);
+          tilesDiv.appendChild(d);
+          tileCache[dk2]={el:d};
+        })(tx,ty,rtx,rty,dk);
+      } else {
+        tileCache[dk].el.style.left=(tx*T-cx)+'px';
+        tileCache[dk].el.style.top=(ty*T-cy)+'px';
+      }
+    }
+  }
+  // clean up old tiles
+  for(var k2 in tileCache){
+    if(!keys[k2]){
+      if(tileCache[k2].el.parentNode) tileCache[k2].el.parentNode.removeChild(tileCache[k2].el);
+      delete tileCache[k2];
+    }
+  }
+}
+
+function updateOverlay(){
+  var wp=toWorld(mla,mlo,zoom);
+  var sx=wp.x-cx;
+  var sy=wp.y-cy;
+  var rPx=metersToPixels(radius,mla,zoom);
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.setAttribute('width',W);
+  svg.setAttribute('height',H);
+  cirEl.setAttribute('cx',sx);
+  cirEl.setAttribute('cy',sy);
+  cirEl.setAttribute('r',rPx);
+  mkrEl.setAttribute('cx',sx);
+  mkrEl.setAttribute('cy',sy);
+}
+
+function centerOn(la,lo){
+  var wp=toWorld(la,lo,zoom);
+  cx=wp.x-W/2;
+  cy=wp.y-H/2;
+}
+
+function render(){
+  loadTiles();
+  updateOverlay();
+}
+
+// init
+centerOn(mla,mlo);
+render();
+
+// resize
+window.addEventListener('resize',function(){
+  W=mapDiv.offsetWidth||window.innerWidth;
+  H=mapDiv.offsetHeight||window.innerHeight;
+  render();
 });
-map.on('click',function(e){
-  marker.setLatLng(e.latlng);
-  circle.setLatLng(e.latlng);
-  Android.onLocationChanged(e.latlng.lat.toString(),e.latlng.lng.toString());
+
+// ---- Touch / Mouse handling ----
+var drag={active:false,startX:0,startY:0,startCx:0,startCy:0};
+var markerDrag={active:false};
+var pinch={active:false,dist:0,startZoom:0,midX:0,midY:0};
+
+function getMarkerScreenPos(){
+  var wp=toWorld(mla,mlo,zoom);
+  return{x:wp.x-cx,y:wp.y-cy};
+}
+function dist2D(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+
+// Mouse
+mapDiv.addEventListener('mousedown',function(e){
+  var mp=getMarkerScreenPos();
+  if(dist2D({x:e.clientX,y:e.clientY},mp)<16){
+    markerDrag.active=true;
+  } else {
+    drag.active=true;
+    drag.startX=e.clientX;drag.startY=e.clientY;
+    drag.startCx=cx;drag.startCy=cy;
+  }
+  e.preventDefault();
 });
-function zoomIn(){map.zoomIn();}
-function zoomOut(){map.zoomOut();}
-function updateRadius(r){if(typeof circle!=='undefined'&&circle!==null){circle.setRadius(r);}}
-window.addEventListener('load',function(){setTimeout(function(){if(typeof map!=='undefined'){map.invalidateSize();}},100);});
+window.addEventListener('mousemove',function(e){
+  if(markerDrag.active){
+    var ll=fromWorld(cx+e.clientX,cy+e.clientY,zoom);
+    mla=ll.lat;mlo=ll.lng;
+    render();
+  } else if(drag.active){
+    cx=drag.startCx-(e.clientX-drag.startX);
+    cy=drag.startCy-(e.clientY-drag.startY);
+    render();
+  }
+});
+window.addEventListener('mouseup',function(e){
+  if(markerDrag.active){
+    Android.onLocationChanged(mla.toString(),mlo.toString());
+  }
+  markerDrag.active=false;drag.active=false;
+});
+mapDiv.addEventListener('click',function(e){
+  if(Math.abs(e.clientX-drag.startX)<5&&Math.abs(e.clientY-drag.startY)<5&&!markerDrag.active){
+    var ll=fromWorld(cx+e.clientX,cy+e.clientY,zoom);
+    mla=ll.lat;mlo=ll.lng;
+    render();
+    Android.onLocationChanged(mla.toString(),mlo.toString());
+  }
+});
+
+// Touch
+var lastTapTime=0;
+mapDiv.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  if(e.touches.length===1){
+    var t=e.touches[0];
+    var mp=getMarkerScreenPos();
+    if(dist2D({x:t.clientX,y:t.clientY},mp)<22){
+      markerDrag.active=true;
+    } else {
+      drag.active=true;
+      drag.startX=t.clientX;drag.startY=t.clientY;
+      drag.startCx=cx;drag.startCy=cy;
+    }
+  } else if(e.touches.length===2){
+    drag.active=false;markerDrag.active=false;
+    pinch.active=true;
+    var dx=e.touches[0].clientX-e.touches[1].clientX;
+    var dy=e.touches[0].clientY-e.touches[1].clientY;
+    pinch.dist=Math.hypot(dx,dy);
+    pinch.startZoom=zoom;
+    pinch.midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+    pinch.midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+  }
+},{passive:false});
+
+mapDiv.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  if(e.touches.length===1&&!pinch.active){
+    var t=e.touches[0];
+    if(markerDrag.active){
+      var ll=fromWorld(cx+t.clientX,cy+t.clientY,zoom);
+      mla=ll.lat;mlo=ll.lng;
+      render();
+    } else if(drag.active){
+      cx=drag.startCx-(t.clientX-drag.startX);
+      cy=drag.startCy-(t.clientY-drag.startY);
+      render();
+    }
+  } else if(e.touches.length===2&&pinch.active){
+    var dx=e.touches[0].clientX-e.touches[1].clientX;
+    var dy=e.touches[0].clientY-e.touches[1].clientY;
+    var newDist=Math.hypot(dx,dy);
+    var ratio=newDist/pinch.dist;
+    var newZoom=Math.max(2,Math.min(19,Math.round(pinch.startZoom+Math.log2(ratio))));
+    if(newZoom!==zoom){
+      // keep midpoint fixed
+      var wMidX=cx+pinch.midX;
+      var wMidY=cy+pinch.midY;
+      var scale=Math.pow(2,newZoom-zoom);
+      zoom=newZoom;
+      tileCache={};
+      while(tilesDiv.firstChild) tilesDiv.removeChild(tilesDiv.firstChild);
+      cx=wMidX*scale-pinch.midX;
+      cy=wMidY*scale-pinch.midY;
+      render();
+    }
+  }
+},{passive:false});
+
+mapDiv.addEventListener('touchend',function(e){
+  e.preventDefault();
+  if(markerDrag.active){
+    Android.onLocationChanged(mla.toString(),mlo.toString());
+  } else if(drag.active&&e.changedTouches.length===1){
+    var t=e.changedTouches[0];
+    if(Math.abs(t.clientX-drag.startX)<8&&Math.abs(t.clientY-drag.startY)<8){
+      // tap
+      var now=Date.now();
+      if(now-lastTapTime<350){
+        // double tap = zoom in
+        zoom=Math.min(19,zoom+1);
+        tileCache={};
+        while(tilesDiv.firstChild) tilesDiv.removeChild(tilesDiv.firstChild);
+        cx=cx+t.clientX/2;cy=cy+t.clientY/2; // rough zoom-to-tap
+        centerOn(mla,mlo);
+        render();
+        lastTapTime=0;
+      } else {
+        lastTapTime=now;
+        var ll=fromWorld(cx+t.clientX,cy+t.clientY,zoom);
+        mla=ll.lat;mlo=ll.lng;
+        render();
+        Android.onLocationChanged(mla.toString(),mlo.toString());
+      }
+    }
+  }
+  markerDrag.active=false;drag.active=false;pinch.active=false;
+},{passive:false});
+
+// Wheel zoom (desktop testing)
+mapDiv.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var newZoom=Math.max(2,Math.min(19,zoom+(e.deltaY<0?1:-1)));
+  if(newZoom!==zoom){
+    var scale=Math.pow(2,newZoom-zoom);
+    cx=(cx+e.clientX)*scale-e.clientX;
+    cy=(cy+e.clientY)*scale-e.clientY;
+    zoom=newZoom;
+    tileCache={};
+    while(tilesDiv.firstChild) tilesDiv.removeChild(tilesDiv.firstChild);
+    render();
+  }
+},{passive:false});
+
+// Public API
+window.zoomIn=function(){
+  if(zoom>=19)return;
+  var scale=2;
+  cx=(cx+W/2)*scale-W/2;
+  cy=(cy+H/2)*scale-H/2;
+  zoom++;
+  tileCache={};
+  while(tilesDiv.firstChild) tilesDiv.removeChild(tilesDiv.firstChild);
+  render();
+};
+window.zoomOut=function(){
+  if(zoom<=2)return;
+  var scale=0.5;
+  cx=(cx+W/2)*scale-W/2;
+  cy=(cy+H/2)*scale-H/2;
+  zoom--;
+  tileCache={};
+  while(tilesDiv.firstChild) tilesDiv.removeChild(tilesDiv.firstChild);
+  render();
+};
+window.updateRadius=function(r){
+  radius=r;
+  updateOverlay();
+};
+
+})();
 </script>
 </body>
 </html>
