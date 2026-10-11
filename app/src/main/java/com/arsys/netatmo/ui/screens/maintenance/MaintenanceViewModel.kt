@@ -14,14 +14,13 @@ enum class MaintenanceFilter(val label: String) {
     ALL("Todos"),
     ANNUAL("Revisiones SAT"),
     PURGE_PRESSURE("Purgas y Presión"),
-    CERTIFICATE("Con Certificado")
+    CERTIFICATE("Con referencia")
 }
 
 data class MaintenanceUiState(
     val records: List<MaintenanceRecordEntity> = emptyList(),
     val isLoading: Boolean = true,
-    val activeFilter: MaintenanceFilter = MaintenanceFilter.ALL,
-    val sentIds: Set<Long> = emptySet()
+    val activeFilter: MaintenanceFilter = MaintenanceFilter.ALL
 ) {
     val filteredRecords: List<MaintenanceRecordEntity>
         get() = when (activeFilter) {
@@ -49,7 +48,6 @@ class MaintenanceViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MaintenanceUiState())
     val uiState: StateFlow<MaintenanceUiState> = _uiState.asStateFlow()
 
-    // Keep for CertificateDetailScreen
     private val _selectedRecord = MutableStateFlow<MaintenanceRecordEntity?>(null)
     val selectedRecord = _selectedRecord.asStateFlow()
 
@@ -142,12 +140,6 @@ class MaintenanceViewModel @Inject constructor(
     fun deleteRecord(record: MaintenanceRecordEntity) {
         viewModelScope.launch { dao.delete(record) }
     }
-
-    fun markAsSent(id: Long) {
-        _uiState.update { it.copy(sentIds = it.sentIds + id) }
-    }
-
-    fun isSent(id: Long): Boolean = _uiState.value.sentIds.contains(id)
 
     // Expose stateflow of records for backward compat
     val records: StateFlow<List<MaintenanceRecordEntity>> = _uiState
