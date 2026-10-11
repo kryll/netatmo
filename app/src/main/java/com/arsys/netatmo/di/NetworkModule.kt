@@ -12,9 +12,12 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
@@ -31,6 +34,18 @@ object NetworkModule {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(readTimeoutSec, TimeUnit.SECONDS)
         .build()
+
+    private val NETATMO_TOKEN_ERROR = Regex("\"code\"\\s*:\\s*(2|3)\\b")
+
+    // Netatmo reports an invalid (2) or expired (3) access token as HTTP 403 with an error code,
+    // not 401; other 403s (e.g. missing scope) must not trigger a token refresh.
+    private fun isTokenRejected(response: Response): Boolean = when (response.code) {
+        401 -> true
+        403 -> NETATMO_TOKEN_ERROR.containsMatchIn(
+            runCatching { response.peekBody(4096).string() }.getOrDefault("")
+        )
+        else -> false
+    }
 
     private fun buildRetrofit(baseUrl: String, client: OkHttpClient): Retrofit =
         Retrofit.Builder()
@@ -60,14 +75,23 @@ object NetworkModule {
         logging: HttpLoggingInterceptor,
         authRepository: AuthRepository
     ): OkHttpClient {
+        // Blocking here is fine: interceptors run on OkHttp worker threads, and the refresh
+        // goes through the separate "auth" client, so it can't deadlock on this dispatcher.
         val authInterceptor = Interceptor { chain ->
-            // Read the non-suspending cache — no blocking on OkHttp's IO thread pool.
-            // Token refresh (when near expiry) is driven proactively from ViewModel/coroutine scope.
-            val token = authRepository.cachedAccessToken
-            val request = chain.request().newBuilder()
-                .addHeader("Authorization", "Bearer $token")
-                .build()
-            chain.proceed(request)
+            fun Request.withBearer(token: String?): Request =
+                if (token == null) this else newBuilder().header("Authorization", "Bearer $token").build()
+
+            val token = runBlocking { authRepository.getValidAccessToken() }
+                ?: authRepository.cachedAccessToken
+            val response = chain.proceed(chain.request().withBearer(token))
+            if (token != null && isTokenRejected(response)) {
+                val newToken = runBlocking { authRepository.refreshAfterRejection(token) }
+                if (newToken != null && newToken != token) {
+                    response.close()
+                    return@Interceptor chain.proceed(chain.request().withBearer(newToken))
+                }
+            }
+            response
         }
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)

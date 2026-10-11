@@ -101,24 +101,27 @@ class AuthRepository @Inject constructor(
         emit(encryptedPrefs.getString(KEY_HOME_ID, null))
     }
 
-    /** Suspending; refreshes if needed and updates the cache. Call from a coroutine scope (e.g. ViewModel) before requests when possible. */
-    suspend fun getValidAccessToken(): String? {
-        val token = encryptedPrefs.getString(KEY_ACCESS_TOKEN, null) ?: return null
-        val expiresAt = encryptedPrefs.getLong(KEY_EXPIRES_AT, 0L)
-        val refreshToken = encryptedPrefs.getString(KEY_REFRESH_TOKEN, null) ?: return null
+    /** Returns the stored access token, refreshing it first if it is expired or about to expire. */
+    suspend fun getValidAccessToken(): String? = refreshIfNeeded(rejectedToken = null)
 
-        return if (System.currentTimeMillis() < expiresAt - 60_000) {
-            token
-        } else {
-            _refreshMutex.withLock {
-                // Re-check inside the lock — another coroutine may have refreshed already.
-                val latestExpiry = encryptedPrefs.getLong(KEY_EXPIRES_AT, 0L)
-                if (System.currentTimeMillis() < latestExpiry - 60_000) {
-                    encryptedPrefs.getString(KEY_ACCESS_TOKEN, null)
-                } else {
-                    refreshTokens(refreshToken)
-                }
-            }
+    /** Forces a refresh when the server rejected [rejectedToken], unless another caller already replaced it. */
+    suspend fun refreshAfterRejection(rejectedToken: String): String? = refreshIfNeeded(rejectedToken)
+
+    private fun isTokenExpiring(): Boolean =
+        System.currentTimeMillis() >= encryptedPrefs.getLong(KEY_EXPIRES_AT, 0L) - 60_000
+
+    private suspend fun refreshIfNeeded(rejectedToken: String?): String? {
+        fun currentToken() = encryptedPrefs.getString(KEY_ACCESS_TOKEN, null)
+        fun needsRefresh() = isTokenExpiring() || (rejectedToken != null && currentToken() == rejectedToken)
+
+        if (currentToken() == null) return null
+        if (!needsRefresh()) return currentToken()
+        return _refreshMutex.withLock {
+            // Re-check inside the lock — another caller may have refreshed already.
+            if (!needsRefresh()) return@withLock currentToken()
+            val refreshToken = encryptedPrefs.getString(KEY_REFRESH_TOKEN, null)
+                ?: return@withLock null
+            refreshTokens(refreshToken)
         }
     }
 
@@ -191,13 +194,25 @@ class AuthRepository @Inject constructor(
                 clientSecret = effectiveClientSecret(),
                 refreshToken = refreshToken
             )
+            if (BuildConfig.DEBUG) AuthDebugLogger.log("refreshTokens() → HTTP ${response.code()}")
             if (response.isSuccessful) {
                 response.body()?.let { token ->
                     saveTokens(token.accessToken, token.refreshToken, token.expiresIn)
                     token.accessToken
                 }
-            } else null
+            } else {
+                // 400/401/403 means the refresh token itself is no longer valid (revoked, rotated
+                // or bad client credentials): retrying can't help, so send the user back to login.
+                if (response.code() in setOf(400, 401, 403)) {
+                    if (BuildConfig.DEBUG) {
+                        AuthDebugLogger.log("  ❌ Refresh rechazado: ${response.errorBody()?.string()} → logout")
+                    }
+                    logout()
+                }
+                null
+            }
         } catch (e: Exception) {
+            if (BuildConfig.DEBUG) AuthDebugLogger.log("refreshTokens() → ❌ ${e.javaClass.simpleName}: ${e.message}")
             null
         }
     }
