@@ -1506,7 +1506,7 @@ fun TemperatureChartCard(
             )
             TemperatureChart(
                 data = data,
-                modifier = Modifier.fillMaxWidth().height(200.dp)
+                modifier = Modifier.fillMaxWidth().height(220.dp)
             )
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 LegendItem(color = Primary, label = "Temperatura")
@@ -1559,52 +1559,160 @@ fun TemperatureChart(
     data: List<TemperatureDataPoint>,
     modifier: Modifier = Modifier
 ) {
-    val gridColor = SurfaceContainerHigh
+    // Pre-compute X-axis tick labels from timestamps (outside Canvas, needs Compose context)
+    val xLabels: List<Pair<Float, String>> = remember(data) {
+        if (data.size < 2) return@remember emptyList()
+        val minTs = data.first().timestamp
+        val maxTs = data.last().timestamp
+        val spanMs = (maxTs - minTs).coerceAtLeast(1L)
+        val spanDays = spanMs / (24 * 60 * 60 * 1000L)
+        val cal = Calendar.getInstance()
+        val dayNames = listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb")
+        val monthAbbr = listOf("ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic")
+        val ticks = mutableListOf<Pair<Float, String>>()
+        when {
+            spanDays <= 8 -> {
+                cal.timeInMillis = minTs
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                while (cal.timeInMillis <= maxTs) {
+                    val fraction = (cal.timeInMillis - minTs).toFloat() / spanMs
+                    ticks.add(fraction.coerceIn(0f, 1f) to dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1])
+                    cal.add(Calendar.DAY_OF_MONTH, 1)
+                }
+            }
+            spanDays <= 60 -> {
+                cal.timeInMillis = minTs
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                while (cal.timeInMillis <= maxTs) {
+                    val fraction = (cal.timeInMillis - minTs).toFloat() / spanMs
+                    val label = "${cal.get(Calendar.DAY_OF_MONTH)}/${cal.get(Calendar.MONTH) + 1}"
+                    ticks.add(fraction.coerceIn(0f, 1f) to label)
+                    cal.add(Calendar.WEEK_OF_YEAR, 1)
+                }
+            }
+            else -> {
+                cal.timeInMillis = minTs
+                cal.set(Calendar.DAY_OF_MONTH, 1); cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                while (cal.timeInMillis <= maxTs) {
+                    val fraction = (cal.timeInMillis - minTs).toFloat() / spanMs
+                    ticks.add(fraction.coerceIn(0f, 1f) to monthAbbr[cal.get(Calendar.MONTH)])
+                    cal.add(Calendar.MONTH, 1)
+                }
+            }
+        }
+        ticks
+    }
+
+    val labelArgb = TextSecondary.copy(alpha = 0.75f).toArgb()
 
     Canvas(modifier = modifier) {
         if (data.size < 2) return@Canvas
 
-        val minTemp = data.minOf { it.temperature }.minus(1.0).toFloat()
-        val maxTemp = data.maxOf { it.temperature }.plus(1.0).toFloat()
-        val minTime = data.first().timestamp.toFloat()
-        val maxTime = data.last().timestamp.toFloat()
-        val timeRange = maxTime - minTime
-        val tempRange = maxTemp - minTemp
+        val leftPad = 38f
+        val bottomPad = 28f
+        val chartLeft = leftPad
+        val chartRight = size.width
+        val chartTop = 4f
+        val chartBottom = size.height - bottomPad
+        val chartWidth = chartRight - chartLeft
+        val chartHeight = chartBottom - chartTop
 
-        fun xOf(ts: Long) = if (timeRange == 0f) size.width / 2
-        else ((ts - minTime) / timeRange) * size.width
+        val minTs = data.first().timestamp
+        val maxTs = data.last().timestamp
+        val timeRange = (maxTs - minTs).toFloat().coerceAtLeast(1f)
 
-        fun yOf(temp: Double) =
-            size.height - ((temp.toFloat() - minTemp) / tempRange) * size.height
+        val rawMin = data.minOf { it.temperature }.toFloat()
+        val rawMax = data.maxOf { it.temperature }.toFloat()
+        val pad = ((rawMax - rawMin) * 0.1f).coerceAtLeast(1f)
+        val tempMin = rawMin - pad
+        val tempMax = rawMax + pad
+        val tempRange = (tempMax - tempMin).coerceAtLeast(0.1f)
 
-        repeat(5) { i ->
-            val y = size.height * i / 4f
-            drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+        fun xOf(ts: Long): Float = chartLeft + (ts - minTs).toFloat() / timeRange * chartWidth
+        fun yOf(temp: Double): Float = chartBottom - ((temp.toFloat() - tempMin) / tempRange) * chartHeight
+
+        // Nice Y ticks
+        val rawStep = (tempMax - tempMin) / 4f
+        val niceStep = when {
+            rawStep <= 0.5f -> 0.5f
+            rawStep <= 1f -> 1f
+            rawStep <= 2f -> 2f
+            rawStep <= 5f -> 5f
+            else -> 10f
+        }
+        val yTicks = mutableListOf<Float>()
+        var tickVal = ((tempMin / niceStep).toInt()) * niceStep
+        while (tickVal <= tempMax + niceStep * 0.1f) {
+            if (tickVal >= tempMin - niceStep * 0.1f) yTicks.add(tickVal)
+            tickVal += niceStep
+            if (yTicks.size > 8) break
         }
 
-        val path = Path()
-        data.forEachIndexed { idx, pt ->
-            val x = xOf(pt.timestamp)
-            val y = yOf(pt.temperature)
-            if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        // Grid lines
+        yTicks.forEach { t ->
+            drawLine(
+                color = OutlineVariant.copy(alpha = 0.4f),
+                start = Offset(chartLeft, yOf(t.toDouble())),
+                end = Offset(chartRight, yOf(t.toDouble())),
+                strokeWidth = 1f
+            )
         }
-        drawPath(path, Primary, style = Stroke(width = 3f, cap = StrokeCap.Round))
 
+        // Y-axis labels
+        val yPaint = android.graphics.Paint().apply {
+            color = labelArgb; textSize = 24f; isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.RIGHT
+        }
+        yTicks.forEach { t ->
+            drawContext.canvas.nativeCanvas.drawText(
+                "${t.toInt()}°", chartLeft - 4f, yOf(t.toDouble()) + 8f, yPaint
+            )
+        }
+
+        // Temperature spline + gradient fill
+        val pts = data.map { pt -> Offset(xOf(pt.timestamp), yOf(pt.temperature)) }
+        val splinePath = buildCatmullRomPath(pts)
+        val areaPath = Path()
+        areaPath.addPath(splinePath)
+        areaPath.lineTo(pts.last().x, chartBottom)
+        areaPath.lineTo(pts.first().x, chartBottom)
+        areaPath.close()
+        drawPath(
+            areaPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(Primary.copy(alpha = 0.3f), Primary.copy(alpha = 0f)),
+                startY = chartTop, endY = chartBottom
+            )
+        )
+        drawPath(splinePath, Primary, style = Stroke(width = 3f, cap = StrokeCap.Round))
+
+        // Setpoint dashed line
         val spPath = Path()
-        var started = false
+        var spStarted = false
         data.forEach { pt ->
             pt.setpoint?.let { sp ->
-                val x = xOf(pt.timestamp)
-                val y = yOf(sp)
-                if (!started) { spPath.moveTo(x, y); started = true }
-                else spPath.lineTo(x, y)
+                val x = xOf(pt.timestamp); val y = yOf(sp)
+                if (!spStarted) { spPath.moveTo(x, y); spStarted = true } else spPath.lineTo(x, y)
             }
         }
-        if (started) {
-            drawPath(
-                spPath, Secondary,
-                style = Stroke(width = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 5f)))
-            )
+        if (spStarted) {
+            drawPath(spPath, Secondary.copy(alpha = 0.85f),
+                style = Stroke(width = 1.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))))
+        }
+
+        // X-axis labels
+        val xPaint = android.graphics.Paint().apply {
+            color = labelArgb; textSize = 22f; isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        xLabels.forEach { (fraction, label) ->
+            val x = chartLeft + fraction * chartWidth
+            if (x in chartLeft..chartRight) {
+                drawContext.canvas.nativeCanvas.drawText(label, x, size.height - 6f, xPaint)
+            }
         }
     }
 }
