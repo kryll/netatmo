@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -158,7 +157,7 @@ fun HomeScreen(
                                         enter = fadeIn() + expandVertically(),
                                         exit = fadeOut() + shrinkVertically()
                                     ) {
-                                        BoilerStatusCard(isActive = isBoilerOn)
+                                        BoilerStatusCard(isActive = isBoilerOn, activeZones = activeRoomCount)
                                     }
 
                                     // Boost active banner
@@ -191,12 +190,6 @@ fun HomeScreen(
                                                 text = "Zonas Climatizadas",
                                                 style = MaterialTheme.typography.titleLarge,
                                                 color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = "Gestionar todas",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.clickable { }
                                             )
                                         }
                                     }
@@ -360,27 +353,11 @@ private fun StitchHeader(
                     }
                 }
 
-                // Actions: Tune + Refresh + Avatar
+                // Actions: Refresh + Avatar
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Tune/filter icon
-                    Surface(
-                        onClick = { },
-                        shape = CircleShape,
-                        color = SurfaceContainer,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                Icons.Default.Tune,
-                                contentDescription = "Filtros",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
                     // Refresh
                     Surface(
                         onClick = onRefresh,
@@ -658,7 +635,7 @@ private fun ExteriorTempTile(temp: Double, modifier: Modifier = Modifier) {
 // ─── Boiler Status Card ───────────────────────────────────────────────────────
 
 @Composable
-private fun BoilerStatusCard(isActive: Boolean) {
+private fun BoilerStatusCard(isActive: Boolean, activeZones: Int) {
     val pulseAnim = rememberInfiniteTransition(label = "boiler_pulse")
     val pulseScale by pulseAnim.animateFloat(
         initialValue = 0.85f, targetValue = 1.15f,
@@ -677,7 +654,7 @@ private fun BoilerStatusCard(isActive: Boolean) {
         color = if (isActive) WarmColor.copy(alpha = 0.07f) else SurfaceContainer
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // Header row: pulsing icon + title/subtitle + pressure chip
+            // Header row: pulsing icon + title/subtitle + active zones chip
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -716,7 +693,7 @@ private fun BoilerStatusCard(isActive: Boolean) {
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                "Caldera Modulante",
+                                "Caldera",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.secondary
                             )
@@ -729,141 +706,32 @@ private fun BoilerStatusCard(isActive: Boolean) {
                             )
                         }
                         Text(
-                            "Modulación activa",
+                            if (isActive) "Encendida" else "Apagada",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                Surface(
-                    shape = RoundedCornerShape(100.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                if (activeZones > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
-                        Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
-                        Text(
-                            "1.35 bar · Óptima",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.Whatshot, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
+                            Text(
+                                if (activeZones == 1) "1 zona calentando" else "$activeZones zonas calentando",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
-            }
-
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = OutlineVariant.copy(alpha = 0.3f))
-            Spacer(Modifier.height(10.dp))
-
-            // 3-column stats
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                BoilerStatCell(
-                    label = "Tª Impulsión",
-                    value = "48.5°C",
-                    icon = Icons.Default.DeviceThermostat,
-                    modifier = Modifier.weight(1f)
-                )
-                BoilerStatCell(
-                    label = "Bomba",
-                    value = "Activa",
-                    icon = Icons.Default.Sync,
-                    isPositive = true,
-                    modifier = Modifier.weight(1f)
-                )
-                BoilerStatCell(
-                    label = "Auditoría",
-                    value = "A+ 100%",
-                    icon = Icons.Default.Stars,
-                    isPositive = true,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = OutlineVariant.copy(alpha = 0.3f))
-            Spacer(Modifier.height(10.dp))
-
-            // Certificate row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        Icons.Default.WorkspacePremium,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Column {
-                        Text(
-                            "Certificado #ND-84920-OK registrado",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            "Garantía extendida hasta 2029",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Surface(
-                    onClick = { },
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
-                ) {
-                    Text(
-                        "Expediente SAT OK",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BoilerStatCell(
-    label: String,
-    value: String,
-    icon: ImageVector? = null,
-    isPositive: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(10.dp), color = SurfaceContainerLow) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                icon?.let {
-                    Icon(
-                        it, null,
-                        tint = if (isPositive) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(13.dp)
-                    )
-                }
-                Text(
-                    value,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isPositive) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
-                )
             }
         }
     }
