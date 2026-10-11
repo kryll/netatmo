@@ -51,7 +51,6 @@ fun HomeScreen(
     val remainingMinutes by viewModel.boostRemainingMinutes.collectAsState()
     var selectedRoom by remember { mutableStateOf<String?>(null) }
     var showBoostSheet by remember { mutableStateOf(false) }
-    var showNotification by remember { mutableStateOf(true) }
 
     val avgTemp = uiState.thermostatState?.rooms
         ?.mapNotNull { it.currentTemp }
@@ -121,16 +120,6 @@ fun HomeScreen(
                                         ErrorBanner(
                                             message = error,
                                             onDismiss = { viewModel.dismissError() }
-                                        )
-                                    }
-
-                                    // Notification card
-                                    AnimatedVisibility(
-                                        visible = showNotification,
-                                        exit = fadeOut() + shrinkVertically()
-                                    ) {
-                                        NotificationCard(
-                                            onDismiss = { showNotification = false }
                                         )
                                     }
 
@@ -481,86 +470,6 @@ private fun HomeTitleRow(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
-            }
-        }
-    }
-}
-
-// ─── Notification Card ────────────────────────────────────────────────────────
-
-@Composable
-private fun NotificationCard(onDismiss: () -> Unit) {
-    val tertiaryContainer = MaterialTheme.colorScheme.tertiaryContainer
-    val tertiary = MaterialTheme.colorScheme.tertiary
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, tertiary.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        color = tertiaryContainer.copy(alpha = 0.20f)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.NotificationImportant,
-                    contentDescription = null,
-                    tint = tertiary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "Acuse de recibo completado",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Su revisión anual ha sido registrada y el certificado está disponible para descarga.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Ref: #ND-84920-OK",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.clickable { }
-                ) {
-                    Icon(
-                        Icons.Default.PictureAsPdf,
-                        contentDescription = null,
-                        tint = tertiary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = "Ver PDF",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = tertiary
-                    )
-                }
             }
         }
     }
