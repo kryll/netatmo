@@ -156,10 +156,21 @@ fun StatisticsScreen(
                     onMove = { from, to -> viewModel.moveCard(from, to) }
                 ) {
                     when (cardKey) {
-                        "24h" -> TemperatureHistory24hCard(
-                            points = uiState.historyPoints,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        // When period > 1 day, show the period chart here (first visible chart)
+                        // so it always matches the selected period chip.
+                        // When period == 1 (24h), show the detailed 24h view from local DB.
+                        "24h" -> if (selectedPeriod == 1) {
+                            TemperatureHistory24hCard(
+                                points = uiState.historyPoints,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else if (uiState.temperatureData.isNotEmpty()) {
+                            TemperatureChartCard(
+                                data = uiState.temperatureData,
+                                periodLabel = periods.firstOrNull { it.second == selectedPeriod }?.first ?: "${selectedPeriod}d",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         "heating" -> HeatingReportCard(
                             heatingHoursToday = uiState.totalHeatingHoursToday,
                             energyToday = uiState.energyKwhToday,
@@ -187,9 +198,11 @@ fun StatisticsScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                        "tempChart" -> if (uiState.temperatureData.isNotEmpty()) {
+                        // tempChart only shown for 24h period (period > 1 already shown in "24h" slot)
+                        "tempChart" -> if (selectedPeriod == 1 && uiState.temperatureData.isNotEmpty()) {
                             TemperatureChartCard(
                                 data = uiState.temperatureData,
+                                periodLabel = "24h",
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -1494,6 +1507,7 @@ fun MonthlyComparisonCard(
 @Composable
 fun TemperatureChartCard(
     data: List<TemperatureDataPoint>,
+    periodLabel: String = "",
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -1508,7 +1522,7 @@ fun TemperatureChartCard(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "Temperatura",
+                if (periodLabel.isNotEmpty()) "Temperatura · $periodLabel" else "Temperatura",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = TextPrimary
