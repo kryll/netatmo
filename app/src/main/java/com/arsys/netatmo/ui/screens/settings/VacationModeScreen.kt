@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -30,7 +29,6 @@ import androidx.navigation.NavController
 import com.arsys.netatmo.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.roundToInt
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
 private val BgColor            = Color(0xFF101419)
@@ -150,7 +148,7 @@ fun VacationModeScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             // 1. STATUS PILL
-            StatusPill(daysCount = daysCount)
+            StatusPill(daysCount = daysCount, active = vacationState.enabled)
 
             // 2. HERO CARD
             HeroCard(startMs = uiState.startMs, endMs = uiState.endMs)
@@ -169,13 +167,8 @@ fun VacationModeScreen(
                 }
             )
 
-            // 4. ANTIFREEZE TEMPERATURE CARD
-            TemperatureCard(
-                temperature = uiState.temperature,
-                onIncrease  = { if (uiState.temperature < 16.0) viewModel.updateTemp(uiState.temperature + 1.0) },
-                onDecrease  = { if (uiState.temperature > 7.0)  viewModel.updateTemp(uiState.temperature - 1.0) },
-                onSliderChange = { viewModel.updateTemp(it) }
-            )
+            // 4. ANTIFREEZE INFO CARD
+            FrostGuardInfoCard()
 
             // 5. ALERTS CARD
             AlertsSecurityCard(
@@ -309,7 +302,7 @@ fun VacationModeScreen(
 // ─── Sub-composables ───────────────────────────────────────────────────────────
 
 @Composable
-private fun StatusPill(daysCount: Int) {
+private fun StatusPill(daysCount: Int, active: Boolean) {
     val infiniteTransition = rememberInfiniteTransition(label = "statusPulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
@@ -335,12 +328,12 @@ private fun StatusPill(daysCount: Int) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(GreenGoodColor.copy(alpha = pulseAlpha))
+                    .background(if (active) GreenGoodColor.copy(alpha = pulseAlpha) else TextSecondaryColor)
             )
             Text(
-                text       = "MODO PROTECCION Y AUSENCIA",
+                text       = if (active) "MODO VACACIONES ACTIVO" else "MODO VACACIONES INACTIVO",
                 style      = MaterialTheme.typography.labelSmall,
-                color      = GreenGoodColor,
+                color      = if (active) GreenGoodColor else TextSecondaryColor,
                 fontWeight = FontWeight.SemiBold,
                 modifier   = Modifier.weight(1f)
             )
@@ -414,40 +407,6 @@ private fun HeroCard(startMs: Long, endMs: Long) {
                         color    = PrimaryColor,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                     )
-                }
-            }
-
-            // Savings sub-card
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = SurfContLowColor
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment    = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector        = Icons.Filled.Eco,
-                        contentDescription = null,
-                        tint               = GreenGoodColor,
-                        modifier           = Modifier.size(20.dp)
-                    )
-                    Column {
-                        Text(
-                            text       = "~64% ahorro (~42.50€ previstos)",
-                            style      = MaterialTheme.typography.labelMedium,
-                            color      = GreenGoodColor,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text  = "Caldera: estimado 2.5h/dia activa",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondaryColor
-                        )
-                    }
                 }
             }
         }
@@ -701,177 +660,38 @@ private fun CalendarStrip(startMs: Long, endMs: Long) {
 }
 
 @Composable
-private fun TemperatureCard(
-    temperature: Double,
-    onIncrease: () -> Unit,
-    onDecrease: () -> Unit,
-    onSliderChange: (Double) -> Unit
-) {
-    val tempInt  = temperature.roundToInt()
-    val fraction = ((temperature - 7.0) / (16.0 - 7.0)).coerceIn(0.0, 1.0).toFloat()
-
+private fun FrostGuardInfoCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(16.dp),
         color    = SurfContainerColor,
         border   = BorderStroke(1.dp, OutlineVariantColor)
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment     = Alignment.CenterVertically
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
+            Icon(
+                imageVector        = Icons.Filled.Security,
+                contentDescription = null,
+                tint               = PrimaryColor,
+                modifier           = Modifier.size(24.dp)
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text       = "Consigna Antihielo",
+                    text       = "Temperatura antihielo",
                     style      = MaterialTheme.typography.titleMedium,
                     color      = TextPrimaryColor,
                     fontWeight = FontWeight.SemiBold
                 )
-                Surface(
-                    shape = RoundedCornerShape(50.dp),
-                    color = GreenGoodColor.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text     = "Ahorro Max",
-                        style    = MaterialTheme.typography.labelSmall,
-                        color    = GreenGoodColor,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // Large temp display with +/- buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
-                Surface(
-                    onClick  = onDecrease,
-                    shape    = CircleShape,
-                    color    = SurfContHighColor,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            imageVector        = Icons.Filled.Remove,
-                            contentDescription = "Reducir temperatura",
-                            tint               = TextPrimaryColor,
-                            modifier           = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment     = Alignment.Top,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text       = tempInt.toString(),
-                        style      = MaterialTheme.typography.displayMedium,
-                        color      = TextPrimaryColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text       = "°",
-                        style      = MaterialTheme.typography.headlineLarge,
-                        color      = PrimaryColor,
-                        fontWeight = FontWeight.Bold,
-                        modifier   = Modifier.padding(top = 6.dp)
-                    )
-                }
-
-                Surface(
-                    onClick  = onIncrease,
-                    shape    = CircleShape,
-                    color    = SurfContHighColor,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            imageVector        = Icons.Filled.Add,
-                            contentDescription = "Aumentar temperatura",
-                            tint               = TextPrimaryColor,
-                            modifier           = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
-
-            // Slider track with labeled markers (range 7–16°C)
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Slider(
-                    value         = fraction,
-                    onValueChange = { f ->
-                        val newTemp = 7.0 + f * (16.0 - 7.0)
-                        onSliderChange(newTemp.roundToInt().toDouble())
-                    },
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(
-                        thumbColor        = PrimaryColor,
-                        activeTrackColor  = PrimaryColor,
-                        inactiveTrackColor = SurfContLowestColor
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                Text(
+                    text  = "Netatmo mantiene la temperatura antiheladas configurada en tu instalacion. " +
+                        "No se puede cambiar desde esta pantalla. Al terminar el periodo se restaura " +
+                        "la programacion normal.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondaryColor
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text      = "7°C\nEstricto",
-                        style     = MaterialTheme.typography.labelSmall,
-                        color     = TextSecondaryColor,
-                        fontSize  = 10.sp,
-                        textAlign = TextAlign.Start
-                    )
-                    Text(
-                        text      = "12°C\nRecomendado",
-                        style     = MaterialTheme.typography.labelSmall,
-                        color     = TextSecondaryColor,
-                        fontSize  = 10.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text      = "16°C\nEco",
-                        style     = MaterialTheme.typography.labelSmall,
-                        color     = TextSecondaryColor,
-                        fontSize  = 10.sp,
-                        textAlign = TextAlign.End
-                    )
-                }
-            }
-
-            // Shield info note
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = SurfContLowColor
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector        = Icons.Filled.Security,
-                        contentDescription = null,
-                        tint               = PrimaryColor.copy(alpha = 0.7f),
-                        modifier           = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text     = "La caldera mantiene esta temperatura minima para proteger tuberias del hielo.",
-                        style    = MaterialTheme.typography.labelSmall,
-                        color    = TextSecondaryColor,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
             }
         }
     }

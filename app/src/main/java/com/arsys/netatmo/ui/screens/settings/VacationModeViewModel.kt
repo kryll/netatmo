@@ -2,6 +2,7 @@ package com.arsys.netatmo.ui.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.VacationModeRepository
 import com.arsys.netatmo.data.repository.VacationState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,7 +16,6 @@ import javax.inject.Inject
 data class VacationModeUiState(
     val startMs: Long = 0L,
     val endMs: Long = 0L,
-    val temperature: Double = 15.0,
     val isSaving: Boolean = false,
     val error: String? = null
 )
@@ -38,10 +38,6 @@ class VacationModeViewModel @Inject constructor(
         _uiState.update { it.copy(endMs = endMs, error = null) }
     }
 
-    fun updateTemp(temp: Double) {
-        _uiState.update { it.copy(temperature = temp) }
-    }
-
     fun setFrozenAlerts(enabled: Boolean) {
         viewModelScope.launch { vacationRepo.setFrozenAlerts(enabled) }
     }
@@ -56,10 +52,17 @@ class VacationModeViewModel @Inject constructor(
             _uiState.update { it.copy(error = "La fecha de fin debe ser posterior a la de inicio") }
             return
         }
+        if (state.endMs <= System.currentTimeMillis()) {
+            _uiState.update { it.copy(error = "La fecha de fin debe ser futura") }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
             try {
-                vacationRepo.activate(state.startMs, state.endMs, state.temperature)
+                val result = vacationRepo.activate(state.startMs, state.endMs)
+                if (result is ApiResult.Error) {
+                    _uiState.update { it.copy(error = "No se pudo activar el modo vacaciones: ${result.message}") }
+                }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Error al activar el modo vacaciones") }
             } finally {
@@ -72,7 +75,10 @@ class VacationModeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
             try {
-                vacationRepo.deactivate()
+                val result = vacationRepo.deactivate()
+                if (result is ApiResult.Error) {
+                    _uiState.update { it.copy(error = "No se pudo restaurar la programacion: ${result.message}") }
+                }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Error al desactivar el modo vacaciones") }
             } finally {
