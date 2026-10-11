@@ -7,6 +7,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
@@ -30,6 +31,11 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
     companion object {
         private val NOTIFICATIONS_ENABLED_KEY = booleanPreferencesKey("notifications_enabled")
         private val ANOMALY_THRESHOLD_KEY = floatPreferencesKey("anomaly_threshold")
+        private val VACATION_ENABLED_KEY = booleanPreferencesKey("vacation_enabled")
+        private val VACATION_START_MS_KEY = longPreferencesKey("vacation_start_ms")
+        private val VACATION_END_MS_KEY = longPreferencesKey("vacation_end_ms")
+        private val VACATION_FROZEN_ALERTS_KEY = booleanPreferencesKey("vacation_frozen_alerts")
+        private const val FROST_ALERT_THRESHOLD = 2.0
         private val SELECTED_HOME_ID_KEY = stringPreferencesKey("selected_home_id")
 
         fun schedule(context: Context) {
@@ -53,6 +59,11 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
 
         val notificationsEnabled = prefs[NOTIFICATIONS_ENABLED_KEY] ?: true
         if (!notificationsEnabled) return Result.success()
+
+        val now = System.currentTimeMillis()
+        val frostWatch = (prefs[VACATION_ENABLED_KEY] ?: false) &&
+            (prefs[VACATION_FROZEN_ALERTS_KEY] ?: true) &&
+            now in (prefs[VACATION_START_MS_KEY] ?: 0L)..(prefs[VACATION_END_MS_KEY] ?: 0L)
 
         val threshold = (prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f).toDouble()
         val homeId = prefs[SELECTED_HOME_ID_KEY] ?: return Result.success()
@@ -78,6 +89,17 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
             val targetTemp: Double? = if (roomObj.isNull("targetTemp")) null
                                      else roomObj.optDouble("targetTemp", Double.NaN)
                                          .takeUnless { it.isNaN() }
+
+            if (frostWatch && currentTemp != null && currentTemp < FROST_ALERT_THRESHOLD) {
+                val frostNotifId = (name.hashCode() and 0x7FFFFFFF) % 1000 + 3000
+                val frostNotification = NotificationCompat.Builder(ctx, NetatmoApp.CHANNEL_ANOMALY)
+                    .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                    .setContentTitle("Riesgo de helada")
+                    .setContentText("$name: ${"%.1f".format(currentTemp)}°C")
+                    .setAutoCancel(true)
+                    .build()
+                notificationManager.notify(frostNotifId, frostNotification)
+            }
 
             if (currentTemp == null || targetTemp == null) continue
             if ((currentTemp - targetTemp).absoluteValue <= threshold) continue

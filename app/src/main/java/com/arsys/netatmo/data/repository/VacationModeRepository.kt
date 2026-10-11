@@ -20,7 +20,8 @@ data class VacationState(
     val enabled: Boolean = false,
     val startMs: Long = 0L,
     val endMs: Long = 0L,
-    val temperature: Double = 15.0
+    val temperature: Double = 15.0,
+    val frozenAlerts: Boolean = true
 )
 
 @Singleton
@@ -32,6 +33,7 @@ class VacationModeRepository @Inject constructor(
         val VACATION_START_MS = longPreferencesKey("vacation_start_ms")
         val VACATION_END_MS = longPreferencesKey("vacation_end_ms")
         val VACATION_TEMP = floatPreferencesKey("vacation_temp")
+        val VACATION_FROZEN_ALERTS = booleanPreferencesKey("vacation_frozen_alerts")
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -42,7 +44,8 @@ class VacationModeRepository @Inject constructor(
                 enabled = prefs[VACATION_ENABLED] ?: false,
                 startMs = prefs[VACATION_START_MS] ?: 0L,
                 endMs = prefs[VACATION_END_MS] ?: 0L,
-                temperature = (prefs[VACATION_TEMP] ?: 15f).toDouble()
+                temperature = (prefs[VACATION_TEMP] ?: 15f).toDouble(),
+                frozenAlerts = prefs[VACATION_FROZEN_ALERTS] ?: true
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, VacationState())
@@ -59,6 +62,12 @@ class VacationModeRepository @Inject constructor(
     suspend fun deactivate() {
         context.dataStore.edit { prefs ->
             prefs[VACATION_ENABLED] = false
+        }
+    }
+
+    suspend fun setFrozenAlerts(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[VACATION_FROZEN_ALERTS] = enabled
         }
     }
 

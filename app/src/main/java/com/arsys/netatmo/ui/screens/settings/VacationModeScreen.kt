@@ -78,13 +78,6 @@ fun VacationModeScreen(
         initialSelectedDateMillis = if (uiState.endMs > 0L) uiState.endMs else null
     )
 
-    // Local UI state for new design sections (not in ViewModel)
-    var comfortOnReturn     by remember { mutableStateOf(true) }
-    var comfortDuration     by remember { mutableStateOf("Auto") }
-    var frozenAlerts        by remember { mutableStateOf(true) }
-    var presenceDetection   by remember { mutableStateOf(false) }
-    var dailyReport         by remember { mutableStateOf(true) }
-
     val daysCount = daysBetween(uiState.startMs, uiState.endMs)
 
     Scaffold(
@@ -184,22 +177,10 @@ fun VacationModeScreen(
                 onSliderChange = { viewModel.updateTemp(it) }
             )
 
-            // 5. COMFORT ON RETURN CARD
-            ComfortOnReturnCard(
-                enabled          = comfortOnReturn,
-                onToggle         = { comfortOnReturn = it },
-                selectedDuration = comfortDuration,
-                onDurationSelect = { comfortDuration = it }
-            )
-
-            // 6. ALERTS & SECURITY CARD
+            // 5. ALERTS CARD
             AlertsSecurityCard(
-                frozenAlerts             = frozenAlerts,
-                onFrozenAlertsToggle     = { frozenAlerts = it },
-                presenceDetection        = presenceDetection,
-                onPresenceDetectionToggle = { presenceDetection = it },
-                dailyReport              = dailyReport,
-                onDailyReportToggle      = { dailyReport = it }
+                frozenAlerts         = vacationState.frozenAlerts,
+                onFrozenAlertsToggle = { viewModel.setFrozenAlerts(it) }
             )
 
             // Error message
@@ -897,163 +878,9 @@ private fun TemperatureCard(
 }
 
 @Composable
-private fun ComfortOnReturnCard(
-    enabled: Boolean,
-    onToggle: (Boolean) -> Unit,
-    selectedDuration: String,
-    onDurationSelect: (String) -> Unit
-) {
-    val durationOptions = listOf("Auto", "2h", "4h", "6h")
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(16.dp),
-        color    = SurfContainerColor,
-        border   = BorderStroke(1.dp, OutlineVariantColor)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Header row with toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier              = Modifier.weight(1f)
-                ) {
-                    Surface(
-                        shape    = RoundedCornerShape(8.dp),
-                        color    = OrangeColor.copy(alpha = 0.2f),
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                imageVector        = Icons.Filled.LocalFireDepartment,
-                                contentDescription = null,
-                                tint               = OrangeColor,
-                                modifier           = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                    Column {
-                        Text(
-                            text       = "Confort al Regreso",
-                            style      = MaterialTheme.typography.titleSmall,
-                            color      = TextPrimaryColor,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text  = "Precalentamiento inteligente",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondaryColor
-                        )
-                    }
-                }
-                Switch(
-                    checked         = enabled,
-                    onCheckedChange = onToggle,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor   = Color.White,
-                        checkedTrackColor   = PrimaryColor,
-                        uncheckedThumbColor = TextSecondaryColor,
-                        uncheckedTrackColor = OutlineVariantColor
-                    )
-                )
-            }
-
-            if (enabled) {
-                Text(
-                    text  = "La caldera arrancara automaticamente antes de tu llegada para que encuentres la temperatura de confort deseada.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondaryColor
-                )
-
-                // 4-segment duration control
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = SurfContLowColor
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        durationOptions.forEach { option ->
-                            val isSelected = option == selectedDuration
-                            Surface(
-                                onClick  = { onDurationSelect(option) },
-                                shape    = RoundedCornerShape(8.dp),
-                                color    = if (isSelected) PrimaryColor else Color.Transparent,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier         = Modifier.padding(vertical = 8.dp)
-                                ) {
-                                    Text(
-                                        text       = option,
-                                        style      = MaterialTheme.typography.labelSmall,
-                                        color      = if (isSelected) OnPrimaryColor else TextSecondaryColor,
-                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Predictive algorithm micro-card
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = SurfContLowColor
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment     = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text       = "Algoritmo predictivo",
-                                style      = MaterialTheme.typography.labelSmall,
-                                color      = TextSecondaryColor,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text  = "Tª exterior: 8°C · Arranque: 17:30 h",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextSecondaryColor
-                            )
-                        }
-                        Icon(
-                            imageVector        = Icons.Filled.AutoAwesome,
-                            contentDescription = null,
-                            tint               = PrimaryColor.copy(alpha = 0.6f),
-                            modifier           = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun AlertsSecurityCard(
     frozenAlerts: Boolean,
-    onFrozenAlertsToggle: (Boolean) -> Unit,
-    presenceDetection: Boolean,
-    onPresenceDetectionToggle: (Boolean) -> Unit,
-    dailyReport: Boolean,
-    onDailyReportToggle: (Boolean) -> Unit
+    onFrozenAlertsToggle: (Boolean) -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1077,30 +904,6 @@ private fun AlertsSecurityCard(
                 subtitle       = "Alerta si la temperatura cae por debajo de 2°C",
                 checked        = frozenAlerts,
                 onCheckedChange = onFrozenAlertsToggle
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(0.5.dp)
-                    .background(OutlineVariantColor.copy(alpha = 0.5f))
-            )
-            AlertToggleRow(
-                title          = "Deteccion de presencia",
-                subtitle       = "Activa modo confort si detecta movimiento",
-                checked        = presenceDetection,
-                onCheckedChange = onPresenceDetectionToggle
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(0.5.dp)
-                    .background(OutlineVariantColor.copy(alpha = 0.5f))
-            )
-            AlertToggleRow(
-                title          = "Informe diario de consumo",
-                subtitle       = "Recibe un resumen cada dia por notificacion",
-                checked        = dailyReport,
-                onCheckedChange = onDailyReportToggle
             )
         }
     }

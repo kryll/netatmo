@@ -42,6 +42,10 @@ class VacationModeViewModel @Inject constructor(
         _uiState.update { it.copy(temperature = temp) }
     }
 
+    fun setFrozenAlerts(enabled: Boolean) {
+        viewModelScope.launch { vacationRepo.setFrozenAlerts(enabled) }
+    }
+
     fun activate() {
         val state = _uiState.value
         if (state.startMs == 0L || state.endMs == 0L) {
