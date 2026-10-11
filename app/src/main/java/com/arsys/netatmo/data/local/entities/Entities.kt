@@ -34,7 +34,7 @@ data class GeofenceEntity(
     val temperatureOnExit: Double? = null,
     val modeOnEnter: String? = null,
     val modeOnExit: String? = null,
-    val notificationsEnabled: Boolean = true
+    val notificationsDisabled: Boolean = false
 )
 
 @Entity(tableName = "schedules")

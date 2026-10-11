@@ -47,7 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE geofences ADD COLUMN notificationsEnabled INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE geofences ADD COLUMN notificationsDisabled INTEGER NOT NULL DEFAULT 0")
             }
         }
 

@@ -88,7 +88,7 @@ class GeofenceDetailViewModel @Inject constructor(
                     tempOnExit = geofence?.temperatureOnExit ?: 17.0,
                     selectedRoomId = automation.roomId,
                     isAutomationActive = automation.enabled,
-                    notificationsEnabled = geofence?.notificationsEnabled ?: true
+                    notificationsEnabled = geofence?.notificationsDisabled?.not() ?: true
                 )
             }
         }
@@ -189,7 +189,7 @@ class GeofenceDetailViewModel @Inject constructor(
                     triggerOnExit = state.triggerOnExit,
                     temperatureOnEnter = if (state.triggerOnEnter) state.tempOnEnter else null,
                     temperatureOnExit = if (state.triggerOnExit) state.tempOnExit else null,
-                    notificationsEnabled = state.notificationsEnabled
+                    notificationsDisabled = !state.notificationsEnabled
                 )
                 automationRepository.saveGeofence(geofence)
                 if (state.isAutomationActive) {

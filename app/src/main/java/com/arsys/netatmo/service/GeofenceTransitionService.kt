@@ -122,9 +122,9 @@ class GeofenceTransitionService : Service() {
                         errorMessage = errorMsg
                     ))
                     if (success) {
-                        sendAutomationNotification(automation, transitionType = "Entrada", success = true, geofenceNotifications = geofenceEntity.notificationsEnabled)
+                        sendAutomationNotification(automation, transitionType = "Entrada", success = true, geofenceNotifications = !geofenceEntity.notificationsDisabled)
                     } else {
-                        sendAutomationNotification(automation, transitionType = "Entrada", success = false, geofenceNotifications = geofenceEntity.notificationsEnabled)
+                        sendAutomationNotification(automation, transitionType = "Entrada", success = false, geofenceNotifications = !geofenceEntity.notificationsDisabled)
                     }
                 }
             }
@@ -144,9 +144,9 @@ class GeofenceTransitionService : Service() {
                         errorMessage = errorMsg
                     ))
                     if (success) {
-                        sendAutomationNotification(automation, transitionType = "Salida", success = true, geofenceNotifications = geofenceEntity.notificationsEnabled)
+                        sendAutomationNotification(automation, transitionType = "Salida", success = true, geofenceNotifications = !geofenceEntity.notificationsDisabled)
                     } else {
-                        sendAutomationNotification(automation, transitionType = "Salida", success = false, geofenceNotifications = geofenceEntity.notificationsEnabled)
+                        sendAutomationNotification(automation, transitionType = "Salida", success = false, geofenceNotifications = !geofenceEntity.notificationsDisabled)
                     }
                 }
             }
