@@ -141,14 +141,16 @@ fun BoilerStatusScreen(
                         pulseAlpha = pulseAlpha
                     )
 
-                    // 3. Hydraulic manometer card
-                    HydraulicManometerCard(pressureBar = pressureBar)
+                    // 3. Hydraulic manometer card (OpenTherm only)
+                    if (state.thermostatType == com.arsys.netatmo.domain.model.ThermostatType.OPENTHERM) {
+                        HydraulicManometerCard(pressureBar = pressureBar)
+                    }
 
                     // 4. Boiler telemetry 2×2 grid
                     BoilerTelemetryCard(
-                        modulationPct  = modulationPct,
+                        modulationPct  = if (state.thermostatType == com.arsys.netatmo.domain.model.ThermostatType.OPENTHERM) modulationPct else null,
                         isModulating   = isModulating,
-                        impulsionTempC = impulsionTempC,
+                        impulsionTempC = if (state.thermostatType == com.arsys.netatmo.domain.model.ThermostatType.OPENTHERM) impulsionTempC else null,
                         rfStrength     = rfStrength,
                         pingScale      = pingScale,
                         pingAlpha      = pingAlpha

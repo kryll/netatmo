@@ -309,6 +309,14 @@ fun SettingsScreen(
                 // ── Calidad del Aire y Caldera ─────────────────────────
                 item { SettingSectionHeader("Sensores y caldera") }
 
+                // Thermostat type selector
+                item {
+                    ThermostatTypeSelector(
+                        selected = uiState.thermostatType,
+                        onSelect = { viewModel.setThermostatType(it) }
+                    )
+                }
+
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Surface(
@@ -335,7 +343,10 @@ fun SettingsScreen(
                             SettingRow(
                                 icon = Icons.Default.LocalFireDepartment,
                                 title = "Estado de la caldera",
-                                subtitle = "Temperatura, presión y diagnóstico hidráulico",
+                                subtitle = if (uiState.thermostatType == com.arsys.netatmo.domain.model.ThermostatType.OPENTHERM)
+                                    "Presión, modulación, temperatura y diagnóstico"
+                                else
+                                    "Estado del relay y diagnóstico básico",
                                 trailing = {
                                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
@@ -591,6 +602,113 @@ fun SettingsScreen(
                 }
 
                 item { Spacer(modifier = Modifier.height(8.dp)) }
+            }
+        }
+    }
+}
+
+// ── Thermostat type selector ───────────────────────────────────────────────────
+
+@Composable
+private fun ThermostatTypeSelector(
+    selected: com.arsys.netatmo.domain.model.ThermostatType,
+    onSelect: (com.arsys.netatmo.domain.model.ThermostatType) -> Unit
+) {
+    val types = listOf(
+        com.arsys.netatmo.domain.model.ThermostatType.STANDARD to Triple(
+            Icons.Default.Thermostat,
+            "Relay estándar",
+            "On/off · solo temperatura ambiente"
+        ),
+        com.arsys.netatmo.domain.model.ThermostatType.OPENTHERM to Triple(
+            Icons.Default.Tune,
+            "OpenTherm",
+            "Modulante · presión, caudal y temperaturas"
+        )
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = SurfaceContainer,
+        border = BorderStroke(1.dp, OutlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceContainerHigh),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.DeviceThermostat,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "Tipo de termostato",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "Determina qué datos y funciones están disponibles",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                types.forEach { (type, meta) ->
+                    val (icon, label, subtitle) = meta
+                    val isSelected = selected == type
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                else SurfaceContainerLow,
+                        border = BorderStroke(
+                            1.5.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else OutlineVariant
+                        ),
+                        onClick = { onSelect(type) }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                icon,
+                                contentDescription = null,
+                                tint = if (isSelected) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                subtitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
+                }
             }
         }
     }

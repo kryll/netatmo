@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arsys.netatmo.data.api.models.Home
 import com.arsys.netatmo.data.model.GitHubRelease
+import com.arsys.netatmo.domain.model.ThermostatType
 import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AuthRepository
 import com.arsys.netatmo.data.repository.BackupManager
@@ -35,7 +36,8 @@ data class SettingsUiState(
     val backupResult: String? = null,
     val anomalyThreshold: Float = 3.0f,
     val exportedUri: Uri? = null,
-    val exportError: String? = null
+    val exportError: String? = null,
+    val thermostatType: ThermostatType = ThermostatType.STANDARD
 )
 
 @HiltViewModel
@@ -57,6 +59,11 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        // Load persisted thermostat type
+        val tprefs = context.getSharedPreferences(ThermostatType.PREFS_NAME, Context.MODE_PRIVATE)
+        val savedType = ThermostatType.fromString(tprefs.getString(ThermostatType.PREFS_KEY, null))
+        _uiState.update { it.copy(thermostatType = savedType) }
+
         viewModelScope.launch {
             authRepository.selectedHomeId.collect { homeId ->
                 _uiState.update { it.copy(selectedHomeId = homeId) }
@@ -191,6 +198,12 @@ class SettingsViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+    fun setThermostatType(type: ThermostatType) {
+        val prefs = context.getSharedPreferences(ThermostatType.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(ThermostatType.PREFS_KEY, type.name).apply()
+        _uiState.update { it.copy(thermostatType = type) }
     }
 
     fun setAnomalyThreshold(v: Float) {

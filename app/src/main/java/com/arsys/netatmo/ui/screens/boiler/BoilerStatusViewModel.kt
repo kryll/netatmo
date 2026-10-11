@@ -1,13 +1,16 @@
 package com.arsys.netatmo.ui.screens.boiler
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AuthRepository
 import com.arsys.netatmo.domain.model.BoilerHealth
 import com.arsys.netatmo.domain.model.ModuleState
+import com.arsys.netatmo.domain.model.ThermostatType
 import com.arsys.netatmo.domain.usecase.GetThermostatStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,7 +66,8 @@ data class BoilerStatusUiState(
     val diagnosticCompletedChecks: List<String> = emptyList(),
     val diagnosticResult: DiagnosticResult? = null,
     // Cached so refresh() works without re-collecting the flow
-    val cachedHomeId: String? = null
+    val cachedHomeId: String? = null,
+    val thermostatType: ThermostatType = ThermostatType.STANDARD
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -71,7 +75,8 @@ data class BoilerStatusUiState(
 @HiltViewModel
 class BoilerStatusViewModel @Inject constructor(
     private val getThermostatState: GetThermostatStateUseCase,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BoilerStatusUiState())
@@ -80,6 +85,9 @@ class BoilerStatusViewModel @Inject constructor(
     private var diagnosticJob: Job? = null
 
     init {
+        val prefs = context.getSharedPreferences(ThermostatType.PREFS_NAME, Context.MODE_PRIVATE)
+        val type = ThermostatType.fromString(prefs.getString(ThermostatType.PREFS_KEY, null))
+        _uiState.update { it.copy(thermostatType = type) }
         viewModelScope.launch {
             authRepository.selectedHomeId.collect { homeId ->
                 if (homeId != null) {

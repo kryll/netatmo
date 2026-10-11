@@ -11,6 +11,7 @@ import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
 import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
 import com.arsys.netatmo.data.repository.AuthRepository
 import com.arsys.netatmo.data.repository.ThermostatRepository
+import com.arsys.netatmo.domain.model.ThermostatType
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
 import com.arsys.netatmo.domain.usecase.GetTemperatureHistoryUseCase
 import com.google.gson.Gson
@@ -53,7 +54,8 @@ data class StatisticsUiState(
     val monthlyEnergyKwh: Float = 0f,
     val monthlyCost: Float = 0f,
     // Latest boiler revision
-    val latestRevision: MaintenanceRecordEntity? = null
+    val latestRevision: MaintenanceRecordEntity? = null,
+    val thermostatType: ThermostatType = ThermostatType.STANDARD
 )
 
 @HiltViewModel
@@ -75,6 +77,11 @@ class StatisticsViewModel @Inject constructor(
     private var historyJob: Job? = null
 
     init {
+        // Load thermostat type
+        val tprefs = context.getSharedPreferences(ThermostatType.PREFS_NAME, Context.MODE_PRIVATE)
+        val thermostatType = ThermostatType.fromString(tprefs.getString(ThermostatType.PREFS_KEY, null))
+        _uiState.update { it.copy(thermostatType = thermostatType) }
+
         // Load persisted price config
         val prefs = context.getSharedPreferences("statistics_prefs", Context.MODE_PRIVATE)
         val kwhPrice = prefs.getFloat("kwh_price", 0.15f)

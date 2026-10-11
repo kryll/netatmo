@@ -39,6 +39,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
 import com.arsys.netatmo.data.local.entities.TemperatureHistoryEntity
 import com.arsys.netatmo.domain.model.TemperatureDataPoint
+import com.arsys.netatmo.domain.model.ThermostatType
 import com.arsys.netatmo.ui.theme.BoilerActiveColor
 import com.arsys.netatmo.ui.theme.OutlineVariant
 import com.arsys.netatmo.ui.theme.SurfaceContainer
@@ -216,6 +217,13 @@ fun StatisticsScreen(
                             strokeWidth = 2.dp
                         )
                     }
+                }
+            }
+
+            // OpenTherm extra metrics banner
+            if (uiState.thermostatType == ThermostatType.OPENTHERM) {
+                item {
+                    OpenThermMetricsCard(modifier = Modifier.fillMaxWidth())
                 }
             }
 
@@ -1704,6 +1712,56 @@ fun StatCard(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OpenTherm Metrics Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun OpenThermMetricsCard(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = SurfaceContainer,
+        border = BorderStroke(1.dp, Color(0xFF3F4850))
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(
+                    Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = Primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    "Datos OpenTherm",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+            val metrics = listOf(
+                Icons.Default.Speed to "Modulación" to "Nivel de modulación del quemador (%)",
+                Icons.Default.Thermostat to "Temp. impulsión" to "Temperatura del agua de salida (°C)",
+                Icons.Default.WaterDrop to "Temp. retorno" to "Temperatura del agua de vuelta (°C)",
+                Icons.Default.Compress to "Presión" to "Presión hidráulica del circuito (bar)"
+            )
+            metrics.forEach { (iconLabel, description) ->
+                val (icon, label) = iconLabel
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp))
+                    Column {
+                        Text(label, style = MaterialTheme.typography.labelMedium, color = TextPrimary, fontWeight = FontWeight.Medium)
+                        Text(description, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Boiler Revision Summary Card
 // ─────────────────────────────────────────────────────────────────────────────
 
