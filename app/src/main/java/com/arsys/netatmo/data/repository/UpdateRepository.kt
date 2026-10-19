@@ -2,6 +2,8 @@ package com.arsys.netatmo.data.repository
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.arsys.netatmo.BuildConfig
@@ -129,6 +131,35 @@ class UpdateRepository @Inject constructor(
             if (BuildConfig.DEBUG) Log.e(TAG, "downloadApk: excepción durante descarga", e)
             Result.failure(e)
         }
+    }
+
+    /**
+     * Whether [apk] is signed with the same certificate as the installed app.
+     * Android refuses to update over an app signed with a different key ("App not installed").
+     * Returns null when it cannot be determined.
+     */
+    @Suppress("DEPRECATION")
+    fun isSignatureCompatible(apk: File): Boolean? = try {
+        val pm = context.packageManager
+        val newCerts: Set<String>
+        val installedCerts: Set<String>
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val flags = PackageManager.GET_SIGNING_CERTIFICATES
+            val archive = pm.getPackageArchiveInfo(apk.absolutePath, flags)?.signingInfo
+            val installed = pm.getPackageInfo(context.packageName, flags).signingInfo
+            newCerts = archive?.apkContentsSigners.orEmpty().map { it.toCharsString() }.toSet()
+            installedCerts = installed?.apkContentsSigners.orEmpty().map { it.toCharsString() }.toSet()
+        } else {
+            val flags = PackageManager.GET_SIGNATURES
+            newCerts = pm.getPackageArchiveInfo(apk.absolutePath, flags)?.signatures
+                .orEmpty().map { it.toCharsString() }.toSet()
+            installedCerts = pm.getPackageInfo(context.packageName, flags).signatures
+                .orEmpty().map { it.toCharsString() }.toSet()
+        }
+        if (newCerts.isEmpty() || installedCerts.isEmpty()) null else newCerts == installedCerts
+    } catch (e: Exception) {
+        if (BuildConfig.DEBUG) Log.e(TAG, "isSignatureCompatible: no se pudo comprobar", e)
+        null
     }
 
     fun installApk(file: File) {

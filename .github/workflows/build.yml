@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      new_signing_key:
+        description: "Create a NEW signing key (installed apps will have to be uninstalled once)"
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -47,9 +52,15 @@ jobs:
           path: debug.keystore
           key: netatmo-debug-keystore-v2
 
-      - name: Create debug keystore if not cached
+      - name: Create debug keystore (only when explicitly requested)
         if: steps.keystore-cache.outputs.cache-hit != 'true'
         run: |
+          # GitHub deletes caches unused for 7 days. Silently generating a new key here would
+          # publish an APK that Android refuses to install over the current app.
+          if [ "${{ github.event.inputs.new_signing_key }}" != "true" ]; then
+            echo "::error::Signing keystore cache not found. Refusing to build with a different key. Run this workflow manually with new_signing_key=true to create a new one on purpose."
+            exit 1
+          fi
           keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 \
             -validity 36500 -dname "CN=Android Debug,O=Android,C=US" \
             -storepass android -keypass android -noprompt

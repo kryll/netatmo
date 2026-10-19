@@ -142,6 +142,18 @@ class SettingsViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { file ->
+                    if (updateRepository.isSignatureCompatible(file) == false) {
+                        _uiState.update {
+                            it.copy(
+                                updateStatus = UpdateStatus.Error(
+                                    "Esta versión está firmada con otra clave y Android no puede instalarla " +
+                                        "sobre la actual. Haz una copia de seguridad en Ajustes, desinstala la app, " +
+                                        "instala la nueva y restaura la copia."
+                                )
+                            )
+                        }
+                        return@fold
+                    }
                     val sizeMb = file.length().toFloat() / 1_048_576f
                     _uiState.update { it.copy(updateStatus = UpdateStatus.Installing(apkSizeMb = sizeMb, apkPath = file.absolutePath)) }
                     updateRepository.installApk(file)
