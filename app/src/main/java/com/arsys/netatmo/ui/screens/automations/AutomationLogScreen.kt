@@ -215,6 +215,7 @@ private fun LogEntryCard(log: AutomationLogEntity, fmt: SimpleDateFormat) {
                     "EXIT"     -> "Al salir"
                     "CALENDAR" -> "Evento de calendario"
                     "SCHEDULE" -> "Horario programado"
+                    "ADVANCED" -> "Automatización avanzada"
                     else       -> log.triggerType
                 }
                 Text(

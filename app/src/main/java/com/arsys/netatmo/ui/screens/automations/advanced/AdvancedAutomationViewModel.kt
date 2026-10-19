@@ -113,9 +113,10 @@ class AdvancedAutomationViewModel @Inject constructor(
         enabled: Boolean
     ) {
         viewModelScope.launch {
-            val entity = AdvancedAutomationEntity(
-                id = if (automationId == -1L) 0 else automationId,
-                name = name,
+            // Editing keeps createdAt and the last-run info of the stored automation.
+            val existing = if (automationId == -1L) null else repository.getById(automationId)
+            val entity = (existing ?: AdvancedAutomationEntity(name = name)).copy(
+                name = name.trim().ifBlank { "Automatización avanzada" },
                 enabled = enabled,
                 triggersJson = mapsToJsonArray(triggers),
                 conditionsJson = mapsToJsonArray(conditions),

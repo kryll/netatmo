@@ -188,7 +188,7 @@ fun AutomationsScreen(
                                         "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
                                         "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
                                         "SCHEDULE" -> navController.navigate("schedule_automation/${automation.id}")
-                                        "ADVANCED" -> navController.navigate("advanced_automation/${automation.id}")
+                                        "ADVANCED" -> navController.navigate("advanced_automation/${-automation.id}")
                                     }
                                 },
                                 onDelete = { viewModel.deleteAutomation(automation) }
@@ -224,7 +224,7 @@ fun AutomationsScreen(
                                                     "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
                                                     "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
                                                     "SCHEDULE" -> navController.navigate("schedule_automation/${automation.id}")
-                                                    "ADVANCED" -> navController.navigate("advanced_automation/${automation.id}")
+                                                    "ADVANCED" -> navController.navigate("advanced_automation/${-automation.id}")
                                                 }
                                             },
                                             onDelete = { viewModel.deleteAutomation(automation) }

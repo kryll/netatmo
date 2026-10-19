@@ -63,6 +63,10 @@
             android:name=".service.GeofenceBroadcastReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".service.ThermostatActionReceiver"
+            android:exported="false" />
+
         <service
             android:name=".service.GeofenceTransitionService"
             android:exported="false"
