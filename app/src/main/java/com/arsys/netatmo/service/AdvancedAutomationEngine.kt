@@ -46,6 +46,8 @@ class AdvancedAutomationEngine @Inject constructor(
         val BOOST_STEPS = listOf(1.0, 1.5, 2.0)
         const val MIN_SETPOINT = 7.0
         const val MAX_SETPOINT = 30.0
+        // The periodic worker runs about every 15 min, so a time trigger counts as "now" for this long.
+        const val TIME_TRIGGER_WINDOW_MIN = 20
     }
 
     private val statePrefs by lazy { context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE) }
@@ -57,21 +59,33 @@ class AdvancedAutomationEngine @Inject constructor(
         }
     }
 
-    /** Runs the actions only when the conditions start being met, not on every periodic check. */
+    /**
+     * An automation runs when one of its triggers fires and its conditions hold. Without triggers
+     * it runs when its conditions start being met. Never on every periodic check.
+     */
     suspend fun evaluateAndExecute(automation: AdvancedAutomationEntity) {
-        val metKey = "met_${automation.id}"
         val firedKey = "fired_${automation.id}"
         try {
-            val conditionsMet = evaluateConditions(automation)
-            val wasMet = statePrefs.getBoolean(metKey, false)
-            statePrefs.edit().putBoolean(metKey, conditionsMet).apply()
-            if (!conditionsMet || wasMet) return
+            val triggers = JSONArray(automation.triggersJson)
+            var firedTrigger: JSONObject? = null
+            val shouldRun: Boolean
+            if (triggers.length() == 0) {
+                val metKey = "met_${automation.id}"
+                val conditionsMet = evaluateConditions(automation)
+                val wasMet = statePrefs.getBoolean(metKey, false)
+                statePrefs.edit().putBoolean(metKey, conditionsMet).apply()
+                shouldRun = conditionsMet && !wasMet
+            } else {
+                firedTrigger = findFiringTrigger(automation.id, triggers)
+                shouldRun = firedTrigger != null && evaluateConditions(automation)
+            }
+            if (!shouldRun) return
 
             val now = System.currentTimeMillis()
             if (now - statePrefs.getLong(firedKey, 0L) < MIN_REPEAT_MS) return
             statePrefs.edit().putLong(firedKey, now).apply()
 
-            val alert = buildTemperatureAlert(automation)
+            val alert = buildTemperatureAlert(automation, firedTrigger)
             executeActions(automation, alert)
             advancedAutomationRepository.updateLastTriggered(automation.id, now, "success")
             logExecution(automation, now, success = true, error = null)
@@ -128,25 +142,9 @@ class AdvancedAutomationEngine @Inject constructor(
                     currentMinutes >= afterMinutes || currentMinutes <= beforeMinutes
                 }
             }
-            "numeric_state" -> {
-                // A value that cannot be read counts as "not met", otherwise a failed request
-                // would fire the automation.
-                when (condition.optString("entity")) {
-                    "outdoor_temp" -> {
-                        val homeId = resolveHomeId(condition.optString("home_id", ""))
-                        if (homeId.isEmpty()) return false
-                        val temp = thermostatRepository.getOutdoorTemperature(homeId) ?: return false
-                        checkNumericCondition(condition, temp)
-                    }
-                    "indoor_temp" -> {
-                        val rooms = readIndoorRooms()
-                        if (rooms.isEmpty()) return false
-                        // "below" is met if any room is below; "above" if any room is above.
-                        rooms.any { checkNumericCondition(condition, it.temp) }
-                    }
-                    else -> true
-                }
-            }
+            // A value that cannot be read counts as "not met", otherwise a failed request
+            // would fire the automation.
+            "numeric_state" -> numericStateActive(condition) ?: false
             "presence" -> {
                 val state = condition.optString("state", "someone_home")
                 val allAway = familyPresenceManager.allMembersAway()
@@ -157,6 +155,61 @@ class AdvancedAutomationEngine @Inject constructor(
             }
             else -> true
         }
+    }
+
+    /** Whether a temperature rule holds right now; null when the value cannot be read. */
+    private suspend fun numericStateActive(rule: JSONObject): Boolean? = when (rule.optString("entity")) {
+        "outdoor_temp" -> {
+            val homeId = resolveHomeId(rule.optString("home_id", ""))
+            val temp = if (homeId.isEmpty()) null else thermostatRepository.getOutdoorTemperature(homeId)
+            temp?.let { checkNumericCondition(rule, it) }
+        }
+        "indoor_temp" -> {
+            val rooms = readIndoorRooms()
+            // "below" holds if any room is below; "above" if any room is above.
+            if (rooms.isEmpty()) null else rooms.any { checkNumericCondition(rule, it.temp) }
+        }
+        else -> null
+    }
+
+    /**
+     * Returns the first trigger that fires now. Time triggers fire once per day inside a short
+     * window after their time; temperature triggers fire when the value crosses the threshold.
+     * Every trigger is evaluated so its stored state stays current.
+     */
+    private suspend fun findFiringTrigger(automationId: Long, triggers: JSONArray): JSONObject? {
+        var fired: JSONObject? = null
+        for (i in 0 until triggers.length()) {
+            val trigger = triggers.getJSONObject(i)
+            val fires = when (trigger.optString("type")) {
+                "time" -> timeTriggerFires(automationId, i, trigger)
+                "numeric_state" -> {
+                    val active = numericStateActive(trigger)
+                    val key = "tact_${automationId}_$i"
+                    val wasActive = statePrefs.getBoolean(key, false)
+                    if (active != null) statePrefs.edit().putBoolean(key, active).apply()
+                    active == true && !wasActive
+                }
+                else -> false // "sun" and "geofence" triggers are not evaluated yet
+            }
+            if (fires && fired == null) fired = trigger
+        }
+        return fired
+    }
+
+    private fun timeTriggerFires(automationId: Long, index: Int, trigger: JSONObject): Boolean {
+        val target = try { parseTimeToMinutes(trigger.optString("time", "")) } catch (e: Exception) { return false }
+        val days = trigger.optJSONArray("days")?.let { arr -> (0 until arr.length()).map { arr.getInt(it) }.toSet() }
+        val cal = Calendar.getInstance()
+        val isoDay = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7 + 1 // Calendar: 1=Sun -> ISO: 7
+        if (days != null && isoDay !in days) return false
+        val elapsed = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE) - target
+        if (elapsed !in 0 until TIME_TRIGGER_WINDOW_MIN) return false
+        val dayKey = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
+        val key = "tday_${automationId}_$index"
+        if (statePrefs.getString(key, null) == dayKey) return false
+        statePrefs.edit().putString(key, dayKey).apply()
+        return true
     }
 
     private suspend fun resolveHomeId(homeIdFromCondition: String): String {
@@ -199,10 +252,14 @@ class AdvancedAutomationEngine @Inject constructor(
     }
 
     /** For a "temperature below X" condition: what is the temperature now and which room to heat. */
-    private suspend fun buildTemperatureAlert(automation: AdvancedAutomationEntity): TemperatureAlert? {
+    private suspend fun buildTemperatureAlert(
+        automation: AdvancedAutomationEntity,
+        firedTrigger: JSONObject?
+    ): TemperatureAlert? {
         val conditions = JSONArray(automation.conditionsJson)
-        for (i in 0 until conditions.length()) {
-            val condition = conditions.getJSONObject(i)
+        val candidates = listOfNotNull(firedTrigger) +
+            (0 until conditions.length()).map { conditions.getJSONObject(it) }
+        for (condition in candidates) {
             if (condition.optString("type") != "numeric_state" || !condition.has("below")) continue
             val entity = condition.optString("entity")
             if (entity != "indoor_temp" && entity != "outdoor_temp") continue

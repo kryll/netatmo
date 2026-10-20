@@ -31,6 +31,7 @@ class NetatmoApp : Application(), Configuration.Provider {
         super.onCreate()
         createNotificationChannels()
         AdvancedAutomationWorker.schedule(this)
+        AdvancedAutomationWorker.runNow(this)
         localScheduleManager.scheduleAll()
         TemperatureAnomalyWorker.schedule(this)
         DataSyncWorker.schedule(this)

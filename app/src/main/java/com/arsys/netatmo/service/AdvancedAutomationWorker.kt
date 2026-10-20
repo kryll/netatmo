@@ -5,6 +5,8 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -28,6 +30,17 @@ class AdvancedAutomationWorker @AssistedInject constructor(
 
     companion object {
         private const val UNIQUE_WORK_NAME = "advanced_automation_worker"
+
+        /** Evaluates the automations once right away (after saving one, or when the app opens). */
+        fun runNow(context: Context) {
+            val request = OneTimeWorkRequestBuilder<AdvancedAutomationWorker>()
+                .setConstraints(
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+                )
+                .build()
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork("advanced_automation_now", ExistingWorkPolicy.REPLACE, request)
+        }
 
         fun schedule(context: Context) {
             val constraints = Constraints.Builder()

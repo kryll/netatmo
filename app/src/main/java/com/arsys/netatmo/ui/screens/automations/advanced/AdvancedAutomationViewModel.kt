@@ -1,11 +1,14 @@
 package com.arsys.netatmo.ui.screens.automations.advanced
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arsys.netatmo.data.local.entities.AdvancedAutomationEntity
 import com.arsys.netatmo.data.repository.AdvancedAutomationRepository
+import com.arsys.netatmo.service.AdvancedAutomationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +33,7 @@ data class AdvancedAutomationUiState(
 @HiltViewModel
 class AdvancedAutomationViewModel @Inject constructor(
     private val repository: AdvancedAutomationRepository,
+    @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -124,6 +128,7 @@ class AdvancedAutomationViewModel @Inject constructor(
                 triggerMode = triggerMode
             )
             repository.save(entity)
+            AdvancedAutomationWorker.runNow(context)
             _uiState.update { it.copy(isSaved = true) }
         }
     }

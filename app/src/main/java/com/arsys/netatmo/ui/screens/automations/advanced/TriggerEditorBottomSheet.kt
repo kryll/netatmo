@@ -69,9 +69,7 @@ fun TriggerEditorBottomSheet(
 
     val triggerTypes = listOf(
         "time" to "Hora",
-        "numeric_state" to "Temperatura",
-        "sun" to "Sol",
-        "geofence" to "Geovalla"
+        "numeric_state" to "Temperatura"
     )
 
     val dayLabels = listOf(1 to "L", 2 to "M", 3 to "X", 4 to "J", 5 to "V", 6 to "S", 7 to "D")
