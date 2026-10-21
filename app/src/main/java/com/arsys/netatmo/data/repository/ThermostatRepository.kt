@@ -171,6 +171,16 @@ class ThermostatRepository @Inject constructor(
         }
     }
 
+    suspend fun deleteSchedule(homeId: String, scheduleId: String): ApiResult<Unit> {
+        return try {
+            val response = apiService.deleteHomeSchedule(homeId, scheduleId)
+            if (response.isSuccessful) ApiResult.Success(Unit)
+            else ApiResult.Error("Error ${response.code()}: ${response.errorBody()?.string()}", response.code())
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Error de red")
+        }
+    }
+
     fun getTemperatureHistory(
         homeId: String,
         roomId: String,

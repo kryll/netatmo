@@ -90,7 +90,9 @@ data class Schedule(
     @SerializedName("selected") val selected: Boolean?,
     @SerializedName("type") val type: String?,
     @SerializedName("timetable") val timetable: List<TimeSlot>?,
-    @SerializedName("zones") val zones: List<Zone>?
+    @SerializedName("zones") val zones: List<Zone>?,
+    @SerializedName("hg_temp") val hgTemp: Double? = null,
+    @SerializedName("away_temp") val awayTemp: Double? = null
 )
 
 data class TimeSlot(

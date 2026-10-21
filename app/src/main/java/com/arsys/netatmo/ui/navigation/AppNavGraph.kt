@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -25,6 +26,7 @@ import com.arsys.netatmo.ui.screens.automations.advanced.AdvancedAutomationScree
 import com.arsys.netatmo.ui.screens.automations.GeofenceDetailScreen
 import com.arsys.netatmo.ui.screens.automations.CalendarAutomationScreen
 import com.arsys.netatmo.ui.screens.home.HomeScreen
+import com.arsys.netatmo.ui.screens.programs.ProgramsScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenariosScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenarioDetailScreen
 import com.arsys.netatmo.ui.screens.schedule.ScheduleEditorScreen
@@ -45,6 +47,7 @@ import com.arsys.netatmo.ui.screens.devices.DevicePairingScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home : Screen("home", "Inicio", Icons.Default.Home)
+    object Programs : Screen("programs", "Programas", Icons.Default.CalendarMonth)
     object Automations : Screen("automations", "Automatizar", Icons.Default.AutoMode)
     object Statistics : Screen("statistics", "Estadísticas", Icons.Default.BarChart)
     object Scenarios : Screen("scenarios", "Escenarios", Icons.Default.AutoAwesome)
@@ -70,11 +73,18 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 
 val bottomNavItems = listOf(
     Screen.Home,
+    Screen.Programs,
     Screen.Automations,
     Screen.Statistics,
     Screen.Scenarios,
     Screen.Settings
 )
+
+private fun Screen.barLabel(): String = when (this) {
+    Screen.Automations -> "Automat."
+    Screen.Statistics -> "Estadíst."
+    else -> label
+}
 
 @Composable
 fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
@@ -144,7 +154,14 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                         bottomNavItems.forEach { screen ->
                             NavigationBarItem(
                                 icon = { Icon(screen.icon, contentDescription = screen.label) },
-                                label = { Text(screen.label) },
+                                label = {
+                                    Text(
+                                        text = screen.barLabel(),
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                },
                                 selected = currentRoute == screen.route,
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = Color(0xFF93CCFF),
@@ -202,6 +219,9 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             }
             composable(Screen.Home.route) {
                 HomeScreen(navController = navController)
+            }
+            composable(Screen.Programs.route) {
+                ProgramsScreen(navController = navController)
             }
             composable(Screen.Automations.route) {
                 AutomationsScreen(navController = navController)

@@ -15,7 +15,8 @@ data class ZoneUi(
     val id: Int,
     val name: String,
     val temperature: Double,
-    val roomTemps: Map<String, Double> = emptyMap()
+    val roomTemps: Map<String, Double> = emptyMap(),
+    val type: Int = 4
 )
 
 data class SlotUi(val dayOfWeek: Int, val minuteOfDay: Int, val zoneId: Int)
@@ -26,6 +27,9 @@ data class ScheduleEditorUiState(
     val zones: List<ZoneUi> = DEFAULT_ZONES,
     val slots: List<SlotUi> = buildDefaultSlots(),
     val rooms: List<Room> = emptyList(),
+    val hgTemp: Double = 7.0,
+    val awayTemp: Double = 14.0,
+    val loadFailed: Boolean = false,
     val selectedDay: Int = 0,
     val isSaving: Boolean = false,
     val saved: Boolean = false,
@@ -33,10 +37,10 @@ data class ScheduleEditorUiState(
 )
 
 private val DEFAULT_ZONES = listOf(
-    ZoneUi(0, "Noche", 16.0),
-    ZoneUi(1, "Mañana", 19.0),
-    ZoneUi(2, "Eco", 16.0),
-    ZoneUi(3, "Confort", 21.0)
+    ZoneUi(0, "Noche", 16.0, type = 1),
+    ZoneUi(1, "Mañana", 19.0, type = 4),
+    ZoneUi(2, "Eco", 16.0, type = 5),
+    ZoneUi(3, "Confort", 21.0, type = 0)
 )
 
 private fun buildDefaultSlots(): List<SlotUi> {
@@ -61,25 +65,40 @@ class ScheduleEditorViewModel @Inject constructor(
 
     fun loadSchedule(scheduleId: String?) {
         viewModelScope.launch {
-            val homeId = authRepository.selectedHomeId.first() ?: return@launch
+            val homeId = authRepository.selectedHomeId.first()
+            if (homeId == null) {
+                _uiState.update { it.copy(loadFailed = true, error = "No hay ningún hogar seleccionado") }
+                return@launch
+            }
             val result = thermostatRepository.getHomesData()
+            if (result is ApiResult.Error) {
+                _uiState.update { it.copy(loadFailed = true, error = "No se pudo cargar el programa: ${result.message}") }
+            }
             if (result is ApiResult.Success) {
-                val home = result.data.find { it.id == homeId } ?: return@launch
+                val home = result.data.find { it.id == homeId }
+                if (home == null) {
+                    _uiState.update { it.copy(loadFailed = true, error = "No se encontró el hogar seleccionado") }
+                    return@launch
+                }
                 val rooms = home.rooms ?: emptyList()
 
                 if (scheduleId == null || scheduleId == "new") {
                     val zonesWithRooms = DEFAULT_ZONES.map { zone ->
                         zone.copy(roomTemps = rooms.associate { it.id to zone.temperature })
                     }
-                    _uiState.update { it.copy(rooms = rooms, zones = zonesWithRooms) }
+                    _uiState.update { it.copy(rooms = rooms, zones = zonesWithRooms, loadFailed = false, error = null) }
                     return@launch
                 }
 
-                val schedule = home.schedules?.find { it.id == scheduleId } ?: return@launch
+                val schedule = home.schedules?.find { it.id == scheduleId }
+                if (schedule == null) {
+                    _uiState.update { it.copy(loadFailed = true, error = "No se encontró el programa") }
+                    return@launch
+                }
                 val zones = schedule.zones?.map { z ->
                     val roomTemps = z.rooms?.associate { zr -> zr.id to (zr.temperature ?: 20.0) } ?: emptyMap()
                     val defaultTemp = roomTemps.values.firstOrNull() ?: 20.0
-                    ZoneUi(z.id, z.name ?: "Zona ${z.id + 1}", defaultTemp, roomTemps)
+                    ZoneUi(z.id, z.name ?: "Zona ${z.id + 1}", defaultTemp, roomTemps, z.type ?: 4)
                 } ?: DEFAULT_ZONES
                 val slots = schedule.timetable?.map { slot ->
                     SlotUi(
@@ -94,7 +113,11 @@ class ScheduleEditorViewModel @Inject constructor(
                         name = schedule.name,
                         zones = zones,
                         slots = slots,
-                        rooms = rooms
+                        rooms = rooms,
+                        hgTemp = schedule.hgTemp ?: 7.0,
+                        awayTemp = schedule.awayTemp ?: 14.0,
+                        loadFailed = false,
+                        error = null
                     )
                 }
             }
@@ -158,6 +181,10 @@ class ScheduleEditorViewModel @Inject constructor(
 
     fun save() {
         viewModelScope.launch {
+            if (_uiState.value.loadFailed) {
+                _uiState.update { it.copy(error = "El programa no se cargó correctamente; no se puede guardar") }
+                return@launch
+            }
             val homeId = authRepository.selectedHomeId.first() ?: return@launch
             val state = _uiState.value
             _uiState.update { it.copy(isSaving = true, error = null) }
@@ -172,7 +199,7 @@ class ScheduleEditorViewModel @Inject constructor(
                         mapOf("id" to room.id, "therm_setpoint_temperature" to z.temperature)
                     }
                 }
-                mapOf("id" to z.id, "name" to z.name, "rooms" to roomsPayload, "type" to 0)
+                mapOf("id" to z.id, "name" to z.name, "rooms" to roomsPayload, "type" to z.type)
             }
             val timetablePayload = state.slots.map { s ->
                 mapOf("m_offset" to s.dayOfWeek * 24 * 60 + s.minuteOfDay, "zone_id" to s.zoneId)
@@ -180,6 +207,9 @@ class ScheduleEditorViewModel @Inject constructor(
             val body: Map<String, Any> = mapOf(
                 "home_id" to homeId,
                 "name" to state.name,
+                "schedule_type" to "therm",
+                "hg_temp" to state.hgTemp,
+                "away_temp" to state.awayTemp,
                 "zones" to zonesPayload,
                 "timetable" to timetablePayload
             )
