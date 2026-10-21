@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
@@ -191,6 +192,21 @@ fun AdvancedAutomationScreen(
     LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) navController.popBackStack() }
     LaunchedEffect(uiState.isDeleted) { if (uiState.isDeleted) navController.popBackStack() }
 
+    uiState.testReport?.let { report ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissTestReport() },
+            title = { Text("Resultado de la prueba") },
+            text = {
+                Text(
+                    report,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())
+                )
+            },
+            confirmButton = { TextButton(onClick = { viewModel.dismissTestReport() }) { Text("Cerrar") } }
+        )
+    }
+
     // ── Delete dialog ─────────────────────────────────────────────────────────
     if (showDeleteDialog) {
         AlertDialog(
@@ -286,12 +302,34 @@ fun AdvancedAutomationScreen(
                 color = SurfaceContainerLow,
                 tonalElevation = 0.dp
             ) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = {
+                            viewModel.testNow(
+                                name = name,
+                                triggers = uiState.triggers,
+                                conditions = uiState.conditions,
+                                actions = uiState.actions,
+                                triggerMode = triggerMode
+                            )
+                        },
+                        enabled = !uiState.isTesting,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            if (uiState.isTesting) "Probando…" else "Probar ahora",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
                     Button(
                         onClick = {
                             viewModel.save(

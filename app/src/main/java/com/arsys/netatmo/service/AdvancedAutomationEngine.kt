@@ -92,8 +92,88 @@ class AdvancedAutomationEngine @Inject constructor(
         } catch (e: Exception) {
             val now = System.currentTimeMillis()
             advancedAutomationRepository.updateLastTriggered(automation.id, now, "error")
-            logExecution(automation, now, success = false, error = e.message)
+            logExecution(automation, now, success = false, error = e.message ?: e.javaClass.simpleName)
+            // Forget the consumed trigger so the next check tries again instead of waiting for a new crossing.
+            val editor = statePrefs.edit().remove(firedKey)
+            statePrefs.all.keys
+                .filter { it.startsWith("tact_${automation.id}_") || it.startsWith("tday_${automation.id}_") }
+                .forEach { editor.remove(it) }
+            editor.apply()
         }
+    }
+
+    /**
+     * Runs [automation] right now, ignoring the "already fired" state, and returns a plain-text
+     * report of what it read and did. Used by the "Probar ahora" button.
+     */
+    suspend fun testRun(automation: AdvancedAutomationEntity): String {
+        val report = StringBuilder()
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled()) {
+            report.appendLine("AVISO: las notificaciones de la app están desactivadas en Android (Ajustes del móvil > Aplicaciones > Netatmo Smart > Notificaciones). Sin eso no verás ningún aviso.")
+        } else if (manager.getNotificationChannel(NetatmoApp.CHANNEL_ADVANCED)?.importance == android.app.NotificationManager.IMPORTANCE_NONE) {
+            report.appendLine("AVISO: el canal \"Automatizaciones avanzadas\" está desactivado en los ajustes de notificaciones de Android.")
+        }
+        try {
+            val triggers = JSONArray(automation.triggersJson)
+            var triggerActive = triggers.length() == 0
+            var activeTrigger: JSONObject? = null
+            if (triggers.length() == 0) report.appendLine("Sin disparadores: se evalúan solo las condiciones.")
+            for (i in 0 until triggers.length()) {
+                val trigger = triggers.getJSONObject(i)
+                when (trigger.optString("type")) {
+                    "numeric_state" -> {
+                        val (active, reading) = describeNumericState(trigger)
+                        report.appendLine("Disparador ${i + 1} (${ruleText(trigger)}): $reading -> " +
+                            when (active) { true -> "se cumple"; false -> "no se cumple"; null -> "no se pudo leer" })
+                        if (active == true && activeTrigger == null) { triggerActive = true; activeTrigger = trigger }
+                    }
+                    "time" -> report.appendLine("Disparador ${i + 1}: a las ${trigger.optString("time")} (se evalúa a su hora, no se puede forzar aquí)")
+                    else -> report.appendLine("Disparador ${i + 1}: tipo \"${trigger.optString("type")}\" todavía no se evalúa")
+                }
+            }
+            val conditionsOk = evaluateConditions(automation)
+            val conditions = JSONArray(automation.conditionsJson)
+            report.appendLine(if (conditions.length() == 0) "Sin condiciones adicionales." else "Condiciones: " + if (conditionsOk) "se cumplen." else "NO se cumplen.")
+            if (!triggerActive) { report.appendLine("Resultado: no se ejecuta, ningún disparador se cumple ahora."); return report.toString().trim() }
+            if (!conditionsOk) { report.appendLine("Resultado: no se ejecuta, las condiciones no se cumplen."); return report.toString().trim() }
+
+            val alert = buildTemperatureAlert(automation, activeTrigger)
+            executeActions(automation, alert)
+            report.appendLine("Resultado: acciones ejecutadas.")
+            if (alert == null && JSONArray(automation.actionsJson).let { a -> (0 until a.length()).any { a.getJSONObject(it).optString("type") == "notify" } }) {
+                report.appendLine("La notificación salió sin botones: no hay un disparador de \"temperatura por debajo de\" con lectura disponible.")
+            }
+        } catch (e: Exception) {
+            report.appendLine("ERROR: ${e.message ?: e.javaClass.simpleName}")
+        }
+        return report.toString().trim()
+    }
+
+    private fun ruleText(rule: JSONObject): String {
+        val entity = if (rule.optString("entity") == "outdoor_temp") "temp. exterior" else "temp. interior"
+        return when {
+            rule.has("below") -> "$entity por debajo de ${formatTemp(rule.getDouble("below"))}°C"
+            rule.has("above") -> "$entity por encima de ${formatTemp(rule.getDouble("above"))}°C"
+            else -> entity
+        }
+    }
+
+    private suspend fun describeNumericState(rule: JSONObject): Pair<Boolean?, String> {
+        val active = numericStateActive(rule)
+        val reading = when (rule.optString("entity")) {
+            "outdoor_temp" -> {
+                val homeId = resolveHomeId(rule.optString("home_id", ""))
+                val temp = if (homeId.isEmpty()) null else thermostatRepository.getOutdoorTemperature(homeId)
+                temp?.let { "exterior ${formatTemp(it)}°C" } ?: "sin lectura exterior"
+            }
+            else -> {
+                val rooms = readIndoorRooms()
+                if (rooms.isEmpty()) "sin lecturas de habitaciones (¿sesión de Netatmo caducada?)"
+                else rooms.joinToString(", ") { "${it.name} ${formatTemp(it.temp)}°C" }
+            }
+        }
+        return active to reading
     }
 
     // The list screen shows advanced automations with a negative id (-id) to tell them apart.
@@ -325,7 +405,14 @@ class AdvancedAutomationEngine @Inject constructor(
         }
     }
 
+    private fun requireNotificationsEnabled() {
+        check(NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            "Las notificaciones de la app están desactivadas en Android"
+        }
+    }
+
     private fun notifyPlain(title: String, message: String) {
+        requireNotificationsEnabled()
         val notification = NotificationCompat.Builder(context, NetatmoApp.CHANNEL_ADVANCED)
             .setContentTitle(title)
             .setContentText(message)
@@ -336,6 +423,7 @@ class AdvancedAutomationEngine @Inject constructor(
     }
 
     private fun notifyTemperatureAlert(title: String, message: String, alert: TemperatureAlert) {
+        requireNotificationsEnabled()
         val notificationId = System.currentTimeMillis().toInt()
         val lines = mutableListOf(
             "${alert.measuredLabel}: ${formatTemp(alert.measured)}°C (umbral: por debajo de ${formatTemp(alert.threshold)}°C)"

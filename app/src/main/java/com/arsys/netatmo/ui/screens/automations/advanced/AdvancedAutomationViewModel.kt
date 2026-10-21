@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arsys.netatmo.data.local.entities.AdvancedAutomationEntity
 import com.arsys.netatmo.data.repository.AdvancedAutomationRepository
+import com.arsys.netatmo.service.AdvancedAutomationEngine
 import com.arsys.netatmo.service.AdvancedAutomationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,12 +28,15 @@ data class AdvancedAutomationUiState(
     val triggerMode: String = "all",
     val isLoading: Boolean = false,
     val isSaved: Boolean = false,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val testReport: String? = null,
+    val isTesting: Boolean = false
 )
 
 @HiltViewModel
 class AdvancedAutomationViewModel @Inject constructor(
     private val repository: AdvancedAutomationRepository,
+    private val engine: AdvancedAutomationEngine,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -133,6 +137,38 @@ class AdvancedAutomationViewModel @Inject constructor(
         }
     }
 
+    /** Runs the automation as currently edited (saved or not) and shows what it read and did. */
+    fun testNow(
+        name: String,
+        triggers: List<Map<String, Any>>,
+        conditions: List<Map<String, Any>>,
+        actions: List<Map<String, Any>>,
+        triggerMode: String
+    ) {
+        if (_uiState.value.isTesting) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTesting = true, testReport = null) }
+            val entity = AdvancedAutomationEntity(
+                id = if (automationId == -1L) 0 else automationId,
+                name = name.ifBlank { "Automatización avanzada" },
+                triggersJson = mapsToJsonArray(triggers),
+                conditionsJson = mapsToJsonArray(conditions),
+                actionsJson = mapsToJsonArray(actions),
+                triggerMode = triggerMode
+            )
+            val report = try {
+                engine.testRun(entity)
+            } catch (e: Exception) {
+                "ERROR: ${e.message ?: e.javaClass.simpleName}"
+            }
+            _uiState.update { it.copy(isTesting = false, testReport = report) }
+        }
+    }
+
+    fun dismissTestReport() {
+        _uiState.update { it.copy(testReport = null) }
+    }
+
     fun delete() {
         if (automationId == -1L) return
         viewModelScope.launch {
@@ -147,7 +183,7 @@ class AdvancedAutomationViewModel @Inject constructor(
         for (map in list) {
             val obj = JSONObject()
             for ((key, value) in map) {
-                obj.put(key, value)
+                obj.put(key, JSONObject.wrap(value))
             }
             array.put(obj)
         }
