@@ -27,7 +27,8 @@ data class AutomationsUiState(
 class AutomationsViewModel @Inject constructor(
     private val automationRepository: AutomationRepository,
     private val advancedAutomationRepository: AdvancedAutomationRepository,
-    private val geofenceManager: GeofenceManager
+    private val geofenceManager: GeofenceManager,
+    private val zoneRepository: com.arsys.netatmo.data.repository.ZoneRepository
 ) : ViewModel() {
 
     // Advanced automations live in their own table; the list shows them as AutomationEntity rows
@@ -47,6 +48,7 @@ class AutomationsViewModel @Inject constructor(
             if (id < 0) {
                 advancedAutomationRepository.getById(-id)
                     ?.let { advancedAutomationRepository.update(it.copy(enabled = enabled)) }
+                zoneRepository.syncGeofences()
                 return@launch
             }
             automationRepository.setAutomationEnabled(id, enabled)
@@ -68,6 +70,7 @@ class AutomationsViewModel @Inject constructor(
             if (automation.type == "ADVANCED") {
                 advancedAutomationRepository.getById(-automation.id)
                     ?.let { advancedAutomationRepository.delete(it) }
+                zoneRepository.syncGeofences()
                 return@launch
             }
             if (automation.type == "GEOFENCE") {
