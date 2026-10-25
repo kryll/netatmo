@@ -312,6 +312,9 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             composable(Screen.DevicePairing.route) {
                 DevicePairingScreen(onBack = { navController.popBackStack() })
             }
+            composable("zones") {
+                com.arsys.netatmo.ui.screens.automations.ZonesScreen(navController = navController)
+            }
             composable(
                 route = "advanced_automation/{automationId}",
                 arguments = listOf(navArgument("automationId") { type = NavType.LongType; defaultValue = -1L })
