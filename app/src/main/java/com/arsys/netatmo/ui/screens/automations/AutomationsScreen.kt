@@ -125,6 +125,22 @@ fun AutomationsScreen(
                 }
 
                 IconButton(
+                    onClick = { navController.navigate("zones") },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 48.dp)
+                        .size(40.dp)
+                        .background(SurfaceContainer, CircleShape)
+                ) {
+                    Icon(
+                        Icons.Default.Place,
+                        contentDescription = "Zonas",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                IconButton(
                     onClick = { navController.navigate("automation_log") },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
