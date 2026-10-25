@@ -95,7 +95,8 @@ data class AutomationTrigger(
     val value: Double = 0.0,
     val event: String = "sunset",
     val offset: Int = 0,
-    val action: String = "enter"
+    val action: String = "enter",
+    val zoneName: String = ""
 )
 
 data class AutomationCondition(
@@ -129,7 +130,10 @@ private fun Map<String, Any>.toAutoTrigger() = AutomationTrigger(
         ?: (this["value"] as? Number)?.toDouble() ?: 0.0,
     event = this["event"] as? String ?: "sunset",
     offset = (this["offset"] as? Number)?.toInt() ?: 0,
-    action = this["action"] as? String ?: "enter"
+    // Zone triggers store enter/exit under "event"; older geofence triggers used "action".
+    action = (if (this["type"] == "geofence") this["event"] as? String else null)
+        ?: this["action"] as? String ?: "enter",
+    zoneName = this["zone"] as? String ?: ""
 )
 
 private fun Map<String, Any>.toAutoCondition() = AutomationCondition(
@@ -161,6 +165,7 @@ fun AdvancedAutomationScreen(
     viewModel: AdvancedAutomationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val zones by viewModel.zones.collectAsState()
 
     var name by remember { mutableStateOf(uiState.name) }
     var triggerMode by remember { mutableStateOf(uiState.triggerMode) }
@@ -237,6 +242,11 @@ fun AdvancedAutomationScreen(
             onAdd = { map ->
                 viewModel.addTrigger(map)
                 showTriggerSheet = false
+            },
+            zones = zones,
+            onManageZones = {
+                showTriggerSheet = false
+                navController.navigate("zones")
             }
         )
     }
@@ -739,7 +749,10 @@ private fun triggerSummary(trigger: AutomationTrigger): String = when (trigger.t
         val event = if (trigger.event == "sunset") "Puesta de sol" else "Salida del sol"
         if (trigger.offset != 0) "$event ± ${trigger.offset} min" else event
     }
-    "geofence" -> if (trigger.action == "enter") "Al llegar a casa" else "Al salir de casa"
+    "geofence" -> {
+        val place = trigger.zoneName.ifBlank { "casa" }
+        if (trigger.action == "enter") "Al llegar a $place" else "Al salir de $place"
+    }
     else -> trigger.type
 }
 

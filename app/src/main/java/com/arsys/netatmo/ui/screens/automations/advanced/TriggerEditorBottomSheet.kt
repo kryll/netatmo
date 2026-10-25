@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.arsys.netatmo.data.local.entities.ZoneEntity
 import com.arsys.netatmo.ui.theme.OutlineVariant
 import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 
@@ -44,7 +45,9 @@ import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 @Composable
 fun TriggerEditorBottomSheet(
     onDismiss: () -> Unit,
-    onAdd: (Map<String, Any>) -> Unit
+    onAdd: (Map<String, Any>) -> Unit,
+    zones: List<ZoneEntity> = emptyList(),
+    onManageZones: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -65,11 +68,12 @@ fun TriggerEditorBottomSheet(
 
     // Geofence
     var geofenceEvent by remember { mutableStateOf("enter") }
-    var geofenceZone by remember { mutableStateOf("home") }
+    var geofenceZoneId by remember { mutableStateOf("") }
 
     val triggerTypes = listOf(
         "time" to "Hora",
-        "numeric_state" to "Temperatura"
+        "numeric_state" to "Temperatura",
+        "geofence" to "Zona"
     )
 
     val dayLabels = listOf(1 to "L", 2 to "M", 3 to "X", 4 to "J", 5 to "V", 6 to "S", 7 to "D")
@@ -202,11 +206,35 @@ fun TriggerEditorBottomSheet(
                         onSelect = { geofenceEvent = it }
                     )
                     SheetLabel("Zona")
-                    SheetTextField(
-                        value = geofenceZone,
-                        onValueChange = { geofenceZone = it },
-                        label = "Nombre de zona"
-                    )
+                    if (zones.isEmpty()) {
+                        Text(
+                            "Todavía no tienes zonas guardadas.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        zones.forEach { zone ->
+                            FilterChip(
+                                selected = geofenceZoneId == zone.id,
+                                onClick = { geofenceZoneId = zone.id },
+                                label = { Text("${zone.name} · ${zone.radius.toInt()} m", style = MaterialTheme.typography.labelMedium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = primary.copy(alpha = 0.15f),
+                                    selectedLabelColor = primary,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = geofenceZoneId == zone.id,
+                                    selectedBorderColor = primary.copy(alpha = 0.5f),
+                                    borderColor = OutlineVariant
+                                )
+                            )
+                        }
+                    }
+                    TextButton(onClick = onManageZones) {
+                        Text(if (zones.isEmpty()) "Añadir zona" else "Gestionar zonas")
+                    }
                 }
             }
 
@@ -214,6 +242,7 @@ fun TriggerEditorBottomSheet(
 
             // Add button
             Button(
+                enabled = selectedType != "geofence" || zones.any { it.id == geofenceZoneId },
                 onClick = {
                     val map: Map<String, Any> = when (selectedType) {
                         "time" -> mapOf(
@@ -238,7 +267,8 @@ fun TriggerEditorBottomSheet(
                             "type" to "geofence",
                             "platform" to "geofence",
                             "event" to geofenceEvent,
-                            "zone" to geofenceZone
+                            "zoneId" to geofenceZoneId,
+                            "zone" to (zones.firstOrNull { it.id == geofenceZoneId }?.name ?: "")
                         )
                         else -> emptyMap()
                     }

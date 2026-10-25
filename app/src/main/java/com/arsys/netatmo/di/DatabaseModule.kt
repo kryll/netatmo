@@ -22,7 +22,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "netatmo_db")
-            .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
+            .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8)
             .build()
 
     @Provides fun provideAutomationDao(db: AppDatabase): AutomationDao = db.automationDao()
@@ -35,5 +35,6 @@ object DatabaseModule {
     @Provides fun provideAutomationLogDao(db: AppDatabase): AutomationLogDao = db.automationLogDao()
     @Provides fun provideFamilyMemberDao(db: AppDatabase): FamilyMemberDao = db.familyMemberDao()
     @Provides fun provideAdvancedAutomationDao(db: AppDatabase): AdvancedAutomationDao = db.advancedAutomationDao()
+    @Provides fun provideZoneDao(db: AppDatabase): ZoneDao = db.zoneDao()
     @Provides fun provideMaintenanceDao(db: AppDatabase): MaintenanceDao = db.maintenanceDao()
 }
