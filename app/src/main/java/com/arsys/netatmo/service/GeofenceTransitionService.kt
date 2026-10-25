@@ -41,6 +41,7 @@ class GeofenceTransitionService : Service() {
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var dataStore: DataStore<Preferences>
     @Inject lateinit var geofenceStateStore: GeofenceStateStore
+    @Inject lateinit var advancedAutomationEngine: AdvancedAutomationEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -97,6 +98,13 @@ class GeofenceTransitionService : Service() {
     }
 
     private suspend fun processGeofenceTrigger(geofenceId: String, transition: Int) {
+        if (geofenceId.startsWith(GeofenceManager.ZONE_PREFIX)) {
+            val entered = transition == Geofence.GEOFENCE_TRANSITION_ENTER
+            if (!entered && transition != Geofence.GEOFENCE_TRANSITION_EXIT) return
+            val changed = geofenceStateStore.registerTransition(geofenceId, transition, System.currentTimeMillis())
+            if (changed) advancedAutomationEngine.onZoneTransition(geofenceId.removePrefix(GeofenceManager.ZONE_PREFIX), entered)
+            return
+        }
         val homeId = authRepository.selectedHomeId.first() ?: return
 
         val geofences = automationRepository.getAllGeofences().first()
