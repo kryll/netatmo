@@ -1,5 +1,6 @@
 package com.arsys.netatmo.service
 
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -12,6 +13,7 @@ import com.arsys.netatmo.data.repository.AdvancedAutomationRepository
 import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AutomationRepository
 import com.arsys.netatmo.data.repository.ThermostatRepository
+import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import org.json.JSONArray
@@ -176,8 +178,12 @@ class AdvancedAutomationEngine @Inject constructor(
             if (!conditionsOk) { report.appendLine("Resultado: no se ejecuta, las condiciones no se cumplen."); return report.toString().trim() }
 
             val alert = buildTemperatureAlert(automation, activeTrigger)
-            executeActions(automation, alert)
-            report.appendLine("Resultado: acciones ejecutadas.")
+            val postedIds = executeActions(automation, alert)
+            val actionCount = JSONArray(automation.actionsJson).length()
+            report.appendLine(if (actionCount == 1) "Resultado: 1 acción ejecutada." else "Resultado: $actionCount acciones ejecutadas.")
+            if (postedIds.isNotEmpty()) {
+                report.append(describeNotificationDelivery(postedIds))
+            }
             if (alert == null && JSONArray(automation.actionsJson).let { a -> (0 until a.length()).any { a.getJSONObject(it).optString("type") == "notify" } }) {
                 report.appendLine("La notificación salió sin botones: no hay un disparador de \"temperatura por debajo de\" con lectura disponible.")
             }
@@ -396,14 +402,17 @@ class AdvancedAutomationEngine @Inject constructor(
         return null
     }
 
-    private suspend fun executeActions(automation: AdvancedAutomationEntity, alert: TemperatureAlert?) {
+    private suspend fun executeActions(automation: AdvancedAutomationEntity, alert: TemperatureAlert?): List<Int> {
         val actions = JSONArray(automation.actionsJson)
+        val postedNotificationIds = mutableListOf<Int>()
         for (i in 0 until actions.length()) {
-            executeAction(actions.getJSONObject(i), alert)
+            executeAction(actions.getJSONObject(i), alert)?.let { postedNotificationIds.add(it) }
         }
+        return postedNotificationIds
     }
 
-    private suspend fun executeAction(action: JSONObject, alert: TemperatureAlert?) {
+    /** Returns the posted notification id for "notify" actions, null for anything else. */
+    private suspend fun executeAction(action: JSONObject, alert: TemperatureAlert?): Int? {
         when (action.optString("type")) {
             "set_temperature" -> {
                 val homeId = action.optString("homeId")
@@ -420,7 +429,7 @@ class AdvancedAutomationEngine @Inject constructor(
             "notify" -> {
                 val title = action.optString("title", "Automation").ifBlank { "Automatización" }
                 val message = action.optString("message", "")
-                if (alert != null) notifyTemperatureAlert(title, message, alert) else notifyPlain(title, message)
+                return if (alert != null) notifyTemperatureAlert(title, message, alert) else notifyPlain(title, message)
             }
             "delay" -> {
                 val minutes = action.optLong("minutes", 1)
@@ -428,7 +437,7 @@ class AdvancedAutomationEngine @Inject constructor(
             }
             "apply_scenario" -> {
                 val scenarioId = action.optLong("scenarioId")
-                val scenario = automationRepository.getScenarioById(scenarioId) ?: return
+                val scenario = automationRepository.getScenarioById(scenarioId) ?: return null
                 val scenarioActions = JSONArray(scenario.actionsJson)
                 for (i in 0 until scenarioActions.length()) {
                     val scenarioAction = scenarioActions.getJSONObject(i)
@@ -440,6 +449,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 }
             }
         }
+        return null
     }
 
     private fun requireNotificationsEnabled() {
@@ -448,18 +458,20 @@ class AdvancedAutomationEngine @Inject constructor(
         }
     }
 
-    private fun notifyPlain(title: String, message: String) {
+    private fun notifyPlain(title: String, message: String): Int {
         requireNotificationsEnabled()
+        val notificationId = System.currentTimeMillis().toInt()
         val notification = NotificationCompat.Builder(context, NetatmoApp.CHANNEL_ADVANCED)
             .setContentTitle(title)
             .setContentText(message)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
-        NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), notification)
+        NotificationManagerCompat.from(context).notify(notificationId, notification)
+        return notificationId
     }
 
-    private fun notifyTemperatureAlert(title: String, message: String, alert: TemperatureAlert) {
+    private fun notifyTemperatureAlert(title: String, message: String, alert: TemperatureAlert): Int {
         requireNotificationsEnabled()
         val notificationId = System.currentTimeMillis().toInt()
         val lines = mutableListOf(
@@ -505,6 +517,57 @@ class AdvancedAutomationEngine @Inject constructor(
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .build()
         NotificationManagerCompat.from(context).notify(notificationId, notification)
+        return notificationId
+    }
+
+    /**
+     * Ground truth about what Android did with the notifications the test just posted, read back
+     * from the system right after sending. Posting without an exception only means the call did
+     * not crash; this reports whether the system actually holds them.
+     */
+    private suspend fun describeNotificationDelivery(postedIds: List<Int>): String {
+        val sb = StringBuilder()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        // Posting can be asynchronous on some devices: re-check over ~1.5 s before reporting.
+        var activeIds: List<Int>? = null
+        var allPosted = false
+        for (attempt in 1..4) {
+            activeIds = try {
+                nm.activeNotifications?.map { it.id }
+            } catch (e: Exception) {
+                null
+            }
+            allPosted = activeIds?.let { ids -> postedIds.all { it in ids } } == true
+            if (allPosted) break
+            if (attempt < 4) delay(500)
+        }
+        when {
+            activeIds == null ->
+                sb.appendLine("No se pudo comprobar en el sistema si el aviso quedó registrado.")
+            allPosted ->
+                sb.appendLine("Android confirma el aviso registrado en el sistema. Si no lo ves, está silenciado u oculto (No molestar/descanso o canal en silencio).")
+            else ->
+                sb.appendLine("El aviso no aparece entre las notificaciones activas del sistema tras enviarlo (comprobado varias veces durante unos segundos).")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = nm.getNotificationChannel(NetatmoApp.CHANNEL_ADVANCED)
+            if (channel == null) {
+                sb.appendLine("El canal «Automatizaciones avanzadas» no existe en Android (puede haberse eliminado).")
+            } else {
+                val importance = when (channel.importance) {
+                    NotificationManager.IMPORTANCE_NONE -> "bloqueado"
+                    NotificationManager.IMPORTANCE_MIN -> "mínima (minimizado en la bandeja, sin sonido)"
+                    NotificationManager.IMPORTANCE_LOW -> "baja (solo bandeja, sin sonido)"
+                    NotificationManager.IMPORTANCE_DEFAULT -> "normal (bandeja y sonido)"
+                    else -> "alta (aviso emergente)"
+                }
+                sb.appendLine("Canal «Automatizaciones avanzadas»: importancia $importance.")
+            }
+            if (nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
+                sb.appendLine("No molestar / modo descanso está activo ahora mismo: puede silenciar u ocultar el aviso aunque esté registrado.")
+            }
+        }
+        return sb.toString()
     }
 
     // Rounded up to the 0.5° step Netatmo accepts, so the result is never below current + step.
