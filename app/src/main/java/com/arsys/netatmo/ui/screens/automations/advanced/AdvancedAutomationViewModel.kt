@@ -11,6 +11,8 @@ import com.arsys.netatmo.service.AdvancedAutomationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -37,6 +39,7 @@ data class AdvancedAutomationUiState(
 class AdvancedAutomationViewModel @Inject constructor(
     private val repository: AdvancedAutomationRepository,
     private val engine: AdvancedAutomationEngine,
+    private val zoneRepository: com.arsys.netatmo.data.repository.ZoneRepository,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -45,6 +48,9 @@ class AdvancedAutomationViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(AdvancedAutomationUiState())
     val uiState: StateFlow<AdvancedAutomationUiState> = _uiState.asStateFlow()
+
+    val zones: StateFlow<List<com.arsys.netatmo.data.local.entities.ZoneEntity>> =
+        zoneRepository.observeZones().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         if (automationId != -1L) {
@@ -132,6 +138,7 @@ class AdvancedAutomationViewModel @Inject constructor(
                 triggerMode = triggerMode
             )
             repository.save(entity)
+            zoneRepository.syncGeofences()
             AdvancedAutomationWorker.runNow(context)
             _uiState.update { it.copy(isSaved = true) }
         }
@@ -174,6 +181,7 @@ class AdvancedAutomationViewModel @Inject constructor(
         viewModelScope.launch {
             val entity = repository.getById(automationId) ?: return@launch
             repository.delete(entity)
+            zoneRepository.syncGeofences()
             _uiState.update { it.copy(isDeleted = true) }
         }
     }
