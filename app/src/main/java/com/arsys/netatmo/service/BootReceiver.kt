@@ -27,6 +27,9 @@ class BootReceiver : BroadcastReceiver() {
     @Inject
     lateinit var automationRepository: AutomationRepository
 
+    @Inject
+    lateinit var zoneRepository: com.arsys.netatmo.data.repository.ZoneRepository
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
             intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
@@ -60,6 +63,7 @@ class BootReceiver : BroadcastReceiver() {
                         // Background location permission not granted
                     }
                 }
+                zoneRepository.syncGeofences()
             } finally {
                 pendingResult.finish()
             }
