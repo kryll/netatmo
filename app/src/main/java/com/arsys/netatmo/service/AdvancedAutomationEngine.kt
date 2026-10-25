@@ -64,7 +64,6 @@ class AdvancedAutomationEngine @Inject constructor(
      * it runs when its conditions start being met. Never on every periodic check.
      */
     suspend fun evaluateAndExecute(automation: AdvancedAutomationEntity) {
-        val firedKey = "fired_${automation.id}"
         try {
             val triggers = JSONArray(automation.triggersJson)
             var firedTrigger: JSONObject? = null
@@ -80,26 +79,63 @@ class AdvancedAutomationEngine @Inject constructor(
                 shouldRun = firedTrigger != null && evaluateConditions(automation)
             }
             if (!shouldRun) return
+            runFired(automation, firedTrigger, MIN_REPEAT_MS)
+        } catch (e: Exception) {
+            recordFailure(automation, e)
+        }
+    }
 
-            val now = System.currentTimeMillis()
-            if (now - statePrefs.getLong(firedKey, 0L) < MIN_REPEAT_MS) return
-            statePrefs.edit().putLong(firedKey, now).apply()
+    /**
+     * Called when the phone arrives at or leaves a saved zone. Runs every enabled automation that
+     * has a zone trigger for that zone and event, if its conditions hold. The geofence state store
+     * already ignores repeated or flapping transitions, so no hourly debounce is applied here.
+     */
+    suspend fun onZoneTransition(zoneId: String, entered: Boolean) {
+        val event = if (entered) "enter" else "exit"
+        advancedAutomationRepository.getEnabledAdvancedAutomations().forEach { automation ->
+            try {
+                val triggers = JSONArray(automation.triggersJson)
+                val matching = (0 until triggers.length())
+                    .map { triggers.getJSONObject(it) }
+                    .firstOrNull {
+                        it.optString("type") == "geofence" &&
+                            it.optString("zoneId") == zoneId &&
+                            it.optString("event", "enter") == event
+                    } ?: return@forEach
+                if (!evaluateConditions(automation)) return@forEach
+                runFired(automation, matching, 0L)
+            } catch (e: Exception) {
+                recordFailure(automation, e)
+            }
+        }
+    }
 
+    private suspend fun runFired(automation: AdvancedAutomationEntity, firedTrigger: JSONObject?, minRepeatMs: Long) {
+        val firedKey = "fired_${automation.id}"
+        val now = System.currentTimeMillis()
+        if (minRepeatMs > 0 && now - statePrefs.getLong(firedKey, 0L) < minRepeatMs) return
+        statePrefs.edit().putLong(firedKey, now).apply()
+        try {
             val alert = buildTemperatureAlert(automation, firedTrigger)
             executeActions(automation, alert)
             advancedAutomationRepository.updateLastTriggered(automation.id, now, "success")
             logExecution(automation, now, success = true, error = null)
         } catch (e: Exception) {
-            val now = System.currentTimeMillis()
-            advancedAutomationRepository.updateLastTriggered(automation.id, now, "error")
-            logExecution(automation, now, success = false, error = e.message ?: e.javaClass.simpleName)
-            // Forget the consumed trigger so the next check tries again instead of waiting for a new crossing.
-            val editor = statePrefs.edit().remove(firedKey)
-            statePrefs.all.keys
-                .filter { it.startsWith("tact_${automation.id}_") || it.startsWith("tday_${automation.id}_") }
-                .forEach { editor.remove(it) }
-            editor.apply()
+            recordFailure(automation, e)
         }
+    }
+
+    private suspend fun recordFailure(automation: AdvancedAutomationEntity, e: Exception) {
+        val firedKey = "fired_${automation.id}"
+        val now = System.currentTimeMillis()
+        advancedAutomationRepository.updateLastTriggered(automation.id, now, "error")
+        logExecution(automation, now, success = false, error = e.message ?: e.javaClass.simpleName)
+        // Forget the consumed trigger so the next check tries again instead of waiting for a new crossing.
+        val editor = statePrefs.edit().remove(firedKey)
+        statePrefs.all.keys
+            .filter { it.startsWith("tact_${automation.id}_") || it.startsWith("tday_${automation.id}_") }
+            .forEach { editor.remove(it) }
+        editor.apply()
     }
 
     /**
@@ -129,6 +165,7 @@ class AdvancedAutomationEngine @Inject constructor(
                         if (active == true && activeTrigger == null) { triggerActive = true; activeTrigger = trigger }
                     }
                     "time" -> report.appendLine("Disparador ${i + 1}: a las ${trigger.optString("time")} (se evalúa a su hora, no se puede forzar aquí)")
+                    "geofence" -> report.appendLine("Disparador ${i + 1}: ${if (trigger.optString("event") == "exit") "al salir de" else "al llegar a"} la zona \"${trigger.optString("zone")}\" (se evalúa cuando el móvil entra o sale, no se puede forzar aquí)")
                     else -> report.appendLine("Disparador ${i + 1}: tipo \"${trigger.optString("type")}\" todavía no se evalúa")
                 }
             }
@@ -270,7 +307,7 @@ class AdvancedAutomationEngine @Inject constructor(
                     if (active != null) statePrefs.edit().putBoolean(key, active).apply()
                     active == true && !wasActive
                 }
-                else -> false // "sun" and "geofence" triggers are not evaluated yet
+                else -> false // "sun" is not evaluated yet; "geofence" runs from onZoneTransition
             }
             if (fires && fired == null) fired = trigger
         }
