@@ -25,9 +25,10 @@ import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
         AutomationLogEntity::class,
         FamilyMemberEntity::class,
         AdvancedAutomationEntity::class,
-        MaintenanceRecordEntity::class
+        MaintenanceRecordEntity::class,
+        ZoneEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -43,8 +44,23 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun familyMemberDao(): FamilyMemberDao
     abstract fun advancedAutomationDao(): AdvancedAutomationDao
     abstract fun maintenanceDao(): MaintenanceDao
+    abstract fun zoneDao(): ZoneDao
 
     companion object {
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `zones` " +
+                    "(`id` TEXT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`latitude` REAL NOT NULL, " +
+                    "`longitude` REAL NOT NULL, " +
+                    "`radius` REAL NOT NULL, " +
+                    "PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE geofences ADD COLUMN notificationsDisabled INTEGER NOT NULL DEFAULT 0")
