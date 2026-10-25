@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import com.arsys.netatmo.data.local.entities.GeofenceEntity
+import com.arsys.netatmo.data.local.entities.ZoneEntity
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingClient
 import com.google.android.gms.location.GeofencingRequest
@@ -55,7 +56,34 @@ class GeofenceManager @Inject constructor(
         geofencingClient.addGeofences(request, geofencePendingIntent)
     }
 
+    /** Registers a reusable zone for both arrival and departure. Request id is [zoneRequestId]. */
+    @SuppressLint("MissingPermission")
+    fun registerZone(zone: ZoneEntity) {
+        val geofence = Geofence.Builder()
+            .setRequestId(zoneRequestId(zone.id))
+            .setCircularRegion(zone.latitude, zone.longitude, zone.radius)
+            .setExpirationDuration(Geofence.NEVER_EXPIRE)
+            .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
+            .build()
+        val request = GeofencingRequest.Builder()
+            // No initial trigger: only real arrivals/departures should run automations.
+            .setInitialTrigger(0)
+            .addGeofence(geofence)
+            .build()
+        geofencingClient.addGeofences(request, geofencePendingIntent)
+    }
+
+    fun removeZones(zoneIds: List<String>) {
+        if (zoneIds.isEmpty()) return
+        geofencingClient.removeGeofences(zoneIds.map { zoneRequestId(it) })
+    }
+
     fun removeGeofence(geofenceId: String) {
         geofencingClient.removeGeofences(listOf(geofenceId))
+    }
+
+    companion object {
+        const val ZONE_PREFIX = "zone_"
+        fun zoneRequestId(zoneId: String) = ZONE_PREFIX + zoneId
     }
 }
