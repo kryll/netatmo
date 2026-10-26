@@ -23,6 +23,7 @@ import javax.inject.Inject
 
 data class AdvancedAutomationUiState(
     val name: String = "",
+    val description: String = "",
     val enabled: Boolean = true,
     val triggers: List<Map<String, Any>> = emptyList(),
     val conditions: List<Map<String, Any>> = emptyList(),
@@ -39,6 +40,7 @@ data class AdvancedAutomationUiState(
 class AdvancedAutomationViewModel @Inject constructor(
     private val repository: AdvancedAutomationRepository,
     private val engine: AdvancedAutomationEngine,
+    private val classicAutomationMigrator: com.arsys.netatmo.service.ClassicAutomationMigrator,
     private val zoneRepository: com.arsys.netatmo.data.repository.ZoneRepository,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
@@ -61,6 +63,7 @@ class AdvancedAutomationViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             name = entity.name,
+                            description = entity.description,
                             enabled = entity.enabled,
                             triggers = jsonArrayToMaps(entity.triggersJson),
                             conditions = jsonArrayToMaps(entity.conditionsJson),
@@ -116,6 +119,16 @@ class AdvancedAutomationViewModel @Inject constructor(
 
     fun setName(name: String) {
         _uiState.update { it.copy(name = name) }
+    }
+
+    /** Reverts this migrated automation to its classic original (see ClassicAutomationMigrator). */
+    fun revertMigration() {
+        viewModelScope.launch {
+            val entity = repository.getById(automationId) ?: return@launch
+            if (classicAutomationMigrator.rollbackFor(entity)) {
+                _uiState.update { it.copy(isDeleted = true) }
+            }
+        }
     }
 
     fun save(
