@@ -61,9 +61,14 @@ fun ActionEditorBottomSheet(
     // delay
     var delayMinutes by remember { mutableStateOf("5") }
 
+    // set_home_mode
+    var homeMode by remember { mutableStateOf("schedule") }
+    var homeModeHours by remember { mutableStateOf("") }
+
     val actionTypes = listOf(
         "set_temperature" to "Temperatura",
         "set_mode" to "Modo",
+        "set_home_mode" to "Modo de la casa",
         "notify" to "Notificación",
         "delay" to "Esperar"
     )
@@ -199,6 +204,45 @@ fun ActionEditorBottomSheet(
                     )
                 }
 
+                "set_home_mode" -> {
+                    SheetLabel("Modo de la casa")
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf(
+                            "schedule" to "Programado",
+                            "away" to "Ausente",
+                            "hg" to "Anticongelación",
+                            "off" to "Apagado"
+                        ).forEach { (mode, label) ->
+                            FilterChip(
+                                selected = homeMode == mode,
+                                onClick = { homeMode = mode },
+                                label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = secondaryContainer.copy(alpha = 0.20f),
+                                    selectedLabelColor = secondary,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = homeMode == mode,
+                                    selectedBorderColor = secondary.copy(alpha = 0.45f),
+                                    borderColor = OutlineVariant
+                                )
+                            )
+                        }
+                    }
+                    SheetLabel("Duración en horas (vacío = hasta cambiarlo)")
+                    SheetTextField(
+                        value = homeModeHours,
+                        onValueChange = { homeModeHours = it },
+                        label = "Horas"
+                    )
+                }
+
                 "delay" -> {
                     SheetLabel("Minutos de espera")
                     SheetTextField(
@@ -229,6 +273,13 @@ fun ActionEditorBottomSheet(
                             "title" to notifyTitle,
                             "message" to notifyMessage
                         )
+                        "set_home_mode" -> buildMap {
+                            put("type", "set_home_mode")
+                            put("mode", homeMode)
+                            homeModeHours.toIntOrNull()?.takeIf { it > 0 }?.let {
+                                put("endAt", System.currentTimeMillis() + it * 3_600_000L)
+                            }
+                        }
                         "delay" -> mapOf(
                             "type" to "delay",
                             "minutes" to (delayMinutes.toIntOrNull() ?: 5)

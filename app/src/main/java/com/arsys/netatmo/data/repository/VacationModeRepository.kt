@@ -81,6 +81,21 @@ class VacationModeRepository @Inject constructor(
         return ApiResult.Success(Unit)
     }
 
+    /**
+     * Stores a future vacation without sending any mode: the advanced automation created by the
+     * caller owns the frost-guard start, and the vacation_end worker restores the schedule and
+     * clears the flag at [endMs].
+     */
+    suspend fun scheduleFuture(startMs: Long, endMs: Long) {
+        context.dataStore.edit { prefs ->
+            prefs[VACATION_ENABLED] = true
+            prefs[VACATION_START_MS] = startMs
+            prefs[VACATION_END_MS] = endMs
+        }
+        VacationModeWorker.cancel(context)
+        VacationModeWorker.schedule(context, VacationModeWorker.ACTION_END, endMs - System.currentTimeMillis())
+    }
+
     suspend fun deactivate(): ApiResult<Unit> {
         if (currentState().enabled) {
             val result = restoreSchedule()

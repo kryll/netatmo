@@ -70,10 +70,42 @@ fun TriggerEditorBottomSheet(
     var geofenceEvent by remember { mutableStateOf("enter") }
     var geofenceZoneId by remember { mutableStateOf("") }
 
+    // Time window (franja)
+    var windowStart by remember { mutableStateOf("22:00") }
+    var windowEnd by remember { mutableStateOf("07:00") }
+
+    // Date & time (one-shot)
+    var dateTimeDate by remember { mutableStateOf("") } // AAAA-MM-DD
+    var dateTimeTime by remember { mutableStateOf("12:00") }
+
+    // Calendar
+    var calendars by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
+    var calendarId by remember { mutableStateOf(-1L) }
+    var calendarTitle by remember { mutableStateOf("") }
+    var calendarMinutesBefore by remember { mutableStateOf("30") }
+    var calendarPermissionDenied by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val calendarPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) calendars = queryDeviceCalendars(context) else calendarPermissionDenied = true
+    }
+    androidx.compose.runtime.LaunchedEffect(selectedType) {
+        if (selectedType == "calendar" && calendars.isEmpty() &&
+            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALENDAR) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            calendars = queryDeviceCalendars(context)
+        }
+    }
+
     val triggerTypes = listOf(
         "time" to "Hora",
+        "time_window" to "Franja",
         "numeric_state" to "Temperatura",
-        "geofence" to "Zona"
+        "geofence" to "Zona",
+        "calendar" to "Calendario",
+        "datetime" to "Fecha"
     )
 
     val dayLabels = listOf(1 to "L", 2 to "M", 3 to "X", 4 to "J", 5 to "V", 6 to "S", 7 to "D")
@@ -148,6 +180,103 @@ fun TriggerEditorBottomSheet(
                                 )
                             )
                         }
+                    }
+                }
+
+                "time_window" -> {
+                    SheetLabel("Días de la semana")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        dayLabels.forEach { (dayNum, dayLabel) ->
+                            FilterChip(
+                                selected = days.contains(dayNum),
+                                onClick = {
+                                    if (days.contains(dayNum)) days.remove(dayNum)
+                                    else days.add(dayNum)
+                                },
+                                label = { Text(dayLabel, style = MaterialTheme.typography.labelMedium) },
+                                modifier = Modifier.weight(1f),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = primary.copy(alpha = 0.15f),
+                                    selectedLabelColor = primary,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = days.contains(dayNum),
+                                    selectedBorderColor = primary.copy(alpha = 0.5f),
+                                    borderColor = OutlineVariant
+                                )
+                            )
+                        }
+                    }
+                    SheetLabel("Desde (HH:MM)")
+                    SheetTextField(value = windowStart, onValueChange = { windowStart = it }, label = "Inicio")
+                    SheetLabel("Hasta (HH:MM)")
+                    SheetTextField(value = windowEnd, onValueChange = { windowEnd = it }, label = "Fin")
+                    Text(
+                        "Se aplica de nuevo en cada comprobación mientras estés dentro de la franja.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                "datetime" -> {
+                    SheetLabel("Fecha (AAAA-MM-DD)")
+                    SheetTextField(value = dateTimeDate, onValueChange = { dateTimeDate = it }, label = "Fecha")
+                    SheetLabel("Hora (HH:MM)")
+                    SheetTextField(value = dateTimeTime, onValueChange = { dateTimeTime = it }, label = "Hora")
+                    Text(
+                        "Se ejecuta una sola vez, a partir de esa fecha y hora.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                "calendar" -> {
+                    if (calendarPermissionDenied) {
+                        Text(
+                            "Sin permiso de calendario no se puede usar este disparador.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    if (calendars.isEmpty() && !calendarPermissionDenied) {
+                        Text(
+                            "Se necesita permiso de calendario para listar tus calendarios.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = { calendarPermissionLauncher.launch(android.Manifest.permission.READ_CALENDAR) }) {
+                            Text("Conceder permiso de calendario")
+                        }
+                    }
+                    if (calendars.isNotEmpty()) {
+                        SheetLabel("Calendario")
+                        calendars.forEach { (id, name) ->
+                            FilterChip(
+                                selected = calendarId == id,
+                                onClick = { calendarId = id },
+                                label = { Text(name, style = MaterialTheme.typography.labelMedium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = primary.copy(alpha = 0.15f),
+                                    selectedLabelColor = primary,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = calendarId == id,
+                                    selectedBorderColor = primary.copy(alpha = 0.5f),
+                                    borderColor = OutlineVariant
+                                )
+                            )
+                        }
+                        SheetLabel("Título del evento contiene (opcional)")
+                        SheetTextField(value = calendarTitle, onValueChange = { calendarTitle = it }, label = "Filtro de título")
+                        SheetLabel("Minutos de antelación")
+                        SheetTextField(value = calendarMinutesBefore, onValueChange = { calendarMinutesBefore = it }, label = "Minutos antes")
                     }
                 }
 
@@ -242,7 +371,14 @@ fun TriggerEditorBottomSheet(
 
             // Add button
             Button(
-                enabled = selectedType != "geofence" || zones.any { it.id == geofenceZoneId },
+                enabled = when (selectedType) {
+                    "geofence" -> zones.any { it.id == geofenceZoneId }
+                    "calendar" -> calendarId >= 0
+                    "datetime" -> parseDateTimeMs(dateTimeDate, dateTimeTime) != null
+                    "time_window" -> days.isNotEmpty() &&
+                        isValidHhMm(windowStart) && isValidHhMm(windowEnd) && windowStart != windowEnd
+                    else -> true
+                },
                 onClick = {
                     val map: Map<String, Any> = when (selectedType) {
                         "time" -> mapOf(
@@ -270,6 +406,23 @@ fun TriggerEditorBottomSheet(
                             "zoneId" to geofenceZoneId,
                             "zone" to (zones.firstOrNull { it.id == geofenceZoneId }?.name ?: "")
                         )
+                        "time_window" -> mapOf(
+                            "type" to "time_window",
+                            "days" to days.sorted(),
+                            "start" to windowStart,
+                            "end" to windowEnd
+                        )
+                        "datetime" -> mapOf(
+                            "type" to "datetime",
+                            "at" to (parseDateTimeMs(dateTimeDate, dateTimeTime) ?: 0L)
+                        )
+                        "calendar" -> buildMap {
+                            put("type", "calendar")
+                            put("calendarId", calendarId)
+                            put("calendarName", calendars.firstOrNull { it.first == calendarId }?.second ?: "")
+                            put("title", calendarTitle.trim())
+                            put("minutesBefore", calendarMinutesBefore.toIntOrNull()?.coerceAtLeast(0) ?: 30)
+                        }
                         else -> emptyMap()
                     }
                     onAdd(map)
@@ -366,4 +519,49 @@ internal fun WrappingFilterChips(
             )
         }
     }
+}
+
+
+// ── Calendar + date helpers ──────────────────────────────────────────────────
+
+internal fun isValidHhMm(value: String): Boolean =
+    Regex("^([01]?\\d|2[0-3]):[0-5]\\d$").matches(value.trim())
+
+/** Parses "AAAA-MM-DD" + "HH:MM" in local time; null when invalid. */
+internal fun parseDateTimeMs(date: String, time: String): Long? {
+    return try {
+        val d = date.trim().split("-").map { it.toInt() }
+        val t = time.trim().split(":").map { it.toInt() }
+        if (d.size != 3 || t.size != 2) return null
+        java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+            set(d[0], d[1] - 1, d[2], t[0], t[1])
+        }.timeInMillis
+    } catch (e: Exception) {
+        null
+    }
+}
+
+internal fun queryDeviceCalendars(context: android.content.Context): List<Pair<Long, String>> {
+    val result = mutableListOf<Pair<Long, String>>()
+    try {
+        context.contentResolver.query(
+            android.provider.CalendarContract.Calendars.CONTENT_URI,
+            arrayOf(
+                android.provider.CalendarContract.Calendars._ID,
+                android.provider.CalendarContract.Calendars.CALENDAR_DISPLAY_NAME
+            ),
+            "${android.provider.CalendarContract.Calendars.VISIBLE} = 1",
+            null,
+            "${android.provider.CalendarContract.Calendars.CALENDAR_DISPLAY_NAME} ASC"
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                result.add(cursor.getLong(0) to (cursor.getString(1) ?: "Calendario"))
+            }
+        }
+    } catch (e: SecurityException) {
+        // Permission not granted yet.
+    }
+    return result
 }

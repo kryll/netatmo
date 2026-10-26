@@ -70,6 +70,9 @@ jobs:
           mkdir -p "$HOME/.android"
           cp debug.keystore "$HOME/.android/debug.keystore"
 
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
       - name: Build debug APK
         run: ./gradlew assembleDebug -PversionCode=${{ github.run_number }} --no-daemon
 

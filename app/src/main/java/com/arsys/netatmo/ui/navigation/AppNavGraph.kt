@@ -23,8 +23,6 @@ import com.arsys.netatmo.ui.screens.auth.AuthViewModel
 import com.arsys.netatmo.ui.screens.automations.AutomationsScreen
 import com.arsys.netatmo.ui.screens.automations.AutomationLogScreen
 import com.arsys.netatmo.ui.screens.automations.advanced.AdvancedAutomationScreen
-import com.arsys.netatmo.ui.screens.automations.GeofenceDetailScreen
-import com.arsys.netatmo.ui.screens.automations.CalendarAutomationScreen
 import com.arsys.netatmo.ui.screens.home.HomeScreen
 import com.arsys.netatmo.ui.screens.programs.ProgramsScreen
 import com.arsys.netatmo.ui.screens.scenarios.ScenariosScreen
@@ -35,7 +33,6 @@ import com.arsys.netatmo.ui.screens.settings.SettingsScreen
 import com.arsys.netatmo.ui.screens.onboarding.OnboardingScreen
 import com.arsys.netatmo.ui.screens.onboarding.OnboardingViewModel
 import com.arsys.netatmo.ui.screens.statistics.StatisticsScreen
-import com.arsys.netatmo.ui.screens.automations.ScheduleAutomationScreen
 import com.arsys.netatmo.ui.screens.settings.VacationModeScreen
 import com.arsys.netatmo.ui.screens.settings.FamilyManagementScreen
 import com.arsys.netatmo.ui.screens.airquality.AirQualityScreen
@@ -53,13 +50,10 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Scenarios : Screen("scenarios", "Escenarios", Icons.Default.AutoAwesome)
     object Settings : Screen("settings", "Ajustes", Icons.Default.Settings)
     object Auth : Screen("auth", "Login", Icons.Default.Login)
-    object GeofenceDetail : Screen("geofence/{id}", "Geovalla", Icons.Default.LocationOn)
-    object CalendarAutomation : Screen("calendar_automation/{id}", "Calendario", Icons.Default.CalendarToday)
     object ScenarioDetail : Screen("scenario/{id}", "Escenario", Icons.Default.AutoAwesome)
     object ScheduleDetail : Screen("schedule/{id}", "Programación", Icons.Default.Schedule)
     object NetatmoCredentials : Screen("netatmo_credentials", "Credenciales", Icons.Default.Key)
     object Onboarding : Screen("onboarding", "Bienvenido", Icons.Default.StarOutline)
-    object ScheduleAutomation : Screen("schedule_automation/{id}", "Horario", Icons.Default.Schedule)
     object VacationMode : Screen("vacation_mode", "Vacaciones", Icons.Default.BeachAccess)
     object FamilyManagement : Screen("family_management", "Familia", Icons.Default.Group)
     object AdvancedAutomation : Screen("advanced_automation/{automationId}", "Automatización avanzada", Icons.Default.AutoAwesome)
@@ -226,20 +220,6 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             composable(Screen.Automations.route) {
                 AutomationsScreen(navController = navController)
             }
-            composable(
-                route = Screen.GeofenceDetail.route,
-                arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })
-            ) { backStackEntry ->
-                val id = backStackEntry.arguments?.getLong("id") ?: -1L
-                GeofenceDetailScreen(automationId = id, navController = navController)
-            }
-            composable(
-                route = Screen.CalendarAutomation.route,
-                arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })
-            ) { backStackEntry ->
-                val id = backStackEntry.arguments?.getLong("id") ?: -1L
-                CalendarAutomationScreen(automationId = id, navController = navController)
-            }
             composable("automation_log") {
                 AutomationLogScreen(navController = navController)
             }
@@ -275,10 +255,6 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             }
             composable(Screen.NetatmoCredentials.route) {
                 NetatmoCredentialsScreen(navController = navController)
-            }
-            composable("schedule_automation/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })) { backStackEntry ->
-                val id = backStackEntry.arguments?.getLong("id") ?: -1L
-                ScheduleAutomationScreen(automationId = id, navController = navController)
             }
             composable("vacation_mode") { VacationModeScreen(navController = navController) }
             composable("family_management") { FamilyManagementScreen(navController = navController) }

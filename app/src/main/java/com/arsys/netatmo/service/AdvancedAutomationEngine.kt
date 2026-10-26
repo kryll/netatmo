@@ -14,6 +14,7 @@ import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AutomationRepository
 import com.arsys.netatmo.data.repository.ThermostatRepository
 import android.os.Build
+import android.provider.CalendarContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import org.json.JSONArray
@@ -81,7 +82,9 @@ class AdvancedAutomationEngine @Inject constructor(
                 shouldRun = firedTrigger != null && evaluateConditions(automation)
             }
             if (!shouldRun) return
-            runFired(automation, firedTrigger, MIN_REPEAT_MS)
+            // A time window re-fires on every check while inside it, like the classic schedule did.
+            val repeatMs = if (firedTrigger?.optString("type") == "time_window") 0L else MIN_REPEAT_MS
+            runFired(automation, firedTrigger, repeatMs)
         } catch (e: Exception) {
             recordFailure(automation, e)
         }
@@ -135,7 +138,10 @@ class AdvancedAutomationEngine @Inject constructor(
         // Forget the consumed trigger so the next check tries again instead of waiting for a new crossing.
         val editor = statePrefs.edit().remove(firedKey)
         statePrefs.all.keys
-            .filter { it.startsWith("tact_${automation.id}_") || it.startsWith("tday_${automation.id}_") }
+            .filter {
+                it.startsWith("tact_${automation.id}_") || it.startsWith("tday_${automation.id}_") ||
+                    it.startsWith("tdt_${automation.id}_") || it.startsWith("tcal_${automation.id}_")
+            }
             .forEach { editor.remove(it) }
         editor.apply()
     }
@@ -167,6 +173,30 @@ class AdvancedAutomationEngine @Inject constructor(
                         if (active == true && activeTrigger == null) { triggerActive = true; activeTrigger = trigger }
                     }
                     "time" -> report.appendLine("Disparador ${i + 1}: a las ${trigger.optString("time")} (se evalúa a su hora, no se puede forzar aquí)")
+                    "time_window" -> {
+                        val inside = timeWindowActive(trigger)
+                        report.appendLine("Disparador ${i + 1}: franja ${trigger.optString("start")}-${trigger.optString("end")} -> " +
+                            (if (inside) "ahora dentro" else "ahora fuera"))
+                        if (inside && activeTrigger == null) { triggerActive = true; activeTrigger = trigger }
+                    }
+                    "calendar" -> {
+                        val next = queryUpcomingEvents(
+                            trigger.optLong("calendarId", -1L),
+                            trigger.optString("title").ifBlank { null },
+                            System.currentTimeMillis(), 7L * 24 * 60 * 60 * 1000
+                        ).firstOrNull()
+                        report.appendLine("Disparador ${i + 1}: calendario «${trigger.optString("calendarName")}»" +
+                            (trigger.optString("title").ifBlank { "" }.let { if (it.isEmpty()) "" else " con «$it»" }) +
+                            ", ${trigger.optInt("minutesBefore", 30)} min antes: " +
+                            (next?.let { "próximo evento «${it.title}» el ${formatDateTime(it.startMs)}" } ?: "sin eventos próximos en 7 días") +
+                            " (se evalúa cuando toca, no se puede forzar aquí)")
+                    }
+                    "datetime" -> {
+                        val at = trigger.optLong("at", 0L)
+                        val consumed = statePrefs.getBoolean("tdt_${automation.id}_$i", false)
+                        report.appendLine("Disparador ${i + 1}: el ${formatDateTime(at)}" +
+                            (if (consumed) " (ya se ejecutó)" else " (se evalúa a su hora, no se puede forzar aquí)"))
+                    }
                     "geofence" -> report.appendLine("Disparador ${i + 1}: ${if (trigger.optString("event") == "exit") "al salir de" else "al llegar a"} la zona \"${trigger.optString("zone")}\" (se evalúa cuando el móvil entra o sale, no se puede forzar aquí)")
                     else -> report.appendLine("Disparador ${i + 1}: tipo \"${trigger.optString("type")}\" todavía no se evalúa")
                 }
@@ -313,6 +343,9 @@ class AdvancedAutomationEngine @Inject constructor(
                     if (active != null) statePrefs.edit().putBoolean(key, active).apply()
                     active == true && !wasActive
                 }
+                "time_window" -> timeWindowActive(trigger)
+                "calendar" -> calendarTriggerFires(automationId, i, trigger)
+                "datetime" -> datetimeTriggerFires(automationId, i, trigger)
                 else -> false // "sun" is not evaluated yet; "geofence" runs from onZoneTransition
             }
             if (fires && fired == null) fired = trigger
@@ -333,6 +366,94 @@ class AdvancedAutomationEngine @Inject constructor(
         if (statePrefs.getString(key, null) == dayKey) return false
         statePrefs.edit().putString(key, dayKey).apply()
         return true
+    }
+
+    /**
+     * Whether now is inside the window (days + start/end). While inside, the trigger fires on
+     * every periodic check, matching the classic schedule automation's re-application.
+     * Overnight windows (start > end) wrap past midnight.
+     */
+    private fun timeWindowActive(trigger: JSONObject): Boolean {
+        val days = trigger.optJSONArray("days")?.let { arr -> (0 until arr.length()).map { arr.getInt(it) }.toSet() }
+        val cal = Calendar.getInstance()
+        val isoDay = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7 + 1
+        val nowMinutes = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+        val start = try { parseTimeToMinutes(trigger.optString("start", "00:00")) } catch (e: Exception) { return false }
+        val end = try { parseTimeToMinutes(trigger.optString("end", "23:59")) } catch (e: Exception) { return false }
+        return AutomationTriggerMath.isInsideWindow(isoDay, nowMinutes, days, start, end)
+    }
+
+    /**
+     * Fires once per matching calendar event, [minutesBefore] before it starts. The periodic
+     * worker polls every ~15 min; a consumed event is remembered so it cannot fire twice.
+     */
+    private fun calendarTriggerFires(automationId: Long, index: Int, trigger: JSONObject): Boolean {
+        val calendarId = trigger.optLong("calendarId", -1L)
+        if (calendarId < 0) return false
+        val minutesBefore = trigger.optInt("minutesBefore", 30).coerceAtLeast(0)
+        val now = System.currentTimeMillis()
+        val events = queryUpcomingEvents(
+            calendarId,
+            trigger.optString("title").ifBlank { null },
+            now,
+            (minutesBefore + 15) * 60_000L
+        )
+        var fires = false
+        for (event in events) {
+            if (AutomationTriggerMath.calendarShouldFire(event.startMs, minutesBefore, now)) {
+                val key = "tcal_${automationId}_${index}_${event.startMs}"
+                if (!statePrefs.getBoolean(key, false)) {
+                    statePrefs.edit().putBoolean(key, true).apply()
+                    fires = true
+                }
+            }
+        }
+        return fires
+    }
+
+    /** One-shot trigger for a fixed instant; fires on the first check at or after [at]. */
+    private fun datetimeTriggerFires(automationId: Long, index: Int, trigger: JSONObject): Boolean {
+        val at = trigger.optLong("at", 0L)
+        val key = "tdt_${automationId}_$index"
+        if (!AutomationTriggerMath.datetimeShouldFire(at, statePrefs.getBoolean(key, false), System.currentTimeMillis())) return false
+        statePrefs.edit().putBoolean(key, true).apply()
+        return true
+    }
+
+    private data class CalendarEventReading(val title: String, val startMs: Long)
+
+    private fun queryUpcomingEvents(calendarId: Long, titleFilter: String?, nowMs: Long, withinMs: Long): List<CalendarEventReading> {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALENDAR) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) return emptyList()
+        val events = mutableListOf<CalendarEventReading>()
+        val projection = arrayOf(CalendarContract.Events.TITLE, CalendarContract.Events.DTSTART)
+        val selection = "${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.DTSTART} BETWEEN ? AND ?"
+        val args = arrayOf(calendarId.toString(), nowMs.toString(), (nowMs + withinMs).toString())
+        try {
+            context.contentResolver.query(
+                CalendarContract.Events.CONTENT_URI, projection, selection, args,
+                "${CalendarContract.Events.DTSTART} ASC"
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val title = cursor.getString(0) ?: ""
+                    if (titleFilter == null || title.contains(titleFilter, ignoreCase = true)) {
+                        events.add(CalendarEventReading(title, cursor.getLong(1)))
+                    }
+                }
+            }
+        } catch (e: SecurityException) {
+            // Calendar permission revoked meanwhile.
+        }
+        return events
+    }
+
+    private fun formatDateTime(ms: Long): String {
+        val cal = Calendar.getInstance().apply { timeInMillis = ms }
+        return "%02d/%02d %02d:%02d".format(
+            cal.get(Calendar.DAY_OF_MONTH), cal.get(Calendar.MONTH) + 1,
+            cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE)
+        )
     }
 
     private suspend fun resolveHomeId(homeIdFromCondition: String): String {
@@ -430,6 +551,13 @@ class AdvancedAutomationEngine @Inject constructor(
                 val title = action.optString("title", "Automation").ifBlank { "Automatización" }
                 val message = action.optString("message", "")
                 return if (alert != null) notifyTemperatureAlert(title, message, alert) else notifyPlain(title, message)
+            }
+            "set_home_mode" -> {
+                val mode = action.optString("mode", "schedule")
+                val endAt = action.optLong("endAt", 0L).takeIf { it > 0 }
+                val homeId = resolveHomeId(action.optString("homeId", ""))
+                check(homeId.isNotEmpty()) { "No hay instalación disponible" }
+                thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 })
             }
             "delay" -> {
                 val minutes = action.optLong("minutes", 1)
