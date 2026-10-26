@@ -7,10 +7,12 @@ import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.arsys.netatmo.service.AdvancedAutomationWorker
+import com.arsys.netatmo.service.ClassicAutomationMigrator
 import com.arsys.netatmo.service.LocalScheduleManager
 import com.arsys.netatmo.service.TemperatureAnomalyWorker
 import com.arsys.netatmo.worker.DataSyncWorker
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -18,6 +20,9 @@ class NetatmoApp : Application(), Configuration.Provider {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var classicAutomationMigrator: ClassicAutomationMigrator
 
     @Inject
     lateinit var localScheduleManager: LocalScheduleManager
@@ -32,9 +37,15 @@ class NetatmoApp : Application(), Configuration.Provider {
         createNotificationChannels()
         AdvancedAutomationWorker.schedule(this)
         AdvancedAutomationWorker.runNow(this)
+        // No-op once every classic schedule automation is migrated (all disabled), but keeps
+        // rollback to a classic automation working.
         localScheduleManager.scheduleAll()
         TemperatureAnomalyWorker.schedule(this)
         DataSyncWorker.schedule(this)
+        // Migrates classic automations (schedule/geofence/calendar/vacation) to advanced ones.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
+            classicAutomationMigrator.runIfNeeded()
+        }
     }
 
     private fun createNotificationChannels() {
