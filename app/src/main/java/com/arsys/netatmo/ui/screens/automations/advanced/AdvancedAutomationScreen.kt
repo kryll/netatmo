@@ -28,8 +28,11 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
@@ -96,7 +99,14 @@ data class AutomationTrigger(
     val event: String = "sunset",
     val offset: Int = 0,
     val action: String = "enter",
-    val zoneName: String = ""
+    val zoneName: String = "",
+    val start: String = "",
+    val end: String = "",
+    val at: Long = 0L,
+    val calendarId: Long = -1L,
+    val calendarName: String = "",
+    val title: String = "",
+    val minutesBefore: Int = 30
 )
 
 data class AutomationCondition(
@@ -114,7 +124,8 @@ data class AutomationAction(
     val mode: String = "",
     val title: String = "",
     val minutes: Int = 0,
-    val scenarioId: String = ""
+    val scenarioId: String = "",
+    val endAt: Long = 0L
 )
 
 // ── Map converters ────────────────────────────────────────────────────────────
@@ -133,7 +144,14 @@ private fun Map<String, Any>.toAutoTrigger() = AutomationTrigger(
     // Zone triggers store enter/exit under "event"; older geofence triggers used "action".
     action = (if (this["type"] == "geofence") this["event"] as? String else null)
         ?: this["action"] as? String ?: "enter",
-    zoneName = this["zone"] as? String ?: ""
+    zoneName = this["zone"] as? String ?: "",
+    start = this["start"] as? String ?: "",
+    end = this["end"] as? String ?: "",
+    at = (this["at"] as? Number)?.toLong() ?: 0L,
+    calendarId = (this["calendarId"] as? Number)?.toLong() ?: -1L,
+    calendarName = this["calendarName"] as? String ?: "",
+    title = this["title"] as? String ?: "",
+    minutesBefore = (this["minutesBefore"] as? Number)?.toInt() ?: 30
 )
 
 private fun Map<String, Any>.toAutoCondition() = AutomationCondition(
@@ -152,7 +170,8 @@ private fun Map<String, Any>.toAutoAction() = AutomationAction(
     mode = this["mode"] as? String ?: "",
     title = this["title"] as? String ?: "",
     minutes = (this["minutes"] as? Number)?.toInt() ?: 0,
-    scenarioId = this["scenarioId"] as? String ?: ""
+    scenarioId = this["scenarioId"] as? String ?: "",
+    endAt = (this["endAt"] as? Number)?.toLong() ?: 0L
 )
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -175,6 +194,7 @@ fun AdvancedAutomationScreen(
     var showConditionSheet by remember { mutableStateOf(false) }
     var showActionSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showRevertDialog by remember { mutableStateOf(false) }
 
     // Notification actions are silently dropped without this permission (Android 13+).
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -235,6 +255,28 @@ fun AdvancedAutomationScreen(
         )
     }
 
+    // ── Revert-migration dialog ─────────────────────────────────────────────
+    if (showRevertDialog) {
+        AlertDialog(
+            onDismissRequest = { showRevertDialog = false },
+            containerColor = SurfaceContainer,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            title = { Text("Revertir migración") },
+            text = {
+                Text("Se eliminará esta automatización avanzada y se reactivará la automatización original de la que se migró.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showRevertDialog = false; viewModel.revertMigration() }
+                ) { Text("Revertir") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRevertDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
     // ── Bottom sheets ─────────────────────────────────────────────────────────
     if (showTriggerSheet) {
         TriggerEditorBottomSheet(
@@ -291,6 +333,11 @@ fun AdvancedAutomationScreen(
                     }
                 },
                 actions = {
+                    if (automationId != -1L && uiState.description.startsWith("migrated:")) {
+                        TextButton(onClick = { showRevertDialog = true }) {
+                            Text("Revertir")
+                        }
+                    }
                     if (automationId != -1L) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(
@@ -753,6 +800,17 @@ private fun triggerSummary(trigger: AutomationTrigger): String = when (trigger.t
         val place = trigger.zoneName.ifBlank { "casa" }
         if (trigger.action == "enter") "Al llegar a $place" else "Al salir de $place"
     }
+    "time_window" -> {
+        val days = trigger.days.joinToString(", ") { dayName(it) }
+        val range = "Franja ${trigger.start}-${trigger.end}"
+        if (days.isBlank()) range else "$range · $days"
+    }
+    "datetime" -> "El ${formatTriggerDateTime(trigger.at)}"
+    "calendar" -> {
+        val cal = trigger.calendarName.ifBlank { "calendario" }
+        val filter = if (trigger.title.isBlank()) "" else " con «${trigger.title}»"
+        "Evento en $cal$filter, ${trigger.minutesBefore} min antes"
+    }
     else -> trigger.type
 }
 
@@ -770,10 +828,21 @@ private fun conditionSummary(condition: AutomationCondition): String = when (con
 private fun actionSummary(action: AutomationAction): String = when (action.type) {
     "set_temperature" -> "Fijar temperatura a ${"%.1f".format(action.temperature)}°C"
     "set_mode" -> "Cambiar modo a ${modeName(action.mode)}"
+    "set_home_mode" -> "Modo de la casa: ${modeName(action.mode)}" +
+        (if (action.endAt > 0) " hasta ${formatTriggerDateTime(action.endAt)}" else "")
     "notify" -> "Notificación: ${action.title.ifBlank { "(sin título)" }}"
     "delay" -> "Esperar ${action.minutes} min"
     "apply_scenario" -> "Escenario: ${action.scenarioId}"
     else -> action.type
+}
+
+private fun formatTriggerDateTime(ms: Long): String {
+    if (ms <= 0) return "(sin fecha)"
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = ms }
+    return "%02d/%02d %02d:%02d".format(
+        cal.get(java.util.Calendar.DAY_OF_MONTH), cal.get(java.util.Calendar.MONTH) + 1,
+        cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)
+    )
 }
 
 private fun dayName(day: Int): String = when (day) {
@@ -794,6 +863,9 @@ private fun triggerIcon(type: String): ImageVector = when (type) {
     "numeric_state" -> Icons.Default.Thermostat
     "sun" -> Icons.Default.WbSunny
     "geofence" -> Icons.Default.LocationOn
+    "time_window" -> Icons.Default.AccessTime
+    "datetime" -> Icons.Default.Event
+    "calendar" -> Icons.Default.DateRange
     else -> Icons.Default.Bolt
 }
 
@@ -807,6 +879,7 @@ private fun conditionIcon(type: String): ImageVector = when (type) {
 private fun actionIcon(type: String): ImageVector = when (type) {
     "set_temperature" -> Icons.Default.Thermostat
     "set_mode" -> Icons.Default.Tune
+    "set_home_mode" -> Icons.Default.Home
     "notify" -> Icons.Default.Notifications
     "delay" -> Icons.Default.HourglassEmpty
     "apply_scenario" -> Icons.Default.AutoAwesome
