@@ -201,9 +201,6 @@ fun AutomationsScreen(
                                 onToggle = { viewModel.toggleAutomation(automation.id, it) },
                                 onEdit = {
                                     when (automation.type) {
-                                        "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
-                                        "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
-                                        "SCHEDULE" -> navController.navigate("schedule_automation/${automation.id}")
                                         "ADVANCED" -> navController.navigate("advanced_automation/${-automation.id}")
                                     }
                                 },
@@ -237,9 +234,6 @@ fun AutomationsScreen(
                                             onToggle = { viewModel.toggleAutomation(automation.id, it) },
                                             onEdit = {
                                                 when (automation.type) {
-                                                    "GEOFENCE" -> navController.navigate("geofence/${automation.id}")
-                                                    "CALENDAR" -> navController.navigate("calendar_automation/${automation.id}")
-                                                    "SCHEDULE" -> navController.navigate("schedule_automation/${automation.id}")
                                                     "ADVANCED" -> navController.navigate("advanced_automation/${-automation.id}")
                                                 }
                                             },
@@ -283,36 +277,6 @@ fun AutomationsScreen(
                         horizontalAlignment = Alignment.End,
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        FabMenuItem(
-                            label = "Geovalla",
-                            icon = Icons.Default.LocationOn,
-                            containerColor = automationTypeContainerColor("GEOFENCE"),
-                            contentColor = Color.White,
-                            onClick = {
-                                fabExpanded = false
-                                navController.navigate("geofence/-1")
-                            }
-                        )
-                        FabMenuItem(
-                            label = "Calendario",
-                            icon = Icons.Default.CalendarToday,
-                            containerColor = Color(0xFF5B21B6),
-                            contentColor = Color.White,
-                            onClick = {
-                                fabExpanded = false
-                                navController.navigate("calendar_automation/-1")
-                            }
-                        )
-                        FabMenuItem(
-                            label = "Horario",
-                            icon = Icons.Default.Schedule,
-                            containerColor = automationTypeContainerColor("SCHEDULE"),
-                            contentColor = Color.White,
-                            onClick = {
-                                fabExpanded = false
-                                navController.navigate("schedule_automation/-1")
-                            }
-                        )
                         FabMenuItem(
                             label = "Avanzada",
                             icon = Icons.Default.AutoAwesome,
