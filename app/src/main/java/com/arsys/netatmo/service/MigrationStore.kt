@@ -1,39 +1,55 @@
 package com.arsys.netatmo.service
 
-import kotlinx.coroutines.sync.Mutex
+import com.arsys.netatmo.data.local.entities.AdvancedAutomationEntity
+import com.arsys.netatmo.data.local.entities.AutomationEntity
+import com.arsys.netatmo.data.local.entities.CalendarAutomationEntity
+import com.arsys.netatmo.data.local.entities.GeofenceEntity
+import com.arsys.netatmo.data.local.entities.ZoneEntity
 
-/** Abstraction over the persistence side-effects of classic-automation migration. */
+/**
+ * Persistence + side-effect seam for [ClassicAutomationMigrator]. The production
+ * implementation is Room/WorkManager-backed; tests use an in-memory one whose [atomic]
+ * discards the whole block on failure, which lets failure-injection tests prove that a
+ * crash at any point never leaves both a classic and its equivalent active (or none).
+ */
 interface MigrationStore {
-    suspend fun disableClassicAutomation(id: String, type: ClassicAutomationType)
-    suspend fun insertAdvancedAutomation(automation: AdvancedAutomation)
-    suspend fun rollback(item: MigrationRecord)
-    suspend fun markMigrated(item: MigrationRecord)
-    suspend fun listMigrated(): List<MigrationRecord>
+
+    /** Runs [block] as one atomic unit: either every write inside lands or none does. */
+    suspend fun <T> atomic(block: suspend () -> T): T
+
+    // ── Reads ────────────────────────────────────────────────────────────────
+    suspend fun scheduleAutomations(): List<AutomationEntity>
+    suspend fun geofences(): List<GeofenceEntity>
+    suspend fun calendarAutomations(): List<CalendarAutomationEntity>
+    suspend fun automationById(id: Long): AutomationEntity?
+    suspend fun selectedHomeId(): String?
+    suspend fun hasEquivalent(marker: String): Boolean
+
+    // ── Writes (only inside [atomic]) ────────────────────────────────────────
+    suspend fun insertAdvanced(entity: AdvancedAutomationEntity)
+    suspend fun deleteAdvancedWithPrefix(markerPrefix: String)
+    suspend fun setClassicEnabled(id: Long, enabled: Boolean)
+    suspend fun updateCalendarClassic(entity: CalendarAutomationEntity)
+    suspend fun upsertZone(zone: ZoneEntity)
+
+    // ── External effects (outside [atomic], idempotent, self-heal on retry) ──
+    suspend fun removeClassicGeofence(geofenceId: String)
+    suspend fun registerClassicGeofence(geofence: GeofenceEntity)
+    suspend fun syncZones()
+    fun scheduleLocalScheduleWorker()
+    fun scheduleCalendarWorker()
+    fun scheduleVacationStart(delayMs: Long)
+    fun cancelVacationStart()
+
+    // ── Vacation DataStore (frost-watch keys; never cleared by migration) ────
+    suspend fun vacationState(): Triple<Boolean, Long, Long> // enabled, startMs, endMs
 }
 
-/** Shared in-memory seam used by tests and by the migration flow. */
-class FakeMigrationStore : MigrationStore {
-    val disabled = mutableListOf<Pair<String, ClassicAutomationType>>()
-    val inserted = mutableListOf<AdvancedAutomation>()
-    val rolledBack = mutableListOf<MigrationRecord>()
-    val migrated = mutableListOf<MigrationRecord>()
-    private val mutex = Mutex()
-
-    override suspend fun disableClassicAutomation(id: String, type: ClassicAutomationType) {
-        disabled += id to type
-    }
-
-    override suspend fun insertAdvancedAutomation(automation: AdvancedAutomation) {
-        inserted += automation
-    }
-
-    override suspend fun rollback(item: MigrationRecord) {
-        rolledBack += item
-    }
-
-    override suspend fun markMigrated(item: MigrationRecord) {
-        migrated += item
-    }
-
-    override suspend fun listMigrated(): List<MigrationRecord> = migrated.toList()
+/** Migration progress flags, so tests can run without Android SharedPreferences. */
+interface MigrationFlags {
+    fun isMarked(key: String): Boolean
+    fun mark(key: String)
+    fun isReverted(key: String): Boolean
+    fun markReverted(key: String)
+    var completedVersion: Int
 }
