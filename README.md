@@ -123,3 +123,24 @@ app/
 ## Licencia
 
 MIT
+
+## Variables en las notificaciones de automatizaciones
+
+En el título y el mensaje de una acción Notificación puedes escribir:
+
+| Variable | Valor al ejecutar la acción |
+| --- | --- |
+| `%automatizacion%` | Nombre de la automatización |
+| `%tem_ext%` | Temperatura exterior de la fuente meteorológica configurada, con el mismo fallback que los disparadores |
+| `%tem_int%` | Temperatura de la estancia seleccionada |
+| `%estancia%` | Nombre de esa estancia |
+| `%consigna%` | Consigna de esa estancia |
+| `%modo%` | Modo de esa estancia |
+| `%temperaturas%` | Lista de estancias y temperaturas de la casa |
+
+La estancia seleccionada es la de la alerta de temperatura, si existe. Sin alerta se usa la estancia más fría de la única casa disponible. Con varias casas y sin alerta no se elige una al azar: los valores generales muestran `no disponible`. Para seleccionar una estancia concreta usa su ID de Netatmo: `%tem_int:ID%`, `%consigna:ID%`, `%modo:ID%` o `%estancia:ID%`. Un ID inexistente muestra `no disponible`.
+
+Ejemplo de título: `%automatizacion%: %tem_ext% °C fuera`.
+Ejemplo de mensaje: `%estancia% está a %tem_int% °C; consigna %consigna% °C (%modo%). %temperaturas%`.
+
+Los números usan un decimal y coma, sin unidad: añade `°C` al texto si lo deseas. Un valor ausente o no finito muestra `no disponible`; las variables desconocidas se dejan tal cual. La sustitución es de una sola pasada: los valores insertados no se vuelven a interpretar. El texto sin variables se conserva y no provoca consultas adicionales. No se cambia el formato ni la base de datos de las automatizaciones guardadas. Los datos se consultan al ejecutar cada notificación, también después de una espera o un cambio de consigna; su frescura depende de las API de Netatmo y meteorología. El estado del termostato no expone humedad, por lo que no hay variable de humedad.

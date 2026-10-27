@@ -202,6 +202,17 @@ fun ActionEditorBottomSheet(
                         onValueChange = { notifyMessage = it },
                         label = "Cuerpo del mensaje"
                     )
+                    Text(
+                        text = "Variables en título y mensaje: %automatizacion%, %tem_ext%, " +
+                            "%tem_int%, %estancia%, %consigna%, %modo%, %temperaturas%.\n" +
+                            "Ejemplo: Exterior %tem_ext% °C. Interior %tem_int% °C.\n" +
+                            "Interior, consigna y modo: estancia de la alerta o la más fría " +
+                            "si solo hay una casa. Para una estancia concreta: %tem_int:ID%, " +
+                            "%consigna:ID%, %modo:ID%, %estancia:ID% (ID de Netatmo).\n" +
+                            "Sin dato: no disponible. Variables desconocidas: se conservan.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
                 "set_home_mode" -> {

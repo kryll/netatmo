@@ -527,13 +527,13 @@ class AdvancedAutomationEngine @Inject constructor(
         val actions = JSONArray(automation.actionsJson)
         val postedNotificationIds = mutableListOf<Int>()
         for (i in 0 until actions.length()) {
-            executeAction(actions.getJSONObject(i), alert)?.let { postedNotificationIds.add(it) }
+            executeAction(actions.getJSONObject(i), alert, automation.name)?.let { postedNotificationIds.add(it) }
         }
         return postedNotificationIds
     }
 
     /** Returns the posted notification id for "notify" actions, null for anything else. */
-    private suspend fun executeAction(action: JSONObject, alert: TemperatureAlert?): Int? {
+    private suspend fun executeAction(action: JSONObject, alert: TemperatureAlert?, automationName: String): Int? {
         when (action.optString("type")) {
             "set_temperature" -> {
                 val homeId = action.optString("homeId")
@@ -548,8 +548,12 @@ class AdvancedAutomationEngine @Inject constructor(
                 thermostatRepository.setMode(homeId, roomId, mode)
             }
             "notify" -> {
-                val title = action.optString("title", "Automation").ifBlank { "Automatización" }
-                val message = action.optString("message", "")
+                val rawTitle = action.optString("title", "Automation").ifBlank { "Automatización" }
+                val rawMessage = action.optString("message", "")
+                val requested = NotificationTemplate.variables(rawTitle) + NotificationTemplate.variables(rawMessage)
+                val values = notificationValues(requested, automationName, alert)
+                val title = NotificationTemplate.render(rawTitle, values)
+                val message = NotificationTemplate.render(rawMessage, values)
                 return if (alert != null) notifyTemperatureAlert(title, message, alert) else notifyPlain(title, message)
             }
             "set_home_mode" -> {
@@ -578,6 +582,30 @@ class AdvancedAutomationEngine @Inject constructor(
             }
         }
         return null
+    }
+
+    /** Read values at each notification action, including after a delay or a setpoint action. */
+    private suspend fun notificationValues(
+        requested: Set<String>, name: String, alert: TemperatureAlert?
+    ): Map<String, String?> {
+        if (requested.isEmpty()) return emptyMap()
+        if ((requested - "automatizacion").isEmpty()) return mapOf("automatizacion" to name)
+        val rooms = mutableListOf<NotificationTemplate.Room>()
+        val homes = (thermostatRepository.getHomesData() as? ApiResult.Success)?.data.orEmpty()
+        val needsRooms = requested.any { it != "automatizacion" && it != "tem_ext" }
+        if (needsRooms) for (home in homes) {
+            val status = (thermostatRepository.getHomeStatus(home.id) as? ApiResult.Success)?.data ?: continue
+            val names = home.rooms.orEmpty().associate { it.id to it.name }
+            status.rooms.orEmpty().forEach { room ->
+                rooms.add(NotificationTemplate.Room(home.id, room.id, names[room.id] ?: "Habitación",
+                    room.measuredTemperature, room.setpointTemperature, room.setpointMode))
+            }
+        }
+        // Base ambiguity on the full home list, not on whichever home happened to respond.
+        val homeId = alert?.room?.homeId ?: homes.singleOrNull()?.id
+        val outdoor = if ("tem_ext" in requested && homeId != null)
+            thermostatRepository.getOutdoorTemperature(homeId) else null
+        return NotificationTemplate.values(name, rooms, homeId ?: "", alert?.room?.roomId, outdoor)
     }
 
     private fun requireNotificationsEnabled() {
