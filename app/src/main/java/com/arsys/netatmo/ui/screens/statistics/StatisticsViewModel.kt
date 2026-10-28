@@ -153,6 +153,17 @@ class StatisticsViewModel @Inject constructor(
         }
     }
 
+    /** Manual reload: stores a fresh sample now and reloads the statistics for [days]. */
+    fun refresh(days: Int) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                authRepository.selectedHomeId.first()?.let { thermostatRepository.getHomeStatus(it) }
+            } catch (e: Exception) { /* offline: keep what is stored */ }
+            loadStatistics(days)
+        }
+    }
+
     /** Switch the active room; the init observer reacts and reloads the 24h history. */
     fun selectRoom(roomId: String) {
         _uiState.update { it.copy(selectedRoomId = roomId) }

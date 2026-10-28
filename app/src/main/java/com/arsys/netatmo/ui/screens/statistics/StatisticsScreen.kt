@@ -152,6 +152,13 @@ fun StatisticsScreen(
                         color = TextPrimary
                     )
                 }
+                IconButton(onClick = { viewModel.refresh(selectedPeriod) }, enabled = !uiState.isLoading) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Recargar estadísticas",
+                        tint = TextSecondary
+                    )
+                }
                 IconButton(onClick = { viewModel.toggleEditMode() }) {
                     Icon(
                         imageVector = if (uiState.isEditMode) Icons.Default.Check else Icons.Default.Edit,
