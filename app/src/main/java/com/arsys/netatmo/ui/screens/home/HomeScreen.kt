@@ -118,7 +118,9 @@ fun HomeScreen(
                                     uiState.error?.let { error ->
                                         ErrorBanner(
                                             message = error,
-                                            onDismiss = { viewModel.dismissError() }
+                                            onDismiss = { viewModel.dismissError() },
+                                            // Keep a retry action visible while there is no data to show
+                                            onRetry = if (uiState.thermostatState == null) ({ viewModel.loadThermostatData() }) else null
                                         )
                                     }
 
@@ -208,6 +210,16 @@ fun HomeScreen(
                                                     viewModel.setRoomMode(room.id, mode)
                                                 },
                                                 isSetting = uiState.isSettingTemp
+                                            )
+                                        }
+                                    }
+                                } else if (uiState.thermostatDataUnavailable) {
+                                    // homestatus answered OK but with no rooms: Netatmo API degraded
+                                    item {
+                                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
+                                            ThermostatDataWarning(
+                                                roomNames = uiState.thermostatState?.knownRoomNames ?: emptyList(),
+                                                onRetry = { viewModel.loadThermostatData() }
                                             )
                                         }
                                     }
@@ -495,7 +507,7 @@ private fun EmptyHomeState() {
 // ─── Error Banner ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
+private fun ErrorBanner(message: String, onDismiss: () -> Unit, onRetry: (() -> Unit)? = null) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
@@ -520,6 +532,18 @@ private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            if (onRetry != null) {
+                TextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Reintentar", style = MaterialTheme.typography.labelMedium)
+                }
+            }
             IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Default.Close,
@@ -527,6 +551,55 @@ private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
+            }
+        }
+    }
+}
+
+// ─── Thermostat Data Warning (API answers OK but returns no rooms) ────────────
+
+@Composable
+private fun ThermostatDataWarning(roomNames: List<String>, onRetry: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.CloudOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Netatmo no está devolviendo datos del termostato ahora mismo",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            if (roomNames.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Habitaciones configuradas: ${roomNames.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Reintentar", style = MaterialTheme.typography.labelMedium)
             }
         }
     }

@@ -71,6 +71,62 @@ private val AmberWarn = Color(0xFFF59E0B)
 private val RedBad = Color(0xFFFFB4AB)
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Error card (network/API failure)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun StatisticsErrorCard(message: String, onRetry: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceContainer),
+        border = BorderStroke(1.dp, OutlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.CloudOff,
+                contentDescription = null,
+                tint = RedBad,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "No se han podido cargar las estadísticas",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+                Text(
+                    friendlyStatsError(message),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+            TextButton(onClick = onRetry) {
+                Text("Reintentar", color = Primary)
+            }
+        }
+    }
+}
+
+/** Map low-level errors to a clear, actionable Spanish message. */
+private fun friendlyStatsError(message: String): String {
+    val lower = message.lowercase()
+    return when {
+        "unable to resolve host" in lower || "failed to connect" in lower ||
+            "timeout" in lower || "unknownhost" in lower ->
+            "No hay conexión con Netatmo. Comprueba tu conexión e inténtalo de nuevo."
+        message.startsWith("Error 5") ->
+            "Netatmo no responde ahora mismo. Inténtalo de nuevo en unos minutos."
+        else -> message
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main screen
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -222,6 +278,15 @@ fun StatisticsScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (uiState.error != null && !uiState.isLoading) {
+                item {
+                    StatisticsErrorCard(
+                        message = uiState.error ?: "",
+                        onRetry = { viewModel.loadStatistics(selectedPeriod) }
+                    )
+                }
+            }
+
             if (uiState.availableRooms.size > 1) {
                 item {
                     LazyRow(

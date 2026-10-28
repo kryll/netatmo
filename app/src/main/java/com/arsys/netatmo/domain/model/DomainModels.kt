@@ -6,7 +6,9 @@ data class ThermostatState(
     val rooms: List<RoomState>,
     val modules: List<ModuleState>,
     val activeScheduleId: String? = null,
-    val schedules: List<ScheduleInfo> = emptyList()
+    val schedules: List<ScheduleInfo> = emptyList(),
+    // Names of the rooms configured in homesdata, kept even when homestatus omits them (API degraded)
+    val knownRoomNames: List<String> = emptyList()
 )
 
 data class ScheduleInfo(
@@ -183,3 +185,4 @@ data class WeatherInfo(
     val windKmh: Double?,
     val condition: String
 )
+

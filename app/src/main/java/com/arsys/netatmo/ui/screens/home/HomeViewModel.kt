@@ -24,7 +24,9 @@ data class HomeUiState(
     val selectedHomeId: String? = null,
     val isSettingTemp: Boolean = false,
     val successMessage: String? = null,
-    val outdoorTemperature: Double? = null
+    val outdoorTemperature: Double? = null,
+    // True when homestatus answers OK but without rooms (Netatmo API degraded)
+    val thermostatDataUnavailable: Boolean = false
 )
 
 @HiltViewModel
@@ -58,13 +60,25 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = getThermostatState(id)) {
                 is ApiResult.Success -> {
-                    _uiState.update { it.copy(isLoading = false, thermostatState = result.data) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            thermostatState = result.data,
+                            thermostatDataUnavailable = result.data.rooms.isEmpty() && result.data.knownRoomNames.isNotEmpty()
+                        )
+                    }
                     // Best-effort: fetch outdoor temperature from NAModule1 if available
                     val outdoorTemp = repository.getOutdoorTemperature(id)
                     _uiState.update { it.copy(outdoorTemperature = outdoorTemp) }
                 }
                 is ApiResult.Error -> {
-                    _uiState.update { it.copy(isLoading = false, error = result.message) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = friendlyConnectionError(result.message),
+                            thermostatDataUnavailable = false
+                        )
+                    }
                 }
                 ApiResult.Loading -> {}
             }
@@ -139,6 +153,20 @@ class HomeViewModel @Inject constructor(
     fun stopBoost() {
         viewModelScope.launch {
             boostManager.stopBoost()
+        }
+    }
+
+    /** Map low-level network/API errors to a clear, actionable Spanish message. */
+    private fun friendlyConnectionError(message: String?): String {
+        val msg = message ?: return "No se puede conectar con Netatmo. Inténtalo de nuevo."
+        val lower = msg.lowercase()
+        return when {
+            "unable to resolve host" in lower || "failed to connect" in lower ||
+                "timeout" in lower || "unknownhost" in lower || "error de red" in lower ->
+                "No se puede conectar con Netatmo. Comprueba tu conexión e inténtalo de nuevo."
+            msg.startsWith("Error 5") ->
+                "Netatmo no responde ahora mismo ($msg). Inténtalo de nuevo en unos minutos."
+            else -> msg
         }
     }
 
