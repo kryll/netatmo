@@ -59,7 +59,9 @@ class GetThermostatStateUseCase @Inject constructor(
                 )
             } ?: emptyList(),
             activeScheduleId = home?.schedules?.find { it.selected == true }?.id,
-            schedules = home?.schedules?.map { ScheduleInfo(it.id, it.name, it.selected == true) } ?: emptyList()
+            schedules = home?.schedules?.map { ScheduleInfo(it.id, it.name, it.selected == true) } ?: emptyList(),
+            // Keep homesdata room names so the UI can explain an empty homestatus (API degraded)
+            knownRoomNames = home?.rooms?.map { it.name } ?: emptyList()
         )
     }
 }
