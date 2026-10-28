@@ -12,6 +12,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -48,9 +49,7 @@ class AirQualityViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            authRepository.selectedHomeId.collect { homeId ->
-                homeId?.let { loadData(it) }
-            }
+            authRepository.selectedHomeId.first()?.let { loadData(it) }
         }
     }
 
