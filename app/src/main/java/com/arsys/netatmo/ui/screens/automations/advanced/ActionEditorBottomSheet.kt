@@ -52,7 +52,7 @@ fun ActionEditorBottomSheet(
     var roomId by remember { mutableStateOf("") }
 
     // set_mode
-    var selectedMode by remember { mutableStateOf("heating") }
+    var selectedMode by remember { mutableStateOf("schedule") }
 
     // notify
     var notifyTitle by remember { mutableStateOf("") }
@@ -73,9 +73,9 @@ fun ActionEditorBottomSheet(
         "delay" to "Esperar"
     )
 
+    // Netatmo home modes (setthermmode); "heating"/"cooling" are not valid values there.
     val modes = listOf(
-        "heating" to "Calefacción",
-        "cooling" to "Frío",
+        "schedule" to "Programado",
         "away" to "Ausente",
         "hg" to "Anticongelación",
         "off" to "Apagado"

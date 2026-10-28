@@ -47,6 +47,36 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun zoneDao(): ZoneDao
 
     companion object {
+        // Versions 1->2 (automation_logs) and 2->3 (family_members) shipped without
+        // migrations in the first releases; without these paths Room crashes on startup
+        // when a very old install upgrades straight to the current schema.
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `automation_logs` " +
+                    "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`automationId` INTEGER NOT NULL, " +
+                    "`automationName` TEXT NOT NULL, " +
+                    "`triggerType` TEXT NOT NULL, " +
+                    "`timestamp` INTEGER NOT NULL, " +
+                    "`success` INTEGER NOT NULL, " +
+                    "`errorMessage` TEXT)"
+                )
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `family_members` " +
+                    "(`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`isHome` INTEGER NOT NULL, " +
+                    "`addedAt` INTEGER NOT NULL)"
+                )
+            }
+        }
+
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

@@ -122,13 +122,17 @@ class HomeViewModel @Inject constructor(
         val room = _uiState.value.thermostatState?.rooms?.firstOrNull() ?: return
         val originalTemp = room.targetTemp ?: room.currentTemp ?: return
         viewModelScope.launch {
-            boostManager.startBoost(
+            val result = boostManager.startBoost(
                 homeId = homeId,
                 roomId = room.id,
                 originalTemp = originalTemp,
                 deltaTemp = deltaTemp,
-                durationMinutes = durationMinutes
+                durationMinutes = durationMinutes,
+                previousMode = room.mode.apiValue
             )
+            if (result is ApiResult.Error) {
+                _uiState.update { it.copy(error = "No se pudo activar el modo Turbo: ${result.message}") }
+            }
         }
     }
 

@@ -542,10 +542,13 @@ class AdvancedAutomationEngine @Inject constructor(
                 thermostatRepository.setTemperature(homeId, roomId, temperature)
             }
             "set_mode" -> {
-                val homeId = action.optString("homeId")
-                val roomId = action.optString("roomId", "")
+                // The editor saves set_mode without home/room: it is a home-level mode change
+                // (same target as set_home_mode). Without resolving the home this always
+                // failed with an API error on an empty home_id.
                 val mode = action.optString("mode")
-                thermostatRepository.setMode(homeId, roomId, mode)
+                val homeId = resolveHomeId(action.optString("homeId", ""))
+                check(homeId.isNotEmpty()) { "No hay instalación disponible" }
+                thermostatRepository.setHomeMode(homeId, mode)
             }
             "notify" -> {
                 val rawTitle = action.optString("title", "Automation").ifBlank { "Automatización" }
