@@ -64,9 +64,10 @@ class AuthRepository @Inject constructor(
     )
     val isLoggedIn: Flow<Boolean> = _isLoggedIn.asStateFlow()
 
-    val hasCustomCredentials: Flow<Boolean> = MutableStateFlow(
+    private val _hasCustomCredentials = MutableStateFlow(
         encryptedPrefs.getString(KEY_CLIENT_ID, null) != null
-    ).asStateFlow()
+    )
+    val hasCustomCredentials: Flow<Boolean> = _hasCustomCredentials.asStateFlow()
 
     fun getStoredClientId(): String? = encryptedPrefs.getString(KEY_CLIENT_ID, null)
 
@@ -79,10 +80,12 @@ class AuthRepository @Inject constructor(
             .putString(KEY_CLIENT_ID, clientId.trim())
             .putString(KEY_CLIENT_SECRET, clientSecret.trim())
             .apply()
+        _hasCustomCredentials.value = true
     }
 
     fun clearCredentials() {
         encryptedPrefs.edit().remove(KEY_CLIENT_ID).remove(KEY_CLIENT_SECRET).apply()
+        _hasCustomCredentials.value = false
     }
 
     private fun effectiveClientId(): String =
@@ -97,9 +100,10 @@ class AuthRepository @Inject constructor(
         emit(encryptedPrefs.getString(KEY_ACCESS_TOKEN, null))
     }
 
-    val selectedHomeId: Flow<String?> = flow {
-        emit(encryptedPrefs.getString(KEY_HOME_ID, null))
-    }
+    // Observable: collectors (home, settings, boiler, air-quality screens) must react when
+    // the user switches home; a one-shot flow left them showing the first home forever.
+    private val _selectedHomeId = MutableStateFlow(encryptedPrefs.getString(KEY_HOME_ID, null))
+    val selectedHomeId: Flow<String?> = _selectedHomeId.asStateFlow()
 
     /** Returns the stored access token, refreshing it first if it is expired or about to expire. */
     suspend fun getValidAccessToken(): String? = refreshIfNeeded(rejectedToken = null)
@@ -229,6 +233,7 @@ class AuthRepository @Inject constructor(
 
     fun setSelectedHome(homeId: String) {
         encryptedPrefs.edit().putString(KEY_HOME_ID, homeId).apply()
+        _selectedHomeId.value = homeId
     }
 
     fun logout() {
@@ -242,6 +247,7 @@ class AuthRepository @Inject constructor(
             .apply()
         _cachedToken.set(null)
         _isLoggedIn.value = false
+        _selectedHomeId.value = null
     }
 
     fun getAuthUrl(): String {
