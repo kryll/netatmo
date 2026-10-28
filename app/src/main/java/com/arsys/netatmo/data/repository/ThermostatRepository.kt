@@ -77,6 +77,7 @@ class ThermostatRepository @Inject constructor(
                         )
                     }
                 }
+                updateCachedRoomsWithStatus(homeId, homeStatus)
 
                 ApiResult.Success(homeStatus)
             } else {
@@ -84,6 +85,53 @@ class ThermostatRepository @Inject constructor(
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Error de red")
+        }
+    }
+
+    /**
+     * Merges the live room readings into the cached home so cache consumers (thermostat
+     * widget, temperature-anomaly worker) can read currentTemp/targetTemp/heatingActive.
+     * homesdata only provides id/name/type/module_ids, so without this the cache never
+     * carries measurements and those features never see a temperature. Names from the last
+     * homesdata refresh are preserved; a later getHomesData rewrites roomsJson plain and the
+     * next status refresh (every ~15 min via DataSyncWorker) re-enriches it. The extra keys
+     * are ignored by the Gson readers that parse roomsJson as List<Room>. Best-effort: never
+     * fails the status call.
+     */
+    private suspend fun updateCachedRoomsWithStatus(homeId: String, status: HomeStatus) {
+        try {
+            val statusRooms = status.rooms.orEmpty()
+            if (statusRooms.isEmpty()) return
+            val cached = homeCacheDao.getHome(homeId)
+            val names = mutableMapOf<String, String>()
+            if (cached != null) {
+                val arr = org.json.JSONArray(cached.roomsJson)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    val id = obj.optString("id")
+                    val name = obj.optString("name")
+                    if (id.isNotEmpty() && name.isNotEmpty()) names[id] = name
+                }
+            }
+            val enriched = org.json.JSONArray()
+            statusRooms.forEach { room ->
+                enriched.put(
+                    org.json.JSONObject()
+                        .put("id", room.id)
+                        .put("name", names[room.id] ?: "Habitación")
+                        .put("currentTemp", room.measuredTemperature)
+                        .put("targetTemp", room.setpointTemperature)
+                        .put("heatingActive", (room.heatingPower ?: 0) > 0)
+                )
+            }
+            homeCacheDao.insertHome(
+                (cached ?: HomeCacheEntity(
+                    homeId = homeId, name = "", country = null, timezone = null,
+                    roomsJson = "[]", modulesJson = "[]"
+                )).copy(roomsJson = enriched.toString(), updatedAt = System.currentTimeMillis())
+            )
+        } catch (e: Exception) {
+            android.util.Log.w("ThermostatRepo", "room cache enrichment failed", e)
         }
     }
 
