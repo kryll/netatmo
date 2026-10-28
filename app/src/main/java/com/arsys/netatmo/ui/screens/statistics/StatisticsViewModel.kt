@@ -24,7 +24,7 @@ import java.util.Calendar
 import javax.inject.Inject
 
 // Longest gap between two samples that still counts as "same state"; longer gaps are missing data.
-private const val MAX_SAMPLE_GAP_MS = 30L * 60 * 1000
+private const val MAX_SAMPLE_GAP_MS = 45L * 60 * 1000
 
 data class MonthlyHeatingData(val label: String, val heatingHours: Float)
 
@@ -93,6 +93,14 @@ class StatisticsViewModel @Inject constructor(
         val kwhPrice = prefs.getFloat("kwh_price", 0.15f)
         val contractedKw = prefs.getFloat("contracted_kw", 1.5f)
         _uiState.update { it.copy(kwhPrice = kwhPrice, contractedKw = contractedKw) }
+
+        // Store a fresh boiler/temperature sample every time the screen opens, so the stats
+        // do not depend only on the background sync (Android may delay it for an hour or more).
+        viewModelScope.launch {
+            try {
+                authRepository.selectedHomeId.first()?.let { thermostatRepository.getHomeStatus(it) }
+            } catch (e: Exception) { /* offline: keep what is stored */ }
+        }
 
         // Observe latest boiler revision
         viewModelScope.launch {
