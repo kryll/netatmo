@@ -56,8 +56,6 @@ data class StatisticsUiState(
     val monthlyHeatingHours: Float = 0f,
     val monthlyEnergyKwh: Float = 0f,
     val monthlyCost: Float = 0f,
-    // Real per-day heating hours of the current month (index 0 = day 1)
-    val dailyHeatingHours: List<Float> = emptyList(),
     // Latest boiler revision
     val latestRevision: MaintenanceRecordEntity? = null,
     val thermostatType: ThermostatType = ThermostatType.STANDARD,
@@ -238,22 +236,10 @@ class StatisticsViewModel @Inject constructor(
                     val kw = _uiState.value.contractedKw
                     val price = _uiState.value.kwhPrice
                     val energy = hours * kw
-                    // Per-day hours so the monthly bar chart shows real data per day
-                    val byDay = mutableMapOf<Int, MutableList<TemperatureHistoryEntity>>()
-                    sorted.forEach { e ->
-                        val c = Calendar.getInstance()
-                        c.timeInMillis = e.timestamp
-                        byDay.getOrPut(c.get(Calendar.DAY_OF_MONTH)) { mutableListOf() }.add(e)
-                    }
-                    val daysInMonth = Calendar.getInstance().getActualMaximum(Calendar.DAY_OF_MONTH)
-                    val daily = (1..daysInMonth).map { d ->
-                        calculateHeatingHours(byDay[d] ?: emptyList())
-                    }
                     _uiState.update { it.copy(
                         monthlyHeatingHours = hours,
                         monthlyEnergyKwh = energy,
-                        monthlyCost = energy * price,
-                        dailyHeatingHours = daily
+                        monthlyCost = energy * price
                     ) }
                 }
         }
