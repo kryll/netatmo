@@ -63,6 +63,9 @@ class ThermostatRepository @Inject constructor(
                 val homeStatus = response.body()?.body?.home
                     ?: return ApiResult.Error("Respuesta vacía")
 
+                // The boiler is one per home: besides the per-room heating request, the relay
+                // module reports boiler_status. Either one means the boiler is firing.
+                val boilerOn = homeStatus.modules?.any { it.boilerStatus == true } == true
                 homeStatus.rooms?.forEach { room ->
                     room.measuredTemperature?.let { temp ->
                         historyDao.insertHistory(
@@ -72,12 +75,12 @@ class ThermostatRepository @Inject constructor(
                                 timestamp = System.currentTimeMillis(),
                                 temperature = temp,
                                 setpoint = room.setpointTemperature,
-                                heatingActive = (room.heatingPower ?: 0) > 0
+                                heatingActive = (room.heatingPower ?: 0) > 0 || boilerOn
                             )
                         )
                     }
                 }
-                updateCachedRoomsWithStatus(homeId, homeStatus)
+                updateCachedRoomsWithStatus(homeId, homeStatus, boilerOn)
 
                 ApiResult.Success(homeStatus)
             } else {
@@ -98,7 +101,7 @@ class ThermostatRepository @Inject constructor(
      * are ignored by the Gson readers that parse roomsJson as List<Room>. Best-effort: never
      * fails the status call.
      */
-    private suspend fun updateCachedRoomsWithStatus(homeId: String, status: HomeStatus) {
+    private suspend fun updateCachedRoomsWithStatus(homeId: String, status: HomeStatus, boilerOn: Boolean) {
         try {
             val statusRooms = status.rooms.orEmpty()
             if (statusRooms.isEmpty()) return
@@ -121,7 +124,7 @@ class ThermostatRepository @Inject constructor(
                         .put("name", names[room.id] ?: "Habitación")
                         .put("currentTemp", room.measuredTemperature)
                         .put("targetTemp", room.setpointTemperature)
-                        .put("heatingActive", (room.heatingPower ?: 0) > 0)
+                        .put("heatingActive", (room.heatingPower ?: 0) > 0 || boilerOn)
                 )
             }
             homeCacheDao.insertHome(
