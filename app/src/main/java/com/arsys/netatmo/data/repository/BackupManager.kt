@@ -70,13 +70,18 @@ class BackupManager @Inject constructor(
 
             var count = 0
 
+            // Automations get fresh ids on import; geofences must be repointed at them or
+            // they would keep referencing the old (now wrong or nonexistent) automation ids.
+            val automationIdMap = mutableMapOf<Long, Long>()
             automations.forEach { automation ->
-                automationRepository.saveAutomation(automation.copy(id = 0))
+                val newId = automationRepository.saveAutomation(automation.copy(id = 0))
+                automationIdMap[automation.id] = newId
                 count++
             }
 
             geofences.forEach { geofence ->
-                automationRepository.saveGeofence(geofence)
+                val mappedAutomationId = automationIdMap[geofence.automationId] ?: geofence.automationId
+                automationRepository.saveGeofence(geofence.copy(automationId = mappedAutomationId))
                 count++
             }
 
