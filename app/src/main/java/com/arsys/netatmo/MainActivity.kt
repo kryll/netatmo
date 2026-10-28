@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
                 if (BuildConfig.DEBUG) {
                     AuthDebugLogger.log("  ❌ Netatmo devolvió error: $error – $errorDesc")
                 }
+                intent.data = null
                 return
             }
             if (code == null) {
@@ -96,6 +97,9 @@ class MainActivity : ComponentActivity() {
                 }
                 return
             }
+            // Consume the deep link: an activity recreation (rotation, process death) would
+            // otherwise re-exchange the same one-time code and surface a bogus login error.
+            intent.data = null
             authViewModel.handleAuthCode(
                 code = code,
                 receivedState = receivedState,
