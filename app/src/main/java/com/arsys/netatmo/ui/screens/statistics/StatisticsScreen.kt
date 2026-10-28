@@ -321,6 +321,7 @@ fun StatisticsScreen(
                             monthlyHeatingHours = uiState.monthlyHeatingHours,
                             monthlyEnergyKwh = uiState.monthlyEnergyKwh,
                             monthlyCost = uiState.monthlyCost,
+                            dailyHours = uiState.dailyHeatingHours,
                             modifier = Modifier.fillMaxWidth()
                         )
                         "comparison" -> if (uiState.monthlyComparison.isNotEmpty()) {
@@ -1240,6 +1241,7 @@ fun MonthlyHeatingCard(
     monthlyHeatingHours: Float,
     monthlyEnergyKwh: Float,
     monthlyCost: Float,
+    dailyHours: List<Float>,
     modifier: Modifier = Modifier
 ) {
     val cal = Calendar.getInstance()
@@ -1252,17 +1254,8 @@ fun MonthlyHeatingCard(
     val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
     val targetHoursPerDay = 2.5f
 
-    // Distribute monthly total evenly across elapsed days
-    val dailyHours = remember(monthlyHeatingHours, todayDay) {
-        if (monthlyHeatingHours <= 0f || todayDay == 0) {
-            List(daysInMonth) { 0f }
-        } else {
-            val avg = monthlyHeatingHours / todayDay
-            List(daysInMonth) { i ->
-                if (i < todayDay) avg.coerceIn(0f, 24f) else 0f
-            }
-        }
-    }
+    // Real per-day hours measured from local samples; days without samples stay at 0
+    val daily = List(daysInMonth) { i -> dailyHours.getOrElse(i) { 0f } }
 
     val vsObjective = monthlyHeatingHours - targetHoursPerDay * todayDay
 
@@ -1357,58 +1350,87 @@ fun MonthlyHeatingCard(
                 )
             }
 
-            // Daily bar chart
-            val maxBarH = dailyHours.maxOrNull()?.coerceAtLeast(0.1f) ?: 1f
-            val targetLineRatio = (targetHoursPerDay / maxBarH).coerceIn(0f, 1f)
+            // Daily bar chart (with Y axis)
+            val rawMax = maxOf(daily.maxOrNull() ?: 0f, targetHoursPerDay)
+            val yMax = when {
+                rawMax <= 1f -> 1f
+                rawMax <= 2f -> 2f
+                rawMax <= 4f -> 4f
+                rawMax <= 8f -> 8f
+                rawMax <= 12f -> 12f
+                else -> kotlin.math.ceil((rawMax / 4f).toDouble()).toFloat() * 4f
+            }
+            val targetLineRatio = (targetHoursPerDay / yMax).coerceIn(0f, 1f)
 
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
             ) {
-                // Bars
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.Bottom
+                // Y-axis labels (hours)
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(26.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.End
                 ) {
-                    dailyHours.forEachIndexed { i, hours ->
-                        val fraction = (hours / maxBarH).coerceIn(0f, 1f)
-                        val isToday = i + 1 == todayDay
-                        val barColor = if (isToday) Primary else Secondary.copy(alpha = 0.7f)
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(fraction.coerceAtLeast(if (i < todayDay) 0.04f else 0f))
-                                .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                                .background(
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            barColor,
-                                            barColor.copy(alpha = 0.4f)
+                    Text("%.0fh".format(yMax), style = MaterialTheme.typography.labelSmall, color = TextSecondary, fontSize = 9.sp)
+                    Text("%.0fh".format(yMax / 2f), style = MaterialTheme.typography.labelSmall, color = TextSecondary, fontSize = 9.sp)
+                    Text("0h", style = MaterialTheme.typography.labelSmall, color = TextSecondary, fontSize = 9.sp)
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    // Bars
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        daily.forEachIndexed { i, hours ->
+                            val fraction = (hours / yMax).coerceIn(0f, 1f)
+                            val isToday = i + 1 == todayDay
+                            val barColor = if (isToday) Primary else Secondary.copy(alpha = 0.7f)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(if (hours > 0f) fraction.coerceAtLeast(0.04f) else 0f)
+                                    .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                                    .background(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                barColor,
+                                                barColor.copy(alpha = 0.4f)
+                                            )
                                         )
                                     )
-                                )
+                            )
+                        }
+                    }
+
+                    // Target line
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val y = size.height * (1f - targetLineRatio)
+                        drawLine(
+                            color = GreenGood.copy(alpha = 0.6f),
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 1.5f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
                         )
                     }
                 }
-
-                // Target line
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val y = size.height * (1f - targetLineRatio)
-                    drawLine(
-                        color = GreenGood.copy(alpha = 0.6f),
-                        start = Offset(0f, y),
-                        end = Offset(size.width, y),
-                        strokeWidth = 1.5f,
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
-                    )
-                }
             }
 
-            // Day labels row (abbreviated)
+            // Day labels row (abbreviated, aligned with the bars)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 listOf(1, 7, 14, 21, daysInMonth).forEach { day ->
@@ -1667,7 +1689,7 @@ fun HeatingChartCard(
             )
             HeatingChart(
                 data = data,
-                modifier = Modifier.fillMaxWidth().height(80.dp)
+                modifier = Modifier.fillMaxWidth().height(110.dp)
             )
         }
     }
@@ -1845,21 +1867,129 @@ fun HeatingChart(
     data: List<TemperatureDataPoint>,
     modifier: Modifier = Modifier
 ) {
+    // Pre-compute X-axis tick labels from timestamps (same logic as TemperatureChart)
+    val xLabels: List<Pair<Float, String>> = remember(data) {
+        if (data.size < 2) return@remember emptyList()
+        val minTs = data.first().timestamp
+        val maxTs = data.last().timestamp
+        val spanMs = (maxTs - minTs).coerceAtLeast(1L)
+        val spanDays = spanMs / (24 * 60 * 60 * 1000L)
+        val cal = Calendar.getInstance()
+        val dayNames = listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb")
+        val monthAbbr = listOf("ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic")
+        val ticks = mutableListOf<Pair<Float, String>>()
+        when {
+            spanDays <= 8 -> {
+                cal.timeInMillis = minTs
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                while (cal.timeInMillis <= maxTs) {
+                    val fraction = (cal.timeInMillis - minTs).toFloat() / spanMs
+                    ticks.add(fraction.coerceIn(0f, 1f) to dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1])
+                    cal.add(Calendar.DAY_OF_MONTH, 1)
+                }
+            }
+            spanDays <= 60 -> {
+                cal.timeInMillis = minTs
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                while (cal.timeInMillis <= maxTs) {
+                    val fraction = (cal.timeInMillis - minTs).toFloat() / spanMs
+                    val label = "${cal.get(Calendar.DAY_OF_MONTH)}/${cal.get(Calendar.MONTH) + 1}"
+                    ticks.add(fraction.coerceIn(0f, 1f) to label)
+                    cal.add(Calendar.WEEK_OF_YEAR, 1)
+                }
+            }
+            else -> {
+                cal.timeInMillis = minTs
+                cal.set(Calendar.DAY_OF_MONTH, 1); cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                while (cal.timeInMillis <= maxTs) {
+                    val fraction = (cal.timeInMillis - minTs).toFloat() / spanMs
+                    ticks.add(fraction.coerceIn(0f, 1f) to monthAbbr[cal.get(Calendar.MONTH)])
+                    cal.add(Calendar.MONTH, 1)
+                }
+            }
+        }
+        ticks
+    }
+
+    val labelArgb = TextSecondary.copy(alpha = 0.75f).toArgb()
+    val hasActivity = data.any { it.heatingActive }
+
     Canvas(modifier = modifier) {
         if (data.isEmpty()) return@Canvas
+        val leftPad = 34f
+        val bottomPad = 24f
+        val chartLeft = leftPad
+        val chartRight = size.width
+        val chartTop = 4f
+        val chartBottom = size.height - bottomPad
+        val chartWidth = chartRight - chartLeft
+
         val minTs = data.first().timestamp
         val maxTs = data.last().timestamp
         val timeRange = (maxTs - minTs).toFloat().coerceAtLeast(1f)
 
-        data.zipWithNext().forEach { (a, b) ->
-            if (a.heatingActive) {
-                val x1 = (a.timestamp - minTs).toFloat() / timeRange * size.width
-                val x2 = (b.timestamp - minTs).toFloat() / timeRange * size.width
-                drawRect(
-                    color = BoilerActiveColor.copy(alpha = 0.6f),
-                    topLeft = Offset(x1, 0f),
-                    size = Size(x2 - x1, size.height)
-                )
+        fun xOf(ts: Long): Float = chartLeft + (ts - minTs).toFloat() / timeRange * chartWidth
+
+        // Y-axis labels (binary boiler state)
+        val yPaint = android.graphics.Paint().apply {
+            color = labelArgb; textSize = 22f; isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.RIGHT
+        }
+        drawContext.canvas.nativeCanvas.drawText("On", chartLeft - 6f, chartTop + 12f, yPaint)
+        drawContext.canvas.nativeCanvas.drawText("Off", chartLeft - 6f, chartBottom, yPaint)
+
+        // Baseline (boiler off)
+        drawLine(
+            color = OutlineVariant.copy(alpha = 0.5f),
+            start = Offset(chartLeft, chartBottom - 2f),
+            end = Offset(chartRight, chartBottom - 2f),
+            strokeWidth = 2f
+        )
+
+        if (!hasActivity) {
+            // No heating recorded in the period: say so instead of drawing fake bars
+            val msgPaint = android.graphics.Paint().apply {
+                color = labelArgb; textSize = 26f; isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            drawContext.canvas.nativeCanvas.drawText(
+                "Sin actividad registrada en el período",
+                (chartLeft + chartRight) / 2f,
+                (chartTop + chartBottom) / 2f + 8f,
+                msgPaint
+            )
+        } else {
+            // One rect per active sample, extended to the next sample and with a
+            // minimum width so sparse data (few samples) stays visible.
+            val minBarWidth = 4f
+            val barHeight = chartBottom - chartTop - 4f
+            val fallbackStep = (timeRange.toLong() / data.size.coerceAtLeast(1)).coerceAtLeast(1L)
+            data.forEachIndexed { idx, pt ->
+                if (pt.heatingActive) {
+                    val x1 = xOf(pt.timestamp).coerceIn(chartLeft, chartRight)
+                    val nextTs = data.getOrNull(idx + 1)?.timestamp ?: (pt.timestamp + fallbackStep)
+                    val x2 = maxOf(xOf(nextTs), x1 + minBarWidth).coerceAtMost(chartRight)
+                    drawRect(
+                        color = BoilerActiveColor.copy(alpha = 0.7f),
+                        topLeft = Offset(x1, chartTop),
+                        size = Size(x2 - x1, barHeight)
+                    )
+                }
+            }
+        }
+
+        // X-axis labels
+        val xPaint = android.graphics.Paint().apply {
+            color = labelArgb; textSize = 22f; isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        xLabels.forEach { (fraction, label) ->
+            val x = chartLeft + fraction * chartWidth
+            if (x in chartLeft..chartRight) {
+                drawContext.canvas.nativeCanvas.drawText(label, x, size.height - 6f, xPaint)
             }
         }
     }
