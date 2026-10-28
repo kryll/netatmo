@@ -12,12 +12,14 @@ class FamilyPresenceManager @Inject constructor(
 ) {
 
     /**
-     * Returns true when all registered members are away (or when no members are registered,
-     * treating the device owner as a single user who is always present/absent on their own).
+     * Returns true when all registered members are away. With no members registered there is
+     * no presence data: report "someone home" (false) so an "everyone away" condition never
+     * fires away-actions without evidence, and a "someone home" condition does not silently
+     * block the automations of a single-user household.
      */
     suspend fun allMembersAway(): Boolean {
         val total = dao.countAll()
-        if (total == 0) return true // no members registered = treat as single user
+        if (total == 0) return false // no presence data: assume home, the safe default
         return dao.countMembersHome() == 0
     }
 
