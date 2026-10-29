@@ -1,6 +1,8 @@
 package com.arsys.netatmo.ui.screens.automations.advanced
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -489,6 +491,7 @@ internal fun SheetTextField(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun WrappingFilterChips(
     items: List<Pair<String, String>>,
@@ -496,8 +499,9 @@ internal fun WrappingFilterChips(
     accentColor: androidx.compose.ui.graphics.Color,
     onSelect: (String) -> Unit
 ) {
-    Row(
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         items.forEach { (value, label) ->
