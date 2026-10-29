@@ -67,6 +67,10 @@
             android:name=".service.ThermostatActionReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".service.OpenWindowActionReceiver"
+            android:exported="false" />
+
         <service
             android:name=".service.GeofenceTransitionService"
             android:exported="false"
@@ -101,3 +105,4 @@
     </application>
 
 </manifest>
+
