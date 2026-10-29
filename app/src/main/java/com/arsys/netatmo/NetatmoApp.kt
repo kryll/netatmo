@@ -9,6 +9,7 @@ import androidx.work.Configuration
 import com.arsys.netatmo.service.AdvancedAutomationWorker
 import com.arsys.netatmo.service.ClassicAutomationMigrator
 import com.arsys.netatmo.service.LocalScheduleManager
+import com.arsys.netatmo.service.OpenWindowWorker
 import com.arsys.netatmo.service.TemperatureAnomalyWorker
 import com.arsys.netatmo.worker.DataSyncWorker
 import dagger.hilt.android.HiltAndroidApp
@@ -41,6 +42,7 @@ class NetatmoApp : Application(), Configuration.Provider {
         // rollback to a classic automation working.
         localScheduleManager.scheduleAll()
         TemperatureAnomalyWorker.schedule(this)
+        OpenWindowWorker.schedule(this)
         DataSyncWorker.schedule(this)
         // Migrates classic automations (schedule/geofence/calendar/vacation) to advanced ones.
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
@@ -103,3 +105,4 @@ class NetatmoApp : Application(), Configuration.Provider {
         const val CHANNEL_ADVANCED = "advanced_automations"
     }
 }
+
