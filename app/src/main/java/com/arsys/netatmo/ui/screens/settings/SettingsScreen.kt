@@ -368,6 +368,18 @@ fun SettingsScreen(
                                     )
                                 )
                             }
+                            HorizontalDivider(color = OutlineVariant, thickness = 0.5.dp)
+                            SettingRow(
+                                icon = Icons.Default.Window,
+                                title = "Detección de ventana abierta",
+                                subtitle = "Aviso si la temperatura cae de golpe con la calefacción encendida",
+                                trailing = {
+                                    Switch(
+                                        checked = uiState.openWindowEnabled,
+                                        onCheckedChange = { viewModel.setOpenWindowEnabled(it) }
+                                    )
+                                }
+                            )
                         }
                     }
                 }
@@ -1074,3 +1086,4 @@ fun UpdateSection(
         }
     }
 }
+
