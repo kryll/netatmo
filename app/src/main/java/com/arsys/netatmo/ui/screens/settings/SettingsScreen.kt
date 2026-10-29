@@ -380,6 +380,18 @@ fun SettingsScreen(
                                     )
                                 }
                             )
+                            HorizontalDivider(color = OutlineVariant, thickness = 0.5.dp)
+                            SettingRow(
+                                icon = Icons.Default.PowerSettingsNew,
+                                title = "Apagar calefacción 30 min",
+                                subtitle = "Botón en el aviso de ventana abierta: apaga la calefacción media hora y luego vuelve a la programación",
+                                trailing = {
+                                    Switch(
+                                        checked = uiState.openWindowOffAction,
+                                        onCheckedChange = { viewModel.setOpenWindowOffAction(it) }
+                                    )
+                                }
+                            )
                         }
                     }
                 }

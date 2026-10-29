@@ -41,6 +41,7 @@ data class SettingsUiState(
     val exportError: String? = null,
     val thermostatType: ThermostatType = ThermostatType.STANDARD,
     val openWindowEnabled: Boolean = true,
+    val openWindowOffAction: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.DARK
 )
 
@@ -58,6 +59,7 @@ class SettingsViewModel @Inject constructor(
         val NOTIFICATIONS_KEY = booleanPreferencesKey("notifications_enabled")
         val ANOMALY_THRESHOLD_KEY = floatPreferencesKey("anomaly_threshold")
         val OPEN_WINDOW_KEY = booleanPreferencesKey("open_window_enabled")
+        val OPEN_WINDOW_OFF_ACTION_KEY = booleanPreferencesKey("open_window_off_action")
         val THEME_KEY = stringPreferencesKey("theme_mode")
     }
 
@@ -83,6 +85,7 @@ class SettingsViewModel @Inject constructor(
                         notificationsEnabled = prefs[NOTIFICATIONS_KEY] ?: true,
                         anomalyThreshold = prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f,
                         openWindowEnabled = prefs[OPEN_WINDOW_KEY] ?: true,
+                        openWindowOffAction = prefs[OPEN_WINDOW_OFF_ACTION_KEY] ?: true,
                         themeMode = ThemeMode.fromString(prefs[THEME_KEY])
                     )
                 }
@@ -236,6 +239,12 @@ class SettingsViewModel @Inject constructor(
     fun setOpenWindowEnabled(enabled: Boolean) {
         viewModelScope.launch {
             context.dataStore.edit { prefs -> prefs[OPEN_WINDOW_KEY] = enabled }
+        }
+    }
+
+    fun setOpenWindowOffAction(enabled: Boolean) {
+        viewModelScope.launch {
+            context.dataStore.edit { prefs -> prefs[OPEN_WINDOW_OFF_ACTION_KEY] = enabled }
         }
     }
 

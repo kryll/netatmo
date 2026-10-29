@@ -39,6 +39,7 @@ class OpenWindowWorker @AssistedInject constructor(
     companion object {
         private val NOTIFICATIONS_ENABLED_KEY = booleanPreferencesKey("notifications_enabled")
         private val OPEN_WINDOW_ENABLED_KEY = booleanPreferencesKey("open_window_enabled")
+        private val OPEN_WINDOW_OFF_ACTION_KEY = booleanPreferencesKey("open_window_off_action")
         private val STATE_KEY = stringPreferencesKey("open_window_state")
 
         private const val PREFS_NAME = "open_window_prefs"
@@ -52,7 +53,10 @@ class OpenWindowWorker @AssistedInject constructor(
         private const val ALERT_COOLDOWN_MS = 120 * 60_000L
 
         const val ACTION_DISMISS = "com.arsys.netatmo.DISMISS_OPEN_WINDOW"
+        const val ACTION_TURN_OFF_30_MIN = "com.arsys.netatmo.OPEN_WINDOW_TURN_OFF_30_MIN"
         const val EXTRA_NOTIFICATION_ID = "notification_id"
+        const val EXTRA_HOME_ID = "home_id"
+        const val OFF_DURATION_SECONDS = 30 * 60L
 
         fun schedule(context: Context) {
             val request = androidx.work.PeriodicWorkRequestBuilder<OpenWindowWorker>(
@@ -74,6 +78,7 @@ class OpenWindowWorker @AssistedInject constructor(
         val prefs = dataStore.data.first()
         if (!(prefs[NOTIFICATIONS_ENABLED_KEY] ?: true)) return Result.success()
         if (!(prefs[OPEN_WINDOW_ENABLED_KEY] ?: true)) return Result.success()
+        val offActionEnabled = prefs[OPEN_WINDOW_OFF_ACTION_KEY] ?: true
 
         val homeId = authRepository.selectedHomeId.first() ?: return Result.success()
         val homeCache = homeCacheDao.getHome(homeId) ?: return Result.success()
@@ -149,6 +154,16 @@ class OpenWindowWorker @AssistedInject constructor(
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                     )
 
+                    val turnOffIntent = PendingIntent.getBroadcast(
+                        ctx,
+                        notifId + 1,
+                        Intent(ACTION_TURN_OFF_30_MIN)
+                            .setPackage(ctx.packageName)
+                            .putExtra(EXTRA_NOTIFICATION_ID, notifId)
+                            .putExtra(EXTRA_HOME_ID, homeId),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+
                     val text = "$name: de ${"%.1f".format(prevTemp)}° a " +
                         "${"%.1f".format(currentTemp)}° en $minutes min con la calefacción encendida"
 
@@ -158,7 +173,8 @@ class OpenWindowWorker @AssistedInject constructor(
                         .setContentText(text)
                         .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                         .setAutoCancel(true)
-                        .addAction(0, "Ignorar", dismissIntent)
+                    if (offActionEnabled) builder.addAction(0, "Apagar 30 min", turnOffIntent)
+                    builder.addAction(0, "Ignorar", dismissIntent)
                     if (contentIntent != null) builder.setContentIntent(contentIntent)
 
                     notificationManager.notify(notifId, builder.build())
