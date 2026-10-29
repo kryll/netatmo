@@ -40,6 +40,7 @@ data class SettingsUiState(
     val exportedUri: Uri? = null,
     val exportError: String? = null,
     val thermostatType: ThermostatType = ThermostatType.STANDARD,
+    val openWindowEnabled: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.DARK
 )
 
@@ -56,6 +57,7 @@ class SettingsViewModel @Inject constructor(
         val AUTO_REFRESH_KEY = booleanPreferencesKey("auto_refresh")
         val NOTIFICATIONS_KEY = booleanPreferencesKey("notifications_enabled")
         val ANOMALY_THRESHOLD_KEY = floatPreferencesKey("anomaly_threshold")
+        val OPEN_WINDOW_KEY = booleanPreferencesKey("open_window_enabled")
         val THEME_KEY = stringPreferencesKey("theme_mode")
     }
 
@@ -80,6 +82,7 @@ class SettingsViewModel @Inject constructor(
                         autoRefresh = prefs[AUTO_REFRESH_KEY] ?: true,
                         notificationsEnabled = prefs[NOTIFICATIONS_KEY] ?: true,
                         anomalyThreshold = prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f,
+                        openWindowEnabled = prefs[OPEN_WINDOW_KEY] ?: true,
                         themeMode = ThemeMode.fromString(prefs[THEME_KEY])
                     )
                 }
@@ -230,6 +233,12 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(thermostatType = type) }
     }
 
+    fun setOpenWindowEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.dataStore.edit { prefs -> prefs[OPEN_WINDOW_KEY] = enabled }
+        }
+    }
+
     fun setAnomalyThreshold(v: Float) {
         viewModelScope.launch {
             context.dataStore.edit { prefs -> prefs[ANOMALY_THRESHOLD_KEY] = v }
@@ -244,3 +253,4 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(exportedUri = null) }
     }
 }
+
