@@ -16,6 +16,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,10 +85,43 @@ fun MaintenanceHistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddSheet by remember { mutableStateOf(false) }
+    var importInitial by remember { mutableStateOf<BoilerRevisionForm?>(null) }
+    var importing by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                importing = true
+                val parsed = withContext(Dispatchers.IO) {
+                    try {
+                        ParteIntervencionParser.parse(ParteIntervencionParser.extractText(context, uri))
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                importing = false
+                if (parsed == null) {
+                    Toast.makeText(context, "No se pudo leer el PDF", Toast.LENGTH_LONG).show()
+                } else {
+                    if (!parsed.isRecognized) {
+                        Toast.makeText(
+                            context,
+                            "Formato no reconocido: revisa y completa los campos a mano",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    importInitial = parsed.toForm()
+                    showAddSheet = true
+                }
+            }
+        }
+    }
 
     if (showAddSheet) {
         AddMaintenanceSheet(
-            onDismiss = { showAddSheet = false },
+            initial = importInitial,
+            onDismiss = { showAddSheet = false; importInitial = null },
             onConfirm = { form ->
                 val sdf = SimpleDateFormat("dd/MM/yyyy", Locale("es", "ES"))
                 val visitMs = try { sdf.parse(form.visitDate)?.time } catch (e: Exception) { null }
@@ -117,6 +157,7 @@ fun MaintenanceHistoryScreen(
                     perdidasChimenea = form.perdidasChimenea.toFloatOrNull()
                 )
                 showAddSheet = false
+                importInitial = null
             }
         )
     }
@@ -144,12 +185,34 @@ fun MaintenanceHistoryScreen(
         },
         containerColor = BgColor,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddSheet = true },
-                containerColor = BluePrimary,
-                contentColor = Color(0xFF001D31)
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir registro")
+                ExtendedFloatingActionButton(
+                    onClick = { if (!importing) pdfLauncher.launch(arrayOf("application/pdf")) },
+                    containerColor = SurfaceContHighest,
+                    contentColor = BluePrimary,
+                    icon = {
+                        if (importing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = BluePrimary
+                            )
+                        } else {
+                            Icon(Icons.Outlined.UploadFile, contentDescription = null)
+                        }
+                    },
+                    text = { Text(if (importing) "Leyendo PDF…" else "Importar parte (PDF)") }
+                )
+                FloatingActionButton(
+                    onClick = { showAddSheet = true },
+                    containerColor = BluePrimary,
+                    contentColor = Color(0xFF001D31)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Añadir registro")
+                }
             }
         }
     ) { padding ->
@@ -647,44 +710,45 @@ data class BoilerRevisionForm(
 @Composable
 fun AddMaintenanceSheet(
     onDismiss: () -> Unit,
-    onConfirm: (BoilerRevisionForm) -> Unit
+    onConfirm: (BoilerRevisionForm) -> Unit,
+    initial: BoilerRevisionForm? = null
 ) {
-    var selectedType by remember { mutableStateOf(MaintenanceType.ANNUAL_REVISION) }
-    var description by remember { mutableStateOf("") }
-    var techName by remember { mutableStateOf("") }
-    var certRef by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf(initial?.type ?: MaintenanceType.ANNUAL_REVISION) }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var techName by remember { mutableStateOf(initial?.techName ?: "") }
+    var certRef by remember { mutableStateOf(initial?.certRef ?: "") }
     var expanded by remember { mutableStateOf(false) }
-    var showCombustion by remember { mutableStateOf(false) }
+    var showCombustion by remember { mutableStateOf(initial?.let { f -> listOf(f.rendimiento, f.co, f.co2, f.o2, f.temperaturaHumos).any { s -> s.isNotBlank() } } == true) }
 
     // Visit info
-    var visitDate by remember { mutableStateOf("") }
-    var visitTimeRange by remember { mutableStateOf("") }
+    var visitDate by remember { mutableStateOf(initial?.visitDate ?: "") }
+    var visitTimeRange by remember { mutableStateOf(initial?.visitTimeRange ?: "") }
 
     // Equipment
-    var modelo by remember { mutableStateOf("") }
-    var numSerie by remember { mutableStateOf("") }
-    var version by remember { mutableStateOf("") }
-    var combustible by remember { mutableStateOf("") }
+    var modelo by remember { mutableStateOf(initial?.modelo ?: "") }
+    var numSerie by remember { mutableStateOf(initial?.numSerie ?: "") }
+    var version by remember { mutableStateOf(initial?.version ?: "") }
+    var combustible by remember { mutableStateOf(initial?.combustible ?: "") }
 
     // Combustion readings
-    var rendimiento by remember { mutableStateOf("") }
-    var co by remember { mutableStateOf("") }
-    var coCorrected by remember { mutableStateOf("") }
-    var coAmbiente by remember { mutableStateOf("") }
-    var co2 by remember { mutableStateOf("") }
-    var o2 by remember { mutableStateOf("") }
-    var o2Ref by remember { mutableStateOf("") }
-    var temperaturaHumos by remember { mutableStateOf("") }
-    var temperaturaAmbiente by remember { mutableStateOf("") }
-    var temperaturaACS by remember { mutableStateOf("") }
-    var temperaturaAguaFria by remember { mutableStateOf("") }
-    var caudalAgua by remember { mutableStateOf("") }
-    var potenciaACS by remember { mutableStateOf("") }
-    var presionDinamica by remember { mutableStateOf("") }
-    var presionEstatica by remember { mutableStateOf("") }
-    var tiro by remember { mutableStateOf("") }
-    var lambda by remember { mutableStateOf("") }
-    var perdidasChimenea by remember { mutableStateOf("") }
+    var rendimiento by remember { mutableStateOf(initial?.rendimiento ?: "") }
+    var co by remember { mutableStateOf(initial?.co ?: "") }
+    var coCorrected by remember { mutableStateOf(initial?.coCorrected ?: "") }
+    var coAmbiente by remember { mutableStateOf(initial?.coAmbiente ?: "") }
+    var co2 by remember { mutableStateOf(initial?.co2 ?: "") }
+    var o2 by remember { mutableStateOf(initial?.o2 ?: "") }
+    var o2Ref by remember { mutableStateOf(initial?.o2Ref ?: "") }
+    var temperaturaHumos by remember { mutableStateOf(initial?.temperaturaHumos ?: "") }
+    var temperaturaAmbiente by remember { mutableStateOf(initial?.temperaturaAmbiente ?: "") }
+    var temperaturaACS by remember { mutableStateOf(initial?.temperaturaACS ?: "") }
+    var temperaturaAguaFria by remember { mutableStateOf(initial?.temperaturaAguaFria ?: "") }
+    var caudalAgua by remember { mutableStateOf(initial?.caudalAgua ?: "") }
+    var potenciaACS by remember { mutableStateOf(initial?.potenciaACS ?: "") }
+    var presionDinamica by remember { mutableStateOf(initial?.presionDinamica ?: "") }
+    var presionEstatica by remember { mutableStateOf(initial?.presionEstatica ?: "") }
+    var tiro by remember { mutableStateOf(initial?.tiro ?: "") }
+    var lambda by remember { mutableStateOf(initial?.lambda ?: "") }
+    var perdidasChimenea by remember { mutableStateOf(initial?.perdidasChimenea ?: "") }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = BluePrimary,
@@ -716,7 +780,7 @@ fun AddMaintenanceSheet(
                 )
             }
             item {
-                Text("Nuevo parte de mantenimiento", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(if (initial != null) "Revisa el parte importado" else "Nuevo parte de mantenimiento", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
 
             // Type selector

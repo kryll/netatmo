@@ -118,6 +118,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.accompanist.permissions)
 
+    // Text extraction from SAT "parte de intervención" PDFs (maintenance import)
+    implementation(libs.pdfbox.android)
+
     implementation(libs.play.services.location)
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
