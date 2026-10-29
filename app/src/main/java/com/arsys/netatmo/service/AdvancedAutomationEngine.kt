@@ -561,7 +561,11 @@ class AdvancedAutomationEngine @Inject constructor(
             }
             "set_home_mode" -> {
                 val mode = action.optString("mode", "schedule")
-                val endAt = action.optLong("endAt", 0L).takeIf { it > 0 }
+                // Prefer durationHours (computed now, at trigger time). "endAt" remains for
+                // automations saved before the fix, where it was frozen at save time.
+                val hours = action.optLong("durationHours", 0L).takeIf { it > 0 }
+                val endAt = hours?.let { System.currentTimeMillis() + it * 3_600_000L }
+                    ?: action.optLong("endAt", 0L).takeIf { it > 0 }
                 val homeId = resolveHomeId(action.optString("homeId", ""))
                 check(homeId.isNotEmpty()) { "No hay instalación disponible" }
                 thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 })
