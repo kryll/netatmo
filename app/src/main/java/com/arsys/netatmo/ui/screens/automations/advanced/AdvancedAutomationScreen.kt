@@ -126,7 +126,7 @@ data class AutomationAction(
     val minutes: Int = 0,
     val scenarioId: String = "",
     val endAt: Long = 0L,
-    val durationHours: Int = 0
+    val durationHours: Double = 0.0
 )
 
 // ── Map converters ────────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ private fun Map<String, Any>.toAutoAction() = AutomationAction(
     minutes = (this["minutes"] as? Number)?.toInt() ?: 0,
     scenarioId = this["scenarioId"] as? String ?: "",
     endAt = (this["endAt"] as? Number)?.toLong() ?: 0L,
-    durationHours = (this["durationHours"] as? Number)?.toInt() ?: 0
+    durationHours = (this["durationHours"] as? Number)?.toDouble() ?: 0.0
 )
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -827,11 +827,14 @@ private fun conditionSummary(condition: AutomationCondition): String = when (con
     else -> condition.type
 }
 
+private fun formatHours(h: Double): String =
+    if (h == h.toLong().toDouble()) h.toLong().toString() else h.toString().replace('.', ',')
+
 private fun actionSummary(action: AutomationAction): String = when (action.type) {
     "set_temperature" -> "Fijar temperatura a ${"%.1f".format(action.temperature)}°C"
     "set_mode" -> "Cambiar modo a ${modeName(action.mode)}"
     "set_home_mode" -> "Modo de la casa: ${modeName(action.mode)}" +
-        (if (action.durationHours > 0) " durante ${action.durationHours} h"
+        (if (action.durationHours > 0) " durante ${formatHours(action.durationHours)} h"
         else if (action.endAt > 0) " hasta ${formatTriggerDateTime(action.endAt)}" else "")
     "notify" -> "Notificación: ${action.title.ifBlank { "(sin título)" }}"
     "delay" -> "Esperar ${action.minutes} min"
