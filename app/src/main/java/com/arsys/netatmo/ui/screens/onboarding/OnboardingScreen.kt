@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.onboarding
 
+import androidx.compose.runtime.Composable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -20,6 +21,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -41,15 +43,23 @@ import kotlinx.coroutines.launch
 import kotlin.math.sqrt
 
 // Design tokens — Stitch dark palette
-private val Background       = Color(0xFF101419)
-private val Primary          = Color(0xFF93CCFF)
-private val PrimaryContainer = Color(0xFF3198DC)
-private val Secondary        = Color(0xFFFFB599)   // warm / heating
+private val Background
+    @Composable get() = MaterialTheme.colorScheme.background
+private val Primary
+    @Composable get() = MaterialTheme.colorScheme.primary
+private val PrimaryContainer
+    @Composable get() = MaterialTheme.colorScheme.primaryContainer
+private val Secondary
+    @Composable get() = MaterialTheme.colorScheme.secondary   // warm / heating
 private val SecondaryActive  = Color(0xFFF66018)   // active orange
-private val Tertiary         = Color(0xFF62DF7D)   // eco / comfort green
-private val TertiaryContainer = Color(0xFF1CA64D)
-private val OnSurface        = Color(0xFFE0E2EA)
-private val OnSurfaceVariant = Color(0xFFBFC7D2)
+private val Tertiary
+    @Composable get() = MaterialTheme.colorScheme.tertiary   // eco / comfort green
+private val TertiaryContainer
+    @Composable get() = MaterialTheme.colorScheme.tertiaryContainer
+private val OnSurface
+    @Composable get() = MaterialTheme.colorScheme.onSurface
+private val OnSurfaceVariant
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 private val Warm             = WarmColor            // 0xFFEA580C orange accent
 
 private data class AutoFlow(val whenLabel: String, val thenLabel: String, val color: Color)
@@ -299,6 +309,10 @@ private fun Slide1Thermostat() {
         title = "Temperatura perfecta",
         subtitle = "Ajusta cada zona desde cualquier lugar"
     ) {
+        val themePrimary = Primary
+        val themeOutlineVariant = OutlineVariant
+        val onSurfaceArgb = OnSurface.toArgb()
+        val onSurfaceVariantArgb = OnSurfaceVariant.toArgb()
         Canvas(modifier = Modifier.size(220.dp)) {
             val strokeWidth = 24f
             val inset = strokeWidth / 2f
@@ -309,10 +323,9 @@ private fun Slide1Thermostat() {
             val fillSweep = totalSweep * 0.55f
             val cx = size.width / 2f
             val cy = size.height / 2f
-
             // Track — dark outlineVariant
             drawArc(
-                color = Color(0xFF3F4850),
+                color = themeOutlineVariant,
                 startAngle = startAngle,
                 sweepAngle = totalSweep,
                 useCenter = false,
@@ -322,7 +335,7 @@ private fun Slide1Thermostat() {
             )
             // Fill — primary
             drawArc(
-                color = Primary,
+                color = themePrimary,
                 startAngle = startAngle,
                 sweepAngle = fillSweep,
                 useCenter = false,
@@ -330,18 +343,16 @@ private fun Slide1Thermostat() {
                 size = arcSize,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
-
             drawIntoCanvas { canvas ->
                 val tempPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#E0E2EA")
+                    color = onSurfaceArgb
                     textSize = 80f
                     textAlign = android.graphics.Paint.Align.CENTER
                     isFakeBoldText = true
                 }
                 canvas.nativeCanvas.drawText("21°", cx, cy + 28f, tempPaint)
-
                 val subPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#BFC7D2")
+                    color = onSurfaceVariantArgb
                     textSize = 26f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
@@ -363,14 +374,16 @@ private fun Slide2Geofence() {
         title = "Llega y enciende",
         subtitle = "Tu termostato te detecta y prepara el hogar"
     ) {
+        val themePrimary = Primary
+        val themeBackground = Background
+        val tertiaryColor = Tertiary
         Canvas(modifier = Modifier.size(220.dp)) {
             val cx = size.width / 2f
             val cy = size.height / 2f
-
             // Geofence rings (tertiary)
             listOf(0.42f, 0.62f, 0.80f).forEach { fraction ->
                 drawCircle(
-                    color = Tertiary.copy(alpha = 0.18f),
+                    color = tertiaryColor.copy(alpha = 0.18f),
                     radius = size.width * fraction / 2f,
                     center = Offset(cx, cy),
                     style = Stroke(width = 1.5f)
@@ -378,16 +391,15 @@ private fun Slide2Geofence() {
             }
             // Home zone
             drawCircle(
-                color = Tertiary.copy(alpha = 0.12f),
+                color = tertiaryColor.copy(alpha = 0.12f),
                 radius = size.width * 0.18f,
                 center = Offset(cx, cy)
             )
             // Phone dot (primary)
             val phoneCx = cx + size.width * 0.28f
             val phoneCy = cy - size.height * 0.24f
-            drawCircle(color = Primary, radius = 14f, center = Offset(phoneCx, phoneCy))
-            drawCircle(color = Background, radius = 6f, center = Offset(phoneCx, phoneCy))
-
+            drawCircle(color = themePrimary, radius = 14f, center = Offset(phoneCx, phoneCy))
+            drawCircle(color = themeBackground, radius = 6f, center = Offset(phoneCx, phoneCy))
             // Dashed line to home
             val dx = cx - phoneCx
             val dy = cy - phoneCy
@@ -400,14 +412,13 @@ private fun Slide2Geofence() {
             while (t < dist - 20f) {
                 val end = minOf(t + dashLen, dist - 20f)
                 drawLine(
-                    color = Primary.copy(alpha = 0.55f),
+                    color = themePrimary.copy(alpha = 0.55f),
                     start = Offset(phoneCx + ux * t, phoneCy + uy * t),
                     end = Offset(phoneCx + ux * end, phoneCy + uy * end),
                     strokeWidth = 2f
                 )
                 t += dashLen + gapLen
             }
-
             drawIntoCanvas { canvas ->
                 val homePaint = android.graphics.Paint().apply {
                     textSize = 40f
@@ -431,6 +442,8 @@ private fun Slide3Stats() {
         title = "Ahorra energía",
         subtitle = "Visualiza el consumo y reduce tu factura"
     ) {
+        val themePrimary = Primary
+        val onSurfaceVariantArgb = OnSurfaceVariant.toArgb()
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -446,23 +459,21 @@ private fun Slide3Stats() {
             val barPad = 6.dp.toPx()
             val barW = totalBarW - barPad * 2
             val cornerR = 4.dp.toPx()
-
             fractions.forEachIndexed { i, fraction ->
                 val barH = (barZone - 4.dp.toPx()) * fraction
                 val left = i * totalBarW + barPad
                 val top = barZone - barH
                 drawRoundRect(
                     color = if (i == highlightIndex) SecondaryActive
-                            else Primary.copy(alpha = 0.35f),
+                            else themePrimary.copy(alpha = 0.35f),
                     topLeft = Offset(left, top),
                     size = Size(barW, barH),
                     cornerRadius = CornerRadius(cornerR)
                 )
             }
-
             drawIntoCanvas { canvas ->
                 val paint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#BFC7D2")
+                    color = onSurfaceVariantArgb
                     textSize = 22f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
@@ -657,6 +668,7 @@ private fun Slide6Schedules() {
         title = "Siempre en horario",
         subtitle = "Configura la semana y olvídate del resto"
     ) {
+        val gridColor = OutlineVariant
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -666,15 +678,12 @@ private fun Slide6Schedules() {
             val rows = 6
             val cellW = size.width / cols
             val cellH = size.height / rows
-            val gridColor = Color(0xFF3F4850)
-
             for (c in 0..cols) {
                 drawLine(gridColor, Offset(c * cellW, 0f), Offset(c * cellW, size.height), 1f)
             }
             for (r in 0..rows) {
                 drawLine(gridColor, Offset(0f, r * cellH), Offset(size.width, r * cellH), 1f)
             }
-
             blocks.forEach { b ->
                 val left = b.dayCol * cellW + 2f
                 val top  = b.startRow * cellH + 2f

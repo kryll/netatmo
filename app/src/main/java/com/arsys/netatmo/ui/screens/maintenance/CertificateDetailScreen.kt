@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.maintenance
 
+import androidx.compose.runtime.Composable
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
@@ -31,15 +32,23 @@ import java.util.Date
 import java.util.Locale
 
 // --- Design tokens ---
-private val BgColor               = Color(0xFF101419)
-private val SurfaceLowest         = Color(0xFF0A0E13)
-private val SurfaceCont           = Color(0xFF1C2025)
-private val OutlineVar            = Color(0xFF3F4850)
-private val TextPrimary           = Color(0xFFE0E2EA)
-private val TextSecondary         = Color(0xFFBFC7D2)
+private val BgColor
+    @Composable get() = MaterialTheme.colorScheme.background
+private val SurfaceLowest
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLowest
+private val SurfaceCont
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainer
+private val OutlineVar
+    @Composable get() = MaterialTheme.colorScheme.outlineVariant
+private val TextPrimary
+    @Composable get() = MaterialTheme.colorScheme.onSurface
+private val TextSecondary
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 private val TextOnSurfaceVariant  = Color(0xFF8D95A0)
-private val BluePrimary           = Color(0xFF93CCFF)
-private val BlueOnPrimary         = Color(0xFF001D31)
+private val BluePrimary
+    @Composable get() = MaterialTheme.colorScheme.primary
+private val BlueOnPrimary
+    @Composable get() = MaterialTheme.colorScheme.onPrimary
 
 private val dateLong = SimpleDateFormat("dd 'de' MMMM 'de' yyyy", Locale("es", "ES"))
 private val numberFormat = DecimalFormat("0.##", DecimalFormatSymbols(Locale("es", "ES")))

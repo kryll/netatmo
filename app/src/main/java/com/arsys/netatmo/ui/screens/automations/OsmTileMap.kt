@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -158,7 +159,7 @@ fun OsmTileMap(
     Box(
         modifier = modifier
             .clipToBounds()
-            .background(Color(0xFF1C2229))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .onSizeChanged { state.viewSize = it }
             .pointerInput(state) {
                 detectTransformGestures { centroid, pan, zoomChange, _ ->
@@ -217,13 +218,14 @@ fun OsmTileMap(
             }
         }
 
+        val markerColor = MaterialTheme.colorScheme.primary
         Canvas(modifier = Modifier.matchParentSize()) {
             if (state.viewSize.width == 0) return@Canvas
             val p = state.worldToScreen(WebMercator.x(markerLng), WebMercator.y(markerLat))
             val metersPerPx = EARTH_CIRCUMFERENCE_M * cos(Math.toRadians(markerLat)) / state.worldPx()
             val r = (radiusMeters / metersPerPx).toFloat()
-            drawCircle(Color(0xFF93CCFF).copy(alpha = 0.18f), r, p)
-            drawCircle(Color(0xFF93CCFF), r, p, style = Stroke(2.dp.toPx()))
+            drawCircle(markerColor.copy(alpha = 0.18f), r, p)
+            drawCircle(markerColor, r, p, style = Stroke(2.dp.toPx()))
             drawCircle(Color.Black.copy(alpha = 0.35f), 11.dp.toPx(), p + Offset(0f, 1.5.dp.toPx()))
             drawCircle(Color.White, 10.dp.toPx(), p)
             drawCircle(Color(0xFF1A73E8), 7.dp.toPx(), p)
@@ -232,7 +234,7 @@ fun OsmTileMap(
         if (!anyTileLoaded) {
             Text(
                 text = tileError?.let { "No se pudo cargar el mapa\n$it" } ?: "Cargando mapa…",
-                color = Color(0xFFC2C7CF),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier

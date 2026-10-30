@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.devices
 
+import androidx.compose.runtime.Composable
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -34,22 +35,38 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // --- Design tokens ---
-private val BgColor          = Color(0xFF101419)
-private val SurfaceLowest    = Color(0xFF0A0E13)
-private val SurfaceContLow   = Color(0xFF181C21)
-private val SurfaceCont      = Color(0xFF1C2025)
-private val SurfaceContHigh  = Color(0xFF262A30)
-private val SurfaceContHighest = Color(0xFF31353B)
-private val OutlineVar       = Color(0xFF3F4850)
-private val OnSurface        = Color(0xFFE0E2EA)
-private val OnSurfaceVar     = Color(0xFFBFC7D2)
-private val Primary          = Color(0xFF93CCFF)
-private val OnPrimary        = Color(0xFF003351)
-private val PrimaryContainer = Color(0xFF3198DC)
-private val Tertiary         = Color(0xFF62DF7D)
-private val OnTertiary       = Color(0xFF003914)
-private val TertiaryContainer = Color(0xFF1CA64D)
-private val ErrorColor       = Color(0xFFFFB4AB)
+private val BgColor
+    @Composable get() = MaterialTheme.colorScheme.background
+private val SurfaceLowest
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLowest
+private val SurfaceContLow
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLow
+private val SurfaceCont
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainer
+private val SurfaceContHigh
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+private val SurfaceContHighest
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerHighest
+private val OutlineVar
+    @Composable get() = MaterialTheme.colorScheme.outlineVariant
+private val OnSurface
+    @Composable get() = MaterialTheme.colorScheme.onSurface
+private val OnSurfaceVar
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val Primary
+    @Composable get() = MaterialTheme.colorScheme.primary
+private val OnPrimary
+    @Composable get() = MaterialTheme.colorScheme.onPrimary
+private val PrimaryContainer
+    @Composable get() = MaterialTheme.colorScheme.primaryContainer
+private val Tertiary
+    @Composable get() = MaterialTheme.colorScheme.tertiary
+private val OnTertiary
+    @Composable get() = MaterialTheme.colorScheme.onTertiary
+private val TertiaryContainer
+    @Composable get() = MaterialTheme.colorScheme.tertiaryContainer
+private val ErrorColor
+    @Composable get() = MaterialTheme.colorScheme.error
 
 private data class DeviceType(
     val apiType: String,

@@ -537,8 +537,9 @@ private fun TimelineCard(
     }
 
     // Build segments as list of (color, weight)
-    val segments: List<Pair<Color, Float>> = remember(slots, zones) {
-        if (slots.isEmpty()) return@remember listOf(Pair(Color(0xFF1C2025), 1440f))
+    val emptySegmentColor = MaterialTheme.colorScheme.surfaceContainer
+    val segments: List<Pair<Color, Float>> = remember(slots, zones, emptySegmentColor) {
+        if (slots.isEmpty()) return@remember listOf(Pair(emptySegmentColor, 1440f))
         val result = mutableListOf<Pair<Color, Float>>()
         if (slots.first().minuteOfDay > 0) {
             result += Pair(zoneColor(slots.last().zoneId).copy(alpha = 0.5f), slots.first().minuteOfDay.toFloat())

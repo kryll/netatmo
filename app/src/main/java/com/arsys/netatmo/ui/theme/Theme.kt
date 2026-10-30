@@ -34,6 +34,11 @@ private val LightColorScheme = lightColorScheme(
     outline = Color(0xFF71787F),
     outlineVariant = Color(0xFFC1C8CF),
     scrim = Color(0xFF000000),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF6F9FC),
+    surfaceContainer = Color(0xFFEDF2F7),
+    surfaceContainerHigh = Color(0xFFE6ECF2),
+    surfaceContainerHighest = Color(0xFFDFE6ED),
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -66,6 +71,11 @@ private val DarkColorScheme = darkColorScheme(
     outline = Color(0xFF89929B),
     outlineVariant = Color(0xFF3F4850),
     scrim = Color(0xFF000000),
+    surfaceContainerLowest = Color(0xFF0A0E13),
+    surfaceContainerLow = Color(0xFF181C21),
+    surfaceContainer = Color(0xFF1C2025),
+    surfaceContainerHigh = Color(0xFF262A30),
+    surfaceContainerHighest = Color(0xFF31353B),
 )
 
 @Composable
@@ -86,9 +96,19 @@ val ComfortColor = Color(0xFF16A34A)
 val AwayColor = Color(0xFF64748B)
 val FrostColor = Color(0xFF7DD3FC)
 val BoilerActiveColor = Color(0xFFF66018)
-val SurfaceContainer = Color(0xFF1C2025)
-val SurfaceContainerLow = Color(0xFF181C21)
-val SurfaceContainerHigh = Color(0xFF262A30)
-val SurfaceContainerLowest = Color(0xFF0A0E13)
-val SurfaceContainerHighest = Color(0xFF31353B)
-val OutlineVariant = Color(0xFF3F4850)
+
+// Roles de superficie/borde que siguen al tema activo (antes eran valores fijos
+// oscuros y rompian el tema claro). Mantienen los nombres antiguos para no
+// tener que renombrar cientos de usos.
+val SurfaceContainer: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainer
+val SurfaceContainerLow: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLow
+val SurfaceContainerHigh: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+val SurfaceContainerLowest: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLowest
+val SurfaceContainerHighest: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerHighest
+val OutlineVariant: Color
+    @Composable get() = MaterialTheme.colorScheme.outlineVariant

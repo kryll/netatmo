@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.statistics
 
+import androidx.compose.runtime.Composable
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -60,15 +61,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // Design token aliases
-private val BgColor = Color(0xFF101419)
-private val Primary = Color(0xFF93CCFF)
+private val BgColor
+    @Composable get() = MaterialTheme.colorScheme.background
+private val Primary
+    @Composable get() = MaterialTheme.colorScheme.primary
 private val Secondary = Color(0xFFF66018)        // orange (secondaryContainer)
-private val Tertiary = Color(0xFF62DF7D)          // green
-private val TextPrimary = Color(0xFFE0E2EA)
-private val TextSecondary = Color(0xFFBFC7D2)
-private val GreenGood = Color(0xFF62DF7D)
+private val Tertiary
+    @Composable get() = MaterialTheme.colorScheme.tertiary          // green
+private val TextPrimary
+    @Composable get() = MaterialTheme.colorScheme.onSurface
+private val TextSecondary
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val GreenGood
+    @Composable get() = MaterialTheme.colorScheme.tertiary
 private val AmberWarn = Color(0xFFF59E0B)
-private val RedBad = Color(0xFFFFB4AB)
+private val RedBad
+    @Composable get() = MaterialTheme.colorScheme.error
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Error card (network/API failure)
@@ -536,8 +544,9 @@ private fun StatusSubHeader() {
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // Animated pulse dot
+            val goodColor = GreenGood
             Canvas(modifier = Modifier.size(8.dp)) {
-                drawCircle(GreenGood.copy(alpha = pulseAlpha))
+                drawCircle(goodColor.copy(alpha = pulseAlpha))
             }
             Text(
                 "Actualizado hace 3 min · Mi Casa",
@@ -783,6 +792,9 @@ fun TemperatureHistory24hCard(
             }
 
             // Chart canvas — cubic spline + gradient area fill
+            val chartGridColor = OutlineVariant
+            val chartPrimary = Primary
+            val chartSurface = SurfaceContainer
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -810,7 +822,7 @@ fun TemperatureHistory24hCard(
                 // Grid lines
                 listOf(16f, 19f, 22f, 25f).forEach { t ->
                     drawLine(
-                        color = OutlineVariant.copy(alpha = 0.5f),
+                        color = chartGridColor.copy(alpha = 0.5f),
                         start = Offset(chartLeft, yOf(t)),
                         end = Offset(chartRight, yOf(t)),
                         strokeWidth = 1f
@@ -851,14 +863,14 @@ fun TemperatureHistory24hCard(
                     drawPath(
                         areaPath,
                         brush = Brush.verticalGradient(
-                            colors = listOf(Primary.copy(alpha = 0.35f), Primary.copy(alpha = 0f)),
+                            colors = listOf(chartPrimary.copy(alpha = 0.35f), chartPrimary.copy(alpha = 0f)),
                             startY = chartTop,
                             endY = chartBottom
                         )
                     )
 
                     // Temperature spline line
-                    drawPath(splinePath, Primary, style = Stroke(width = 3f, cap = StrokeCap.Round))
+                    drawPath(splinePath, chartPrimary, style = Stroke(width = 3f, cap = StrokeCap.Round))
 
                     // Setpoint dashed line (orange = Secondary)
                     val spPath = Path()
@@ -884,14 +896,14 @@ fun TemperatureHistory24hCard(
                     // Latest point floating indicator (crosshair dot)
                     val last = pts.last()
                     drawLine(
-                        color = Primary.copy(alpha = 0.3f),
+                        color = chartPrimary.copy(alpha = 0.3f),
                         start = Offset(last.x, chartTop),
                         end = Offset(last.x, chartBottom),
                         strokeWidth = 1f,
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
                     )
-                    drawCircle(Primary, radius = 6f, center = last)
-                    drawCircle(SurfaceContainer, radius = 3f, center = last)
+                    drawCircle(chartPrimary, radius = 6f, center = last)
+                    drawCircle(chartSurface, radius = 3f, center = last)
                 }
 
                 // X-axis labels — derived from actual data timestamps, every 4 hours
@@ -1478,10 +1490,11 @@ fun MonthlyHeatingCard(
                     }
 
                     // Target line
+                    val goodColor = GreenGood
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val y = size.height * (1f - targetLineRatio)
                         drawLine(
-                            color = GreenGood.copy(alpha = 0.6f),
+                            color = goodColor.copy(alpha = 0.6f),
                             start = Offset(0f, y),
                             end = Offset(size.width, y),
                             strokeWidth = 1.5f,
@@ -1818,6 +1831,8 @@ fun TemperatureChart(
 
     val labelArgb = TextSecondary.copy(alpha = 0.75f).toArgb()
 
+    val chartGridColor = OutlineVariant
+    val chartPrimary = Primary
     Canvas(modifier = modifier) {
         if (data.size < 2) return@Canvas
 
@@ -1864,7 +1879,7 @@ fun TemperatureChart(
         // Grid lines
         yTicks.forEach { t ->
             drawLine(
-                color = OutlineVariant.copy(alpha = 0.4f),
+                color = chartGridColor.copy(alpha = 0.4f),
                 start = Offset(chartLeft, yOf(t.toDouble())),
                 end = Offset(chartRight, yOf(t.toDouble())),
                 strokeWidth = 1f
@@ -1893,11 +1908,11 @@ fun TemperatureChart(
         drawPath(
             areaPath,
             brush = Brush.verticalGradient(
-                colors = listOf(Primary.copy(alpha = 0.3f), Primary.copy(alpha = 0f)),
+                colors = listOf(chartPrimary.copy(alpha = 0.3f), chartPrimary.copy(alpha = 0f)),
                 startY = chartTop, endY = chartBottom
             )
         )
-        drawPath(splinePath, Primary, style = Stroke(width = 3f, cap = StrokeCap.Round))
+        drawPath(splinePath, chartPrimary, style = Stroke(width = 3f, cap = StrokeCap.Round))
 
         // Setpoint dashed line
         val spPath = Path()
@@ -1982,6 +1997,7 @@ fun HeatingChart(
     val labelArgb = TextSecondary.copy(alpha = 0.75f).toArgb()
     val hasActivity = data.any { it.heatingActive }
 
+    val chartGridColor = OutlineVariant
     Canvas(modifier = modifier) {
         if (data.isEmpty()) return@Canvas
         val leftPad = 34f
@@ -2008,7 +2024,7 @@ fun HeatingChart(
 
         // Baseline (boiler off)
         drawLine(
-            color = OutlineVariant.copy(alpha = 0.5f),
+            color = chartGridColor.copy(alpha = 0.5f),
             start = Offset(chartLeft, chartBottom - 2f),
             end = Offset(chartRight, chartBottom - 2f),
             strokeWidth = 2f
@@ -2137,7 +2153,7 @@ private fun OpenThermMetricsCard(modifier: Modifier = Modifier) {
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = SurfaceContainer,
-        border = BorderStroke(1.dp, Color(0xFF3F4850))
+        border = BorderStroke(1.dp, OutlineVariant)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

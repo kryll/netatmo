@@ -53,7 +53,7 @@ fun AutomationLogScreen(
     val logs by viewModel.logs.collectAsState()
     val fmt = remember { SimpleDateFormat("dd/MM/yyyy · HH:mm:ss", Locale.getDefault()) }
 
-    val bgColor = Color(0xFF101419)
+    val bgColor = MaterialTheme.colorScheme.background
 
     Column(
         modifier = Modifier

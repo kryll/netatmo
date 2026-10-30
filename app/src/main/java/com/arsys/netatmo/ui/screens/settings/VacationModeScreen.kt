@@ -2,6 +2,7 @@
 
 package com.arsys.netatmo.ui.screens.settings
 
+import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -40,19 +41,31 @@ import java.time.temporal.ChronoUnit
 import java.util.*
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
-private val BgColor            = Color(0xFF101419)
-private val SurfContainerColor = Color(0xFF1C2025)
-private val SurfContLowColor   = Color(0xFF181C21)
-private val SurfContHighColor  = Color(0xFF262A30)
-private val SurfContLowestColor = Color(0xFF0A0E13)
-private val PrimaryColor       = Color(0xFF93CCFF)
-private val OnPrimaryColor     = Color(0xFF003351)
-private val TextPrimaryColor   = Color(0xFFE0E2EA)
-private val TextSecondaryColor = Color(0xFFBFC7D2)
-private val GreenGoodColor     = Color(0xFF62DF7D)
-private val RedBadColor        = Color(0xFFFFB4AB)
+private val BgColor
+    @Composable get() = MaterialTheme.colorScheme.background
+private val SurfContainerColor
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainer
+private val SurfContLowColor
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLow
+private val SurfContHighColor
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+private val SurfContLowestColor
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLowest
+private val PrimaryColor
+    @Composable get() = MaterialTheme.colorScheme.primary
+private val OnPrimaryColor
+    @Composable get() = MaterialTheme.colorScheme.onPrimary
+private val TextPrimaryColor
+    @Composable get() = MaterialTheme.colorScheme.onSurface
+private val TextSecondaryColor
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val GreenGoodColor
+    @Composable get() = MaterialTheme.colorScheme.tertiary
+private val RedBadColor
+    @Composable get() = MaterialTheme.colorScheme.error
 private val OrangeColor        = Color(0xFFF66018)
-private val OutlineVariantColor = Color(0xFF3F4850)
+private val OutlineVariantColor
+    @Composable get() = MaterialTheme.colorScheme.outlineVariant
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 private val SPAIN_ZONE: ZoneId = ZoneId.of("Europe/Madrid")

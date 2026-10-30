@@ -40,10 +40,11 @@ private fun automationTypeAccent(type: String): Color = when (type) {
     else       -> AwayColor
 }
 
+@Composable
 private fun automationTypeContainerColor(type: String): Color = when (type) {
-    "GEOFENCE" -> Color(0xFF3198DC)  // primaryContainer
+    "GEOFENCE" -> MaterialTheme.colorScheme.primaryContainer
     "CALENDAR" -> Color(0xFF5B21B6)  // violet container
-    "SCHEDULE" -> Color(0xFF1CA64D)  // tertiaryContainer
+    "SCHEDULE" -> MaterialTheme.colorScheme.tertiaryContainer
     "ADVANCED" -> Color(0xFF5B21B6)
     else       -> AwayColor
 }
@@ -79,7 +80,7 @@ fun AutomationsScreen(
     val activeAutomations = uiState.automations.filter { it.enabled }
     val inactiveAutomations = uiState.automations.filter { !it.enabled }
 
-    val bgColor = Color(0xFF101419)
+    val bgColor = MaterialTheme.colorScheme.background
 
     Box(
         modifier = Modifier

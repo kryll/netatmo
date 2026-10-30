@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.maintenance
 
+import androidx.compose.runtime.Composable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -43,29 +44,45 @@ import java.util.Date
 import java.util.Locale
 
 // --- Design tokens aligned with Stitch Netatmo Smart Atmosphere ---
-private val BgColor = Color(0xFF101419)
-private val SurfaceLowest = Color(0xFF0A0E13)
-private val SurfaceContLow = Color(0xFF181C21)
-private val SurfaceCont = Color(0xFF1C2025)
-private val SurfaceContHigh = Color(0xFF262A30)
-private val SurfaceContHighest = Color(0xFF31353B)
-private val OutlineVar = Color(0xFF3F4850)
-private val TextPrimary = Color(0xFFE0E2EA)
-private val TextSecondary = Color(0xFFBFC7D2)
-private val BluePrimary = Color(0xFF93CCFF)
-private val OrangeSecondary = Color(0xFFFFB599)
-private val GreenTertiary = Color(0xFF62DF7D)
-private val ErrorColor = Color(0xFFFFB4AB)
+private val BgColor
+    @Composable get() = MaterialTheme.colorScheme.background
+private val SurfaceLowest
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLowest
+private val SurfaceContLow
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerLow
+private val SurfaceCont
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainer
+private val SurfaceContHigh
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+private val SurfaceContHighest
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerHighest
+private val OutlineVar
+    @Composable get() = MaterialTheme.colorScheme.outlineVariant
+private val TextPrimary
+    @Composable get() = MaterialTheme.colorScheme.onSurface
+private val TextSecondary
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val BluePrimary
+    @Composable get() = MaterialTheme.colorScheme.primary
+private val BlueOnPrimary
+    @Composable get() = MaterialTheme.colorScheme.onPrimary
+private val OrangeSecondary
+    @Composable get() = MaterialTheme.colorScheme.secondary
+private val GreenTertiary
+    @Composable get() = MaterialTheme.colorScheme.tertiary
+private val ErrorColor
+    @Composable get() = MaterialTheme.colorScheme.error
 
 private val dateShort = SimpleDateFormat("dd/MM/yyyy", Locale("es", "ES"))
 private val dateRich = SimpleDateFormat("d MMM yyyy · HH:mm", Locale("es", "ES"))
 
+@Composable
 private fun MaintenanceType.chipColor() = when (this) {
     MaintenanceType.ANNUAL_REVISION -> GreenTertiary
     MaintenanceType.PURGE -> BluePrimary
     MaintenanceType.PRESSURE_CHECK -> OrangeSecondary
-    MaintenanceType.VALVE_CALIBRATION -> Color(0xFFBFC7D2)
-    MaintenanceType.OTHER -> Color(0xFF89929B)
+    MaintenanceType.VALVE_CALIBRATION -> MaterialTheme.colorScheme.onSurfaceVariant
+    MaintenanceType.OTHER -> MaterialTheme.colorScheme.outline
 }
 
 private fun MaintenanceType.icon() = when (this) {
@@ -209,7 +226,7 @@ fun MaintenanceHistoryScreen(
                 FloatingActionButton(
                     onClick = { showAddSheet = true },
                     containerColor = BluePrimary,
-                    contentColor = Color(0xFF001D31)
+                    contentColor = BlueOnPrimary
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Añadir registro")
                 }
@@ -358,12 +375,12 @@ private fun FilterChipsRow(
                     Icon(
                         icon,
                         contentDescription = null,
-                        tint = if (selected) Color(0xFF001D31) else TextSecondary,
+                        tint = if (selected) BlueOnPrimary else TextSecondary,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         label,
-                        color = if (selected) Color(0xFF001D31) else TextSecondary,
+                        color = if (selected) BlueOnPrimary else TextSecondary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -581,7 +598,7 @@ private fun MaintenanceRecordCard(
                                         .height(48.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = BluePrimary,
-                                        contentColor = Color(0xFF001D31)
+                                        contentColor = BlueOnPrimary
                                     ),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
@@ -996,7 +1013,7 @@ fun AddMaintenanceSheet(
                     },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     enabled = description.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = BluePrimary, contentColor = Color(0xFF001D31)),
+                    colors = ButtonDefaults.buttonColors(containerColor = BluePrimary, contentColor = BlueOnPrimary),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))

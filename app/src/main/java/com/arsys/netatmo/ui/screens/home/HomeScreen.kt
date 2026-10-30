@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.home
 
+import androidx.compose.runtime.Composable
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -33,7 +34,8 @@ import com.arsys.netatmo.ui.components.TemperatureSlider
 import com.arsys.netatmo.ui.theme.*
 
 // ─── Color constants ──────────────────────────────────────────────────────────
-private val ScreenBackground = Color(0xFF101419)
+private val ScreenBackground
+    @Composable get() = MaterialTheme.colorScheme.background
 private val SecondaryContainerOrange = Color(0xFFF66018)
 private val AtmosphericGlowColor = SecondaryContainerOrange.copy(alpha = 0.10f)
 
