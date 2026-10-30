@@ -220,6 +220,9 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             composable(Screen.Automations.route) {
                 AutomationsScreen(navController = navController)
             }
+            composable("automation_diagnostic") {
+                com.arsys.netatmo.ui.screens.automations.AutomationDiagnosticScreen(navController = navController)
+            }
             composable("automation_log") {
                 AutomationLogScreen(navController = navController)
             }
