@@ -120,7 +120,7 @@ fun ProgramsScreen(
         )
     }
 
-    val bgColor = Color(0xFF101419)
+    val bgColor = MaterialTheme.colorScheme.background
 
     Box(
         modifier = Modifier
@@ -217,7 +217,7 @@ fun ProgramsScreen(
         ExtendedFloatingActionButton(
             onClick = { navController.navigate("schedule/new") },
             containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
