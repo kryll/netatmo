@@ -76,6 +76,31 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug -PversionCode=${{ github.run_number }} --no-daemon
 
+      - name: Verify WorkManager init and Hilt worker codegen
+        # Structural proof for the @HiltWorker fix, beyond compiling:
+        # 1) the merged manifest must NOT register androidx.work.WorkManagerInitializer
+        #    (otherwise WorkManager starts before Application.onCreate with the default
+        #    reflective factory and every @HiltWorker fails ENQUEUED -> FAILED instantly);
+        # 2) androidx.startup's InitializationProvider must stay for the other initializers;
+        # 3) KSP must have generated the Hilt assisted-factory binding for the worker.
+        run: |
+          set -e
+          MANIFEST=$(find app/build/intermediates -path '*merged_manifest*' -path '*debug*' -name AndroidManifest.xml | head -1)
+          test -n "$MANIFEST" || { echo "::error::Merged manifest not found"; exit 1; }
+          echo "Merged manifest: $MANIFEST"
+          if grep -q 'androidx.work.WorkManagerInitializer' "$MANIFEST"; then
+            echo "::error::Merged manifest still registers androidx.work.WorkManagerInitializer: WorkManager would use the default factory and @HiltWorker creation would fail again."
+            exit 1
+          fi
+          grep -q 'androidx.startup.InitializationProvider' "$MANIFEST" || { echo "::error::androidx.startup InitializationProvider missing from merged manifest"; exit 1; }
+          echo "OK: default WorkManager initializer removed; androidx.startup provider kept."
+          BINDING=$(grep -rl 'AdvancedAutomationWorker_AssistedFactory' app/build/generated/ksp/debug/java | head -1 || true)
+          if [ -z "$BINDING" ]; then
+            echo "::error::Hilt codegen did not produce AdvancedAutomationWorker_AssistedFactory binding."
+            exit 1
+          fi
+          echo "OK: Hilt worker factory binding present: $BINDING"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
