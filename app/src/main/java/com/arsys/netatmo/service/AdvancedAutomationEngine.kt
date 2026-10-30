@@ -563,8 +563,8 @@ class AdvancedAutomationEngine @Inject constructor(
                 val mode = action.optString("mode", "schedule")
                 // Prefer durationHours (computed now, at trigger time). "endAt" remains for
                 // automations saved before the fix, where it was frozen at save time.
-                val hours = action.optLong("durationHours", 0L).takeIf { it > 0 }
-                val endAt = hours?.let { System.currentTimeMillis() + it * 3_600_000L }
+                val hours = action.optDouble("durationHours", 0.0).takeIf { it > 0.0 }
+                val endAt = hours?.let { System.currentTimeMillis() + (it * 3_600_000).toLong() }
                     ?: action.optLong("endAt", 0L).takeIf { it > 0 }
                 val homeId = resolveHomeId(action.optString("homeId", ""))
                 check(homeId.isNotEmpty()) { "No hay instalación disponible" }
