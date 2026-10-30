@@ -37,6 +37,7 @@ data class StatisticsUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val availableRooms: List<Pair<String, String>> = emptyList(),
+    val homeName: String = "",
     val selectedRoomId: String = "",
     // 24h history points from TemperatureHistoryDao
     val historyPoints: List<TemperatureHistoryEntity> = emptyList(),
@@ -148,7 +149,7 @@ class StatisticsViewModel @Inject constructor(
                         else
                             currentRoomId
                         _uiState.update { state ->
-                            state.copy(availableRooms = roomPairs, selectedRoomId = firstRoomId)
+                            state.copy(availableRooms = roomPairs, selectedRoomId = firstRoomId, homeName = cachedHome.name)
                         }
                     }
                 }

@@ -246,7 +246,7 @@ fun StatisticsScreen(
                 }
             }
 
-            StatusSubHeader()
+            StatusSubHeader(homeName = uiState.homeName)
 
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
@@ -520,7 +520,7 @@ private suspend fun exportTemperatureCsv(context: Context, data: List<Temperatur
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun StatusSubHeader() {
+private fun StatusSubHeader(homeName: String) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -549,7 +549,7 @@ private fun StatusSubHeader() {
                 drawCircle(goodColor.copy(alpha = pulseAlpha))
             }
             Text(
-                "Actualizado hace 3 min · Mi Casa",
+                if (homeName.isBlank()) "Actualizado hace 3 min" else "Actualizado hace 3 min · $homeName",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextSecondary
             )
