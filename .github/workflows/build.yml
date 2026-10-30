@@ -77,23 +77,31 @@ jobs:
         run: ./gradlew assembleDebug -PversionCode=${{ github.run_number }} --no-daemon
 
       - name: Verify WorkManager init and Hilt worker codegen
-        # Structural proof for the @HiltWorker fix, beyond compiling:
-        # 1) the merged manifest must NOT register androidx.work.WorkManagerInitializer
+        # Structural proof for the @HiltWorker fix, beyond compiling. Ground truth is
+        # the APK itself (aapt2 dump), not an intermediates path:
+        # 1) the APK manifest must NOT register androidx.work.WorkManagerInitializer
         #    (otherwise WorkManager starts before Application.onCreate with the default
         #    reflective factory and every @HiltWorker fails ENQUEUED -> FAILED instantly);
         # 2) androidx.startup's InitializationProvider must stay for the other initializers;
         # 3) KSP must have generated the Hilt assisted-factory binding for the worker.
         run: |
           set -e
-          MANIFEST=$(find app/build/intermediates -path '*merged_manifest*' -path '*debug*' -name AndroidManifest.xml | head -1)
-          test -n "$MANIFEST" || { echo "::error::Merged manifest not found"; exit 1; }
-          echo "Merged manifest: $MANIFEST"
-          if grep -q 'androidx.work.WorkManagerInitializer' "$MANIFEST"; then
-            echo "::error::Merged manifest still registers androidx.work.WorkManagerInitializer: WorkManager would use the default factory and @HiltWorker creation would fail again."
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          AAPT2=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          test -n "$AAPT2" || { echo "::error::aapt2 not found in $ANDROID_SDK_ROOT/build-tools"; exit 1; }
+          echo "aapt2: $AAPT2"
+          "$AAPT2" dump xmltree "$APK" --file AndroidManifest.xml > /tmp/apk_manifest.txt
+          if grep -q 'androidx.work.WorkManagerInitializer' /tmp/apk_manifest.txt; then
+            echo "::error::APK still registers androidx.work.WorkManagerInitializer: WorkManager would use the default factory and @HiltWorker creation would fail again."
+            echo "== diagnostic: merged manifest candidates =="
+            find app/build/intermediates -path '*merged_manifest*' -path '*debug*' -name AndroidManifest.xml | while read M; do
+              echo "-- $M"
+              grep -n -B3 -A3 'WorkManagerInitializer' "$M" || echo "   (no match)"
+            done
             exit 1
           fi
-          grep -q 'androidx.startup.InitializationProvider' "$MANIFEST" || { echo "::error::androidx.startup InitializationProvider missing from merged manifest"; exit 1; }
-          echo "OK: default WorkManager initializer removed; androidx.startup provider kept."
+          grep -q 'androidx.startup.InitializationProvider' /tmp/apk_manifest.txt || { echo "::error::androidx.startup InitializationProvider missing from APK manifest"; exit 1; }
+          echo "OK: APK manifest has no default WorkManager initializer; androidx.startup provider kept."
           BINDING=$(grep -rl 'AdvancedAutomationWorker_AssistedFactory' app/build/generated/ksp/debug/java | head -1 || true)
           if [ -z "$BINDING" ]; then
             echo "::error::Hilt codegen did not produce AdvancedAutomationWorker_AssistedFactory binding."
