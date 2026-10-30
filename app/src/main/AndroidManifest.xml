@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -109,6 +110,27 @@
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/thermostat_widget_info" />
         </receiver>
+
+        <!--
+          WorkManager must start with the app's Hilt worker factory, not the default
+          one. work-runtime ships androidx.work.WorkManagerInitializer via androidx.startup;
+          if it stays, WorkManager initializes BEFORE Application.onCreate with the default
+          Configuration and its reflective WorkerFactory, which cannot instantiate
+          @HiltWorker classes (no (Context, WorkerParameters) constructor). The work then
+          flips ENQUEUED -> FAILED in milliseconds and doWork() never runs (v209 field log).
+          Removing this meta-data leaves on-demand init to NetatmoApp (Configuration.Provider)
+          and keeps every other androidx.startup initializer (emoji2, lifecycle, profileinstaller).
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
     </application>
 
