@@ -44,6 +44,7 @@ class BootReceiver : BroadcastReceiver() {
         val isTimeChange = intent.action == Intent.ACTION_TIME_CHANGED ||
             intent.action == Intent.ACTION_TIMEZONE_CHANGED
 
+        DiagnosticLog.log(context, "ARRANQUE", "Evento ${intent.action}: rearmando alarmas y tareas")
         val workManager = WorkManager.getInstance(context)
 
         DataSyncWorker.schedule(context)
