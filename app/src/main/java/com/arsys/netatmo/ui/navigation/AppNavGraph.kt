@@ -138,11 +138,11 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
             if (showBottomBar) {
                 Column {
                     HorizontalDivider(
-                        color = Color(0xFF3F4850),
+                        color = MaterialTheme.colorScheme.outlineVariant,
                         thickness = 1.dp
                     )
                     NavigationBar(
-                        containerColor = Color(0xFF0F1419),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         tonalElevation = 0.dp
                     ) {
                         bottomNavItems.forEach { screen ->
@@ -158,11 +158,11 @@ fun AppNavGraph(pendingRoute: String? = null, onRoutePending: () -> Unit = {}) {
                                 },
                                 selected = currentRoute == screen.route,
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color(0xFF93CCFF),
-                                    selectedTextColor = Color(0xFF93CCFF),
-                                    indicatorColor = Color(0xFF93CCFF).copy(alpha = 0.2f),
-                                    unselectedIconColor = Color(0xFFBFC7D2),
-                                    unselectedTextColor = Color(0xFFBFC7D2)
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 ),
                                 onClick = {
                                     navController.navigate(screen.route) {
