@@ -29,7 +29,9 @@ class AdvancedAutomationWorker @AssistedInject constructor(
         try {
             engine.evaluateAndExecuteAll()
         } catch (e: Exception) {
-            DiagnosticLog.log(applicationContext, "WORKER", "ERROR evaluando: ${e.javaClass.simpleName}: ${e.message}")
+            // Same as v195: the exception still propagates and fails/retries the work as before.
+            DiagnosticLog.log(applicationContext, "WORKER", "ERROR evaluando (se propaga, el worker falla como antes): ${e.javaClass.simpleName}: ${e.message}")
+            throw e
         }
         DiagnosticLog.log(applicationContext, "WORKER", "Fin evaluación")
         // Rearm the next exact alarm after every run (a fired trigger may reveal a new "next").
