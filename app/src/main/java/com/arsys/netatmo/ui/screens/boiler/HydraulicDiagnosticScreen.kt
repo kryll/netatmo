@@ -114,7 +114,7 @@ private fun DiagnosticResultPhase(
     val (gradeColor, gradeBgAlpha) = when (result.grade) {
         "A+" -> ComfortColor to 0.12f
         "A"  -> ComfortColor to 0.10f
-        "B"  -> Color(0xFF93CCFF) to 0.10f
+        "B"  -> MaterialTheme.colorScheme.primary to 0.10f
         "C"  -> WarmColor to 0.12f
         else -> MaterialTheme.colorScheme.error to 0.15f
     }
