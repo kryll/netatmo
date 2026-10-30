@@ -17,6 +17,8 @@ import android.os.Build
 import android.provider.CalendarContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.*
@@ -54,10 +56,16 @@ class AdvancedAutomationEngine @Inject constructor(
 
     private val statePrefs by lazy { context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE) }
 
+    // Serializes engine evaluation: the periodic worker and an alarm-driven run can overlap,
+    // and the read-check-mark sequence must not execute the same trigger twice.
+    private val evaluationMutex = Mutex()
+
     suspend fun evaluateAndExecuteAll() {
-        val automations = advancedAutomationRepository.getEnabledAdvancedAutomations()
-        automations.forEach { automation ->
-            evaluateAndExecute(automation)
+        evaluationMutex.withLock {
+            val automations = advancedAutomationRepository.getEnabledAdvancedAutomations()
+            automations.forEach { automation ->
+                evaluateAndExecute(automation)
+            }
         }
     }
 
@@ -157,6 +165,7 @@ class AdvancedAutomationEngine @Inject constructor(
         } else if (manager.getNotificationChannel(NetatmoApp.CHANNEL_ADVANCED)?.importance == android.app.NotificationManager.IMPORTANCE_NONE) {
             report.appendLine("AVISO: el canal \"Automatizaciones avanzadas\" está desactivado en los ajustes de notificaciones de Android.")
         }
+        evaluationMutex.withLock {
         try {
             val triggers = JSONArray(automation.triggersJson)
             var triggerActive = triggers.length() == 0
@@ -218,6 +227,7 @@ class AdvancedAutomationEngine @Inject constructor(
             }
         } catch (e: Exception) {
             report.appendLine("ERROR: ${e.message ?: e.javaClass.simpleName}")
+        }
         }
         if (!alarmScheduler.canScheduleExact()) {
             report.appendLine("AVISO: este móvil no permite alarmas exactas; los disparadores de hora y fecha dependen de la comprobación periódica (~15 min) y pueden retrasarse.")
