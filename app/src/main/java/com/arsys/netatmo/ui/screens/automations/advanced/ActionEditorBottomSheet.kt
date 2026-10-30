@@ -246,7 +246,7 @@ fun ActionEditorBottomSheet(
                             )
                         }
                     }
-                    SheetLabel("Duración en horas (vacío = hasta cambiarlo)")
+                    SheetLabel("Duración en horas desde que salte (vacío = hasta cambiarlo)")
                     SheetTextField(
                         value = homeModeHours,
                         onValueChange = { homeModeHours = it },
@@ -287,8 +287,10 @@ fun ActionEditorBottomSheet(
                         "set_home_mode" -> buildMap {
                             put("type", "set_home_mode")
                             put("mode", homeMode)
+                            // Store the duration, not a fixed end: the engine computes the
+                            // end when the trigger fires, not when the automation is saved.
                             homeModeHours.toIntOrNull()?.takeIf { it > 0 }?.let {
-                                put("endAt", System.currentTimeMillis() + it * 3_600_000L)
+                                put("durationHours", it)
                             }
                         }
                         "delay" -> mapOf(
