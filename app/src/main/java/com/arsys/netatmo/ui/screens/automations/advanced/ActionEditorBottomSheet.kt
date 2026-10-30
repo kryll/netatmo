@@ -64,6 +64,7 @@ fun ActionEditorBottomSheet(
     // set_home_mode
     var homeMode by remember { mutableStateOf("schedule") }
     var homeModeHours by remember { mutableStateOf("") }
+    var homeModeHoursError by remember { mutableStateOf(false) }
 
     val actionTypes = listOf(
         "set_temperature" to "Temperatura",
@@ -246,12 +247,19 @@ fun ActionEditorBottomSheet(
                             )
                         }
                     }
-                    SheetLabel("Duración en horas desde que salte (vacío = hasta cambiarlo)")
+                    SheetLabel("Duración en horas desde que salte (vacío = hasta cambiarlo; admite decimales: 3,5)")
                     SheetTextField(
                         value = homeModeHours,
-                        onValueChange = { homeModeHours = it },
+                        onValueChange = { homeModeHours = it; homeModeHoursError = false },
                         label = "Horas"
                     )
+                    if (homeModeHoursError) {
+                        Text(
+                            "Introduce un número de horas válido (por ejemplo 3 o 3,5) o deja el campo vacío.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
 
                 "delay" -> {
@@ -268,6 +276,15 @@ fun ActionEditorBottomSheet(
 
             Button(
                 onClick = {
+                    if (selectedType == "set_home_mode") {
+                        // Never save an invalid duration silently as "until changed":
+                        // reject visibly and keep the sheet open.
+                        val hoursText = homeModeHours.trim()
+                        val parsed = hoursText.replace(',', '.').toDoubleOrNull()
+                        val invalid = hoursText.isNotEmpty() && (parsed == null || parsed <= 0.0)
+                        homeModeHoursError = invalid
+                        if (invalid) return@Button
+                    }
                     val map: Map<String, Any> = when (selectedType) {
                         "set_temperature" -> mapOf(
                             "type" to "set_temperature",
@@ -289,7 +306,7 @@ fun ActionEditorBottomSheet(
                             put("mode", homeMode)
                             // Store the duration, not a fixed end: the engine computes the
                             // end when the trigger fires, not when the automation is saved.
-                            homeModeHours.toIntOrNull()?.takeIf { it > 0 }?.let {
+                            homeModeHours.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0.0 }?.let {
                                 put("durationHours", it)
                             }
                         }
