@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.airquality
 
+import androidx.compose.runtime.Composable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
@@ -30,14 +31,21 @@ import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 import com.arsys.netatmo.ui.theme.SurfaceContainerLowest
 
 // ── Semantic colour aliases (local to this screen) ───────────────────────────
-private val BgColor         = Color(0xFF101419)
-private val TextPrimary     = Color(0xFFE0E2EA)
-private val TextSecondary   = Color(0xFFBFC7D2)
-private val BlueAccent      = Color(0xFF93CCFF)       // primary
-private val GreenGood       = Color(0xFF62DF7D)        // tertiary
+private val BgColor
+    @Composable get() = MaterialTheme.colorScheme.background
+private val TextPrimary
+    @Composable get() = MaterialTheme.colorScheme.onSurface
+private val TextSecondary
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val BlueAccent
+    @Composable get() = MaterialTheme.colorScheme.primary       // primary
+private val GreenGood
+    @Composable get() = MaterialTheme.colorScheme.tertiary        // tertiary
 private val AmberWarn       = Color(0xFFF59E0B)
-private val RedBad          = Color(0xFFFFB4AB)        // error
-private val GaugeTrack      = Color(0xFF3F4850)        // outlineVariant
+private val RedBad
+    @Composable get() = MaterialTheme.colorScheme.error        // error
+private val GaugeTrack
+    @Composable get() = MaterialTheme.colorScheme.outlineVariant        // outlineVariant
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -247,6 +255,9 @@ private fun AqiGauge(score: Int) {
     val fillFraction = (score / 100f).coerceIn(0f, 1f)
 
     Box(contentAlignment = Alignment.Center) {
+        val gaugeTrackColor = GaugeTrack
+        val textPrimaryColor = TextPrimary
+        val textSecondaryColor = TextSecondary
         Canvas(modifier = Modifier.size(240.dp)) {
             val strokeWidth = 20.dp.toPx()
             val inset = strokeWidth / 2f
@@ -255,7 +266,7 @@ private fun AqiGauge(score: Int) {
 
             // Track
             drawArc(
-                color = GaugeTrack,
+                color = gaugeTrackColor,
                 startAngle = startAngle,
                 sweepAngle = sweepDeg,
                 useCenter = false,
@@ -417,8 +428,9 @@ private fun OutdoorCard(temp: Double, condition: String) {
 // Helper label functions
 // ─────────────────────────────────────────────────────────────────────────────
 
+@Composable
 private fun co2Color(ppm: Int?): Color = when {
-    ppm == null  -> Color(0xFFBFC7D2)
+    ppm == null  -> MaterialTheme.colorScheme.onSurfaceVariant
     ppm < 800    -> GreenGood
     ppm < 1200   -> AmberWarn
     else          -> RedBad
