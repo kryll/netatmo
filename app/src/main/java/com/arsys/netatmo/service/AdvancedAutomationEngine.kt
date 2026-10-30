@@ -40,7 +40,8 @@ class AdvancedAutomationEngine @Inject constructor(
     private val advancedAutomationRepository: AdvancedAutomationRepository,
     private val thermostatRepository: ThermostatRepository,
     private val automationRepository: AutomationRepository,
-    private val familyPresenceManager: FamilyPresenceManager
+    private val familyPresenceManager: FamilyPresenceManager,
+    private val alarmScheduler: AutomationAlarmScheduler
 ) {
     private companion object {
         const val STATE_PREFS = "advanced_automation_state"
@@ -49,8 +50,6 @@ class AdvancedAutomationEngine @Inject constructor(
         val BOOST_STEPS = listOf(1.0, 1.5, 2.0)
         const val MIN_SETPOINT = 7.0
         const val MAX_SETPOINT = 30.0
-        // The periodic worker runs about every 15 min, so a time trigger counts as "now" for this long.
-        const val TIME_TRIGGER_WINDOW_MIN = 20
     }
 
     private val statePrefs by lazy { context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE) }
@@ -220,6 +219,15 @@ class AdvancedAutomationEngine @Inject constructor(
         } catch (e: Exception) {
             report.appendLine("ERROR: ${e.message ?: e.javaClass.simpleName}")
         }
+        if (!alarmScheduler.canScheduleExact()) {
+            report.appendLine("AVISO: este móvil no permite alarmas exactas; los disparadores de hora y fecha dependen de la comprobación periódica (~15 min) y pueden retrasarse.")
+        } else {
+            val nextAlarm = alarmScheduler.nextArmedAt()
+            report.appendLine(
+                if (nextAlarm > 0) "Programación puntual: próxima alarma ${formatDateTime(nextAlarm)}."
+                else "Programación puntual: activada; sin alarma armada ahora mismo (se reprograma al guardar y tras cada ejecución)."
+            )
+        }
         return report.toString().trim()
     }
 
@@ -360,7 +368,7 @@ class AdvancedAutomationEngine @Inject constructor(
         val isoDay = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7 + 1 // Calendar: 1=Sun -> ISO: 7
         if (days != null && isoDay !in days) return false
         val elapsed = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE) - target
-        if (elapsed !in 0 until TIME_TRIGGER_WINDOW_MIN) return false
+        if (elapsed !in 0 until AutomationTriggerMath.TIME_TRIGGER_WINDOW_MIN) return false
         val dayKey = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
         val key = "tday_${automationId}_$index"
         if (statePrefs.getString(key, null) == dayKey) return false
