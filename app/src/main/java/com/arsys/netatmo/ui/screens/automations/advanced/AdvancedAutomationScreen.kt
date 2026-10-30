@@ -832,7 +832,8 @@ private fun formatHours(h: Double): String =
 
 private fun actionSummary(action: AutomationAction): String = when (action.type) {
     "set_temperature" -> "Fijar temperatura a ${"%.1f".format(action.temperature)}°C"
-    "set_mode" -> "Cambiar modo a ${modeName(action.mode)}"
+    "set_mode" -> "Cambiar modo a ${modeName(action.mode)}" +
+        (if (action.durationHours > 0) " durante ${formatHours(action.durationHours)} h" else "")
     "set_home_mode" -> "Modo de la casa: ${modeName(action.mode)}" +
         (if (action.durationHours > 0) " durante ${formatHours(action.durationHours)} h"
         else if (action.endAt > 0) " hasta ${formatTriggerDateTime(action.endAt)}" else "")
