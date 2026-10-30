@@ -30,6 +30,9 @@ class BootReceiver : BroadcastReceiver() {
     @Inject
     lateinit var zoneRepository: com.arsys.netatmo.data.repository.ZoneRepository
 
+    @Inject
+    lateinit var automationAlarmScheduler: AutomationAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
             intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
@@ -56,6 +59,8 @@ class BootReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
+                // Exact alarms do not survive reboot or app update either: rearm the next one.
+                automationAlarmScheduler.reschedule()
                 automationRepository.getEnabledGeofences().forEach { geofence ->
                     try {
                         geofenceManager.registerGeofence(geofence)
