@@ -20,11 +20,18 @@ import java.util.concurrent.TimeUnit
 class AdvancedAutomationWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
-    private val engine: AdvancedAutomationEngine
+    private val engine: AdvancedAutomationEngine,
+    private val alarmScheduler: AutomationAlarmScheduler
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
         engine.evaluateAndExecuteAll()
+        // Rearm the next exact alarm after every run (a fired trigger may reveal a new "next").
+        try {
+            alarmScheduler.reschedule()
+        } catch (e: Exception) {
+            // The periodic pass remains as fallback; a rearm failure must not fail the work.
+        }
         return Result.success()
     }
 
