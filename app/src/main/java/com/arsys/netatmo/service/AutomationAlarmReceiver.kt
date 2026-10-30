@@ -12,6 +12,10 @@ import android.content.Intent
 class AutomationAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AutomationAlarmScheduler.ACTION_FIRE) return
+        val armed = context.getSharedPreferences("advanced_automation_state", Context.MODE_PRIVATE)
+            .getLong("alarm_next_at", 0L)
+        val lateS = if (armed > 0) (System.currentTimeMillis() - armed) / 1000 else 0
+        DiagnosticLog.log(context, "ALARMA", "Alarma recibida. Prevista ${DiagnosticLog.fmt(armed)}, retraso ${lateS}s. Encolando evaluación.")
         AdvancedAutomationWorker.runNow(context)
     }
 }
