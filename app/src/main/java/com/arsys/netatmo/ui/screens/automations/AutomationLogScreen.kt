@@ -86,8 +86,12 @@ fun AutomationLogScreen(
                     text = "Historial",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
                 )
+                TextButton(onClick = { navController.navigate("automation_diagnostic") }) {
+                    Text("Diagnóstico")
+                }
             }
         }
 
