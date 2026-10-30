@@ -64,6 +64,8 @@ private val TextSecondary
     @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 private val BluePrimary
     @Composable get() = MaterialTheme.colorScheme.primary
+private val BlueOnPrimary
+    @Composable get() = MaterialTheme.colorScheme.onPrimary
 private val OrangeSecondary
     @Composable get() = MaterialTheme.colorScheme.secondary
 private val GreenTertiary
