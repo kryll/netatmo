@@ -47,6 +47,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -584,29 +585,41 @@ internal fun queryDeviceCalendars(context: android.content.Context): List<Pair<L
 @Composable
 internal fun DatePickerField(label: String, value: String, onValueChange: (String) -> Unit) {
     var show by remember { mutableStateOf(false) }
+    var valueBeforeDialog by remember { mutableStateOf(value) }
     SheetLabel(label)
-    OutlinedButton(onClick = { show = true }, modifier = Modifier.fillMaxWidth()) {
+    OutlinedButton(onClick = {
+        valueBeforeDialog = value
+        show = true
+    }, modifier = Modifier.fillMaxWidth()) {
         Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.size(8.dp))
         Text(if (value.isEmpty()) "Elegir fecha" else formatDateEs(value))
     }
     if (show) {
-        val initialMs = utcMsFromYmd(value)
-        val state = rememberDatePickerState(initialSelectedDateMillis = initialMs)
-        // Al tocar un día la fecha se aplica y se cierra: la selección nunca se pierde.
-        LaunchedEffect(state.selectedDateMillis) {
-            val sel = state.selectedDateMillis
-            if (sel != null && sel != initialMs) {
-                onValueChange(ymdFromUtcMs(sel))
-                show = false
+        val state = rememberDatePickerState(initialSelectedDateMillis = utcMsFromYmd(value))
+        // Aplica cada día marcado al instante; Aceptar solo cierra y Cancelar revierte.
+        LaunchedEffect(state) {
+            snapshotFlow { state.selectedDateMillis }.collect { sel ->
+                sel?.let { onValueChange(ymdFromUtcMs(it)) }
             }
         }
         DatePickerDialog(
-            onDismissRequest = { show = false },
-            confirmButton = {
-                TextButton(onClick = { show = false }) { Text("Aceptar") }
+            onDismissRequest = {
+                onValueChange(valueBeforeDialog)
+                show = false
             },
-            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancelar") } }
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { onValueChange(ymdFromUtcMs(it)) }
+                    show = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    onValueChange(valueBeforeDialog)
+                    show = false
+                }) { Text("Cancelar") }
+            }
         ) {
             DatePicker(state = state)
         }
