@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -590,14 +591,20 @@ internal fun DatePickerField(label: String, value: String, onValueChange: (Strin
         Text(if (value.isEmpty()) "Elegir fecha" else formatDateEs(value))
     }
     if (show) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = utcMsFromYmd(value))
+        val initialMs = utcMsFromYmd(value)
+        val state = rememberDatePickerState(initialSelectedDateMillis = initialMs)
+        // Al tocar un día la fecha se aplica y se cierra: la selección nunca se pierde.
+        LaunchedEffect(state.selectedDateMillis) {
+            val sel = state.selectedDateMillis
+            if (sel != null && sel != initialMs) {
+                onValueChange(ymdFromUtcMs(sel))
+                show = false
+            }
+        }
         DatePickerDialog(
             onDismissRequest = { show = false },
             confirmButton = {
-                TextButton(onClick = {
-                    state.selectedDateMillis?.let { onValueChange(ymdFromUtcMs(it)) }
-                    show = false
-                }) { Text("Aceptar") }
+                TextButton(onClick = { show = false }) { Text("Aceptar") }
             },
             dismissButton = { TextButton(onClick = { show = false }) { Text("Cancelar") } }
         ) {
