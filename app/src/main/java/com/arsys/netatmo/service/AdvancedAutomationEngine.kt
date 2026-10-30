@@ -137,10 +137,15 @@ class AdvancedAutomationEngine @Inject constructor(
         statePrefs.edit().putLong(firedKey, now).apply()
         try {
             val alert = buildTemperatureAlert(automation, firedTrigger)
+            apiErrorsInRun = 0
             executeActions(automation, alert)
             advancedAutomationRepository.updateLastTriggered(automation.id, now, "success")
             logExecution(automation, now, success = true, error = null)
-            DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: acciones completadas con éxito")
+            if (apiErrorsInRun > 0) {
+                DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: acciones terminadas con $apiErrorsInRun ERROR(ES) de API de Netatmo. El Historial lo marca como éxito (comportamiento previo) y no se reintenta")
+            } else {
+                DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: acciones terminadas sin errores de API")
+            }
         } catch (e: Exception) {
             recordFailure(automation, e)
         }
@@ -560,14 +565,20 @@ class AdvancedAutomationEngine @Inject constructor(
         return null
     }
 
-    /** Turns a silent API error into an exception so it is logged and retried, not marked as success. */
-    private fun requireOk(what: String, result: ApiResult<Unit>) {
-        when (result) {
-            is ApiResult.Error -> {
-                DiagnosticLog.log(context, "ACCION", "$what: ERROR de Netatmo código=${result.code ?: "-"} ${result.message}")
-                error("$what falló: ${result.message}")
-            }
-            else -> DiagnosticLog.log(context, "ACCION", "$what: OK (Netatmo aceptó la orden)")
+    /** Diagnostic only: counts Netatmo API errors during the current run. Never changes execution. */
+    @Volatile private var apiErrorsInRun = 0
+
+    /**
+     * Logs the API result of an action. Behaviour is the same as v195: an API error does NOT
+     * fail the automation and is NOT retried (the Historial still marks it as success). Only the
+     * diagnostic log says so explicitly.
+     */
+    private fun logApiResult(what: String, result: ApiResult<Unit>) {
+        if (result is ApiResult.Error) {
+            apiErrorsInRun++
+            DiagnosticLog.log(context, "ACCION", "$what: ERROR de Netatmo código=${result.code ?: "-"} ${result.message}. NO se reintenta (igual que antes); la acción NO se aplicó")
+        } else {
+            DiagnosticLog.log(context, "ACCION", "$what: OK (Netatmo aceptó la orden)")
         }
     }
 
@@ -587,7 +598,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 val homeId = action.optString("homeId")
                 val roomId = action.optString("roomId")
                 val temperature = action.getDouble("temperature")
-                requireOk("Cambiar temperatura", thermostatRepository.setTemperature(homeId, roomId, temperature))
+                logApiResult("Cambiar temperatura", thermostatRepository.setTemperature(homeId, roomId, temperature))
             }
             "set_mode" -> {
                 // The editor saves set_mode without home/room: it is a home-level mode change
@@ -602,7 +613,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 val homeId = resolveHomeId(action.optString("homeId", ""))
                 check(homeId.isNotEmpty()) { "No hay instalación disponible" }
                 DiagnosticLog.log(context, "ACCION", "Modo=$mode hasta=${endAt?.let { DiagnosticLog.fmt(it) } ?: "sin fin"} (tipo ${action.optString("type")})")
-                requireOk("Cambiar modo", thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 }))
+                logApiResult("Cambiar modo", thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 }))
             }
             "notify" -> {
                 val rawTitle = action.optString("title", "Automation").ifBlank { "Automatización" }
@@ -623,7 +634,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 val homeId = resolveHomeId(action.optString("homeId", ""))
                 check(homeId.isNotEmpty()) { "No hay instalación disponible" }
                 DiagnosticLog.log(context, "ACCION", "Modo=$mode hasta=${endAt?.let { DiagnosticLog.fmt(it) } ?: "sin fin"} (tipo ${action.optString("type")})")
-                requireOk("Cambiar modo", thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 }))
+                logApiResult("Cambiar modo", thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 }))
             }
             "delay" -> {
                 val minutes = action.optLong("minutes", 1)
