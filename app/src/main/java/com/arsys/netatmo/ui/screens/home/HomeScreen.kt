@@ -128,7 +128,7 @@ fun HomeScreen(
 
                                     // Home title row
                                     HomeTitleRow(
-                                        homeName = uiState.thermostatState?.homeName ?: "Mi Casa",
+                                        homeName = uiState.thermostatState?.homeName ?: "Inicio",
                                         activeZones = activeRoomCount,
                                         onRefresh = { viewModel.loadThermostatData() }
                                     )
