@@ -7,6 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -52,9 +53,13 @@ class AdvancedAutomationWorker @AssistedInject constructor(
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 )
+                // Expedited so the immediate evaluation is not held back by standby buckets or
+                // deferral; falls back to a normal job when the expedited quota is exhausted.
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
             WorkManager.getInstance(context)
                 .enqueueUniqueWork("advanced_automation_now", ExistingWorkPolicy.REPLACE, request)
+            DiagnosticLog.log(context, "WORKER", "Evaluación inmediata encolada (acelerada, id ${request.id})")
         }
 
         fun schedule(context: Context) {
