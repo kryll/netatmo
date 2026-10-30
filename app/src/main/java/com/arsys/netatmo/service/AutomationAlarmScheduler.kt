@@ -58,6 +58,7 @@ class AutomationAlarmScheduler @Inject constructor(
     suspend fun reschedule() {
         val now = System.currentTimeMillis()
         var next: Long? = null
+        val diag = StringBuilder()
         for (automation in advancedAutomationRepository.getEnabledAdvancedAutomations()) {
             val triggers = try {
                 JSONArray(automation.triggersJson)
@@ -65,12 +66,18 @@ class AutomationAlarmScheduler @Inject constructor(
                 continue
             }
             for (i in 0 until triggers.length()) {
-                val instant = nextInstant(automation.id, i, triggers.getJSONObject(i), now) ?: continue
+                val trg = triggers.getJSONObject(i)
+                val instant = nextInstant(automation.id, i, trg, now)
+                if (trg.optString("type") == "time" || trg.optString("type") == "datetime") {
+                    diag.append("\n    «${automation.name}» disparador ${i + 1} (${trg.optString("type")}): próximo ${instant?.let { DiagnosticLog.fmt(it) } ?: "ninguno"}")
+                }
+                if (instant == null) continue
                 if (next == null || instant < next!!) next = instant
             }
         }
         val pi = pendingIntent()
         val armedAt = next
+        DiagnosticLog.log(context, "ALARMA", "Rearmado. Ahora ${DiagnosticLog.fmt(now)}. Alarma exacta permitida=${canScheduleExact()}. Elegida=${armedAt?.let { DiagnosticLog.fmt(it) } ?: "ninguna"}.$diag")
         if (armedAt == null) {
             alarmManager?.cancel(pi)
             statePrefs.edit().remove(KEY_NEXT_AT).apply()

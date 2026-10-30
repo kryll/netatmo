@@ -25,12 +25,18 @@ class AdvancedAutomationWorker @AssistedInject constructor(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        engine.evaluateAndExecuteAll()
+        DiagnosticLog.log(applicationContext, "WORKER", "Inicio evaluación (intento ${runAttemptCount + 1}, tags=${tags.filter { it.contains("Automation") || it.contains("automation") }})")
+        try {
+            engine.evaluateAndExecuteAll()
+        } catch (e: Exception) {
+            DiagnosticLog.log(applicationContext, "WORKER", "ERROR evaluando: ${e.javaClass.simpleName}: ${e.message}")
+        }
+        DiagnosticLog.log(applicationContext, "WORKER", "Fin evaluación")
         // Rearm the next exact alarm after every run (a fired trigger may reveal a new "next").
         try {
             alarmScheduler.reschedule()
         } catch (e: Exception) {
-            // The periodic pass remains as fallback; a rearm failure must not fail the work.
+            DiagnosticLog.log(applicationContext, "ALARMA", "ERROR rearmando: ${e.javaClass.simpleName}: ${e.message}")
         }
         return Result.success()
     }

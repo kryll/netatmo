@@ -36,6 +36,7 @@ class NetatmoApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        com.arsys.netatmo.service.DiagnosticLog.log(this, "APP", "Proceso de la app iniciado")
         AdvancedAutomationWorker.schedule(this)
         AdvancedAutomationWorker.runNow(this)
         // No-op once every classic schedule automation is migrated (all disabled), but keeps

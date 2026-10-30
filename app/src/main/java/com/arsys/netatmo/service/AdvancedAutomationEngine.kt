@@ -63,6 +63,7 @@ class AdvancedAutomationEngine @Inject constructor(
     suspend fun evaluateAndExecuteAll() {
         evaluationMutex.withLock {
             val automations = advancedAutomationRepository.getEnabledAdvancedAutomations()
+            DiagnosticLog.log(context, "MOTOR", "Evaluando ${automations.size} automatización(es) activas")
             automations.forEach { automation ->
                 evaluateAndExecute(automation)
             }
@@ -87,6 +88,9 @@ class AdvancedAutomationEngine @Inject constructor(
             } else {
                 firedTrigger = findFiringTrigger(automation.id, triggers)
                 shouldRun = firedTrigger != null && evaluateConditions(automation)
+            }
+            if (firedTrigger != null || triggers.length() == 0) {
+                DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: disparador=${firedTrigger?.optString("type") ?: "sin disparadores"} dispara=${firedTrigger != null} condiciones/ejecutar=$shouldRun")
             }
             if (!shouldRun) return
             // A time window re-fires on every check while inside it, like the classic schedule did.
@@ -125,13 +129,18 @@ class AdvancedAutomationEngine @Inject constructor(
     private suspend fun runFired(automation: AdvancedAutomationEntity, firedTrigger: JSONObject?, minRepeatMs: Long) {
         val firedKey = "fired_${automation.id}"
         val now = System.currentTimeMillis()
-        if (minRepeatMs > 0 && now - statePrefs.getLong(firedKey, 0L) < minRepeatMs) return
+        if (minRepeatMs > 0 && now - statePrefs.getLong(firedKey, 0L) < minRepeatMs) {
+            DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: NO ejecutada, ya se ejecutó hace menos de 1 h (${DiagnosticLog.fmt(statePrefs.getLong(firedKey, 0L))})")
+            return
+        }
+        DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: ejecutando acciones")
         statePrefs.edit().putLong(firedKey, now).apply()
         try {
             val alert = buildTemperatureAlert(automation, firedTrigger)
             executeActions(automation, alert)
             advancedAutomationRepository.updateLastTriggered(automation.id, now, "success")
             logExecution(automation, now, success = true, error = null)
+            DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: acciones completadas con éxito")
         } catch (e: Exception) {
             recordFailure(automation, e)
         }
@@ -140,6 +149,7 @@ class AdvancedAutomationEngine @Inject constructor(
     private suspend fun recordFailure(automation: AdvancedAutomationEntity, e: Exception) {
         val firedKey = "fired_${automation.id}"
         val now = System.currentTimeMillis()
+        DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: FALLO ${e.javaClass.simpleName}: ${e.message}. Se reintentará en la próxima evaluación.")
         advancedAutomationRepository.updateLastTriggered(automation.id, now, "error")
         logExecution(automation, now, success = false, error = e.message ?: e.javaClass.simpleName)
         // Forget the consumed trigger so the next check tries again instead of waiting for a new crossing.
@@ -383,6 +393,7 @@ class AdvancedAutomationEngine @Inject constructor(
         val key = "tday_${automationId}_$index"
         if (statePrefs.getString(key, null) == dayKey) return false
         statePrefs.edit().putString(key, dayKey).apply()
+        DiagnosticLog.log(context, "MOTOR", "Disparador hora ${trigger.optString("time")}: dentro de la ventana (${elapsed} min tras la hora), se ejecuta")
         return true
     }
 
@@ -433,7 +444,15 @@ class AdvancedAutomationEngine @Inject constructor(
     private fun datetimeTriggerFires(automationId: Long, index: Int, trigger: JSONObject): Boolean {
         val at = trigger.optLong("at", 0L)
         val key = "tdt_${automationId}_$index"
-        if (!AutomationTriggerMath.datetimeShouldFire(at, statePrefs.getBoolean(key, false), System.currentTimeMillis())) return false
+        val consumed = statePrefs.getBoolean(key, false)
+        val nowMs = System.currentTimeMillis()
+        if (!AutomationTriggerMath.datetimeShouldFire(at, consumed, nowMs)) {
+            if (at > 0 && !consumed) {
+                DiagnosticLog.log(context, "MOTOR", "Disparador fecha ${DiagnosticLog.fmt(at)}: aún no toca (ahora ${DiagnosticLog.fmt(nowMs)})")
+            }
+            return false
+        }
+        DiagnosticLog.log(context, "MOTOR", "Disparador fecha ${DiagnosticLog.fmt(at)}: VENCIDO, se ejecuta (retraso ${(nowMs - at) / 1000}s)")
         statePrefs.edit().putBoolean(key, true).apply()
         return true
     }
@@ -541,6 +560,17 @@ class AdvancedAutomationEngine @Inject constructor(
         return null
     }
 
+    /** Turns a silent API error into an exception so it is logged and retried, not marked as success. */
+    private fun requireOk(what: String, result: ApiResult<Unit>) {
+        when (result) {
+            is ApiResult.Error -> {
+                DiagnosticLog.log(context, "ACCION", "$what: ERROR de Netatmo código=${result.code ?: "-"} ${result.message}")
+                error("$what falló: ${result.message}")
+            }
+            else -> DiagnosticLog.log(context, "ACCION", "$what: OK (Netatmo aceptó la orden)")
+        }
+    }
+
     private suspend fun executeActions(automation: AdvancedAutomationEntity, alert: TemperatureAlert?): List<Int> {
         val actions = JSONArray(automation.actionsJson)
         val postedNotificationIds = mutableListOf<Int>()
@@ -557,7 +587,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 val homeId = action.optString("homeId")
                 val roomId = action.optString("roomId")
                 val temperature = action.getDouble("temperature")
-                thermostatRepository.setTemperature(homeId, roomId, temperature)
+                requireOk("Cambiar temperatura", thermostatRepository.setTemperature(homeId, roomId, temperature))
             }
             "set_mode" -> {
                 // The editor saves set_mode without home/room: it is a home-level mode change
@@ -571,7 +601,8 @@ class AdvancedAutomationEngine @Inject constructor(
                     ?: action.optLong("endAt", 0L).takeIf { it > 0 }
                 val homeId = resolveHomeId(action.optString("homeId", ""))
                 check(homeId.isNotEmpty()) { "No hay instalación disponible" }
-                thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 })
+                DiagnosticLog.log(context, "ACCION", "Modo=$mode hasta=${endAt?.let { DiagnosticLog.fmt(it) } ?: "sin fin"} (tipo ${action.optString("type")})")
+                requireOk("Cambiar modo", thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 }))
             }
             "notify" -> {
                 val rawTitle = action.optString("title", "Automation").ifBlank { "Automatización" }
@@ -591,7 +622,8 @@ class AdvancedAutomationEngine @Inject constructor(
                     ?: action.optLong("endAt", 0L).takeIf { it > 0 }
                 val homeId = resolveHomeId(action.optString("homeId", ""))
                 check(homeId.isNotEmpty()) { "No hay instalación disponible" }
-                thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 })
+                DiagnosticLog.log(context, "ACCION", "Modo=$mode hasta=${endAt?.let { DiagnosticLog.fmt(it) } ?: "sin fin"} (tipo ${action.optString("type")})")
+                requireOk("Cambiar modo", thermostatRepository.setHomeMode(homeId, mode, endAt?.let { it / 1000 }))
             }
             "delay" -> {
                 val minutes = action.optLong("minutes", 1)
