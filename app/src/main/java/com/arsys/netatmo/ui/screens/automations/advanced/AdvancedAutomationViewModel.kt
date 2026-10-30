@@ -42,6 +42,7 @@ class AdvancedAutomationViewModel @Inject constructor(
     private val engine: AdvancedAutomationEngine,
     private val classicAutomationMigrator: com.arsys.netatmo.service.ClassicAutomationMigrator,
     private val zoneRepository: com.arsys.netatmo.data.repository.ZoneRepository,
+    private val alarmScheduler: com.arsys.netatmo.service.AutomationAlarmScheduler,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -152,6 +153,7 @@ class AdvancedAutomationViewModel @Inject constructor(
             )
             repository.save(entity)
             zoneRepository.syncGeofences()
+            alarmScheduler.reschedule()
             AdvancedAutomationWorker.runNow(context)
             _uiState.update { it.copy(isSaved = true) }
         }
@@ -195,6 +197,7 @@ class AdvancedAutomationViewModel @Inject constructor(
             val entity = repository.getById(automationId) ?: return@launch
             repository.delete(entity)
             zoneRepository.syncGeofences()
+            alarmScheduler.reschedule()
             _uiState.update { it.copy(isDeleted = true) }
         }
     }
