@@ -574,12 +574,8 @@ class AdvancedAutomationEngine @Inject constructor(
      * diagnostic log says so explicitly.
      */
     private fun logApiResult(what: String, result: ApiResult<Unit>) {
-        if (result is ApiResult.Error) {
-            apiErrorsInRun++
-            DiagnosticLog.log(context, "ACCION", "$what: ERROR de Netatmo código=${result.code ?: "-"} ${result.message}. NO se reintenta (igual que antes); la acción NO se aplicó")
-        } else {
-            DiagnosticLog.log(context, "ACCION", "$what: OK (Netatmo aceptó la orden)")
-        }
+        if (ApiResultLog.isError(result)) apiErrorsInRun++
+        DiagnosticLog.log(context, "ACCION", ApiResultLog.describe(what, result))
     }
 
     private suspend fun executeActions(automation: AdvancedAutomationEntity, alert: TemperatureAlert?): List<Int> {
