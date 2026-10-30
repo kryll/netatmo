@@ -23,7 +23,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TimePickerDialog
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -623,7 +623,7 @@ internal fun TimePickerField(label: String, value: String, onValueChange: (Strin
             initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0,
             is24Hour = true
         )
-        TimePickerDialog(
+        AlertDialog(
             onDismissRequest = { show = false },
             confirmButton = {
                 TextButton(onClick = {
@@ -631,10 +631,9 @@ internal fun TimePickerField(label: String, value: String, onValueChange: (Strin
                     show = false
                 }) { Text("Aceptar") }
             },
-            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancelar") } }
-        ) {
-            TimePicker(state = state)
-        }
+            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancelar") } },
+            text = { TimePicker(state = state) }
+        )
     }
 }
 
