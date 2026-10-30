@@ -66,6 +66,43 @@ class AutomationsViewModel @Inject constructor(
         }
     }
 
+    fun duplicateAutomation(automation: AutomationEntity) {
+        viewModelScope.launch {
+            if (automation.type == "ADVANCED") {
+                advancedAutomationRepository.getById(-automation.id)?.let { original ->
+                    advancedAutomationRepository.save(
+                        original.copy(
+                            id = 0,
+                            name = original.name + " (copia)",
+                            enabled = false,
+                            createdAt = System.currentTimeMillis(),
+                            lastTriggeredAt = null,
+                            lastTriggeredResult = null
+                        )
+                    )
+                }
+                zoneRepository.syncGeofences()
+                return@launch
+            }
+            val newId = automationRepository.saveAutomation(
+                automation.copy(
+                    id = 0,
+                    name = automation.name + " (copia)",
+                    enabled = false,
+                    createdAt = System.currentTimeMillis(),
+                    lastTriggeredAt = null
+                )
+            )
+            // Una geovalla clásica necesita también su zona copiada al nuevo id
+            automationRepository.getGeofenceByAutomation(automation.id)?.let { geofence ->
+                automationRepository.saveGeofence(
+                    geofence.copy(id = geofence.id + "-copia-" + newId, automationId = newId)
+                )
+                zoneRepository.syncGeofences()
+            }
+        }
+    }
+
     fun deleteAutomation(automation: AutomationEntity) {
         viewModelScope.launch {
             if (automation.type == "ADVANCED") {
