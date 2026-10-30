@@ -35,8 +35,14 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
-            intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
+            intent.action != Intent.ACTION_MY_PACKAGE_REPLACED &&
+            intent.action != Intent.ACTION_TIME_CHANGED &&
+            intent.action != Intent.ACTION_TIMEZONE_CHANGED
         ) return
+        // Clock/timezone changes only need the exact alarms rearmed (they hold absolute
+        // instants); workers and geofences are unaffected.
+        val isTimeChange = intent.action == Intent.ACTION_TIME_CHANGED ||
+            intent.action == Intent.ACTION_TIMEZONE_CHANGED
 
         val workManager = WorkManager.getInstance(context)
 
@@ -59,16 +65,19 @@ class BootReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                // Exact alarms do not survive reboot or app update either: rearm the next one.
+                // Exact alarms do not survive reboot, app update or clock changes: rearm.
                 automationAlarmScheduler.reschedule()
-                automationRepository.getEnabledGeofences().forEach { geofence ->
-                    try {
-                        geofenceManager.registerGeofence(geofence)
-                    } catch (e: SecurityException) {
-                        // Background location permission not granted
+                if (!isTimeChange) {
+                    // Play Services geofences are lost on reboot/app update: register them again
+                    automationRepository.getEnabledGeofences().forEach { geofence ->
+                        try {
+                            geofenceManager.registerGeofence(geofence)
+                        } catch (e: SecurityException) {
+                            // Background location permission not granted
+                        }
                     }
+                    zoneRepository.syncGeofences()
                 }
-                zoneRepository.syncGeofences()
             } finally {
                 pendingResult.finish()
             }
