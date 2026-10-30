@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.boiler
 
+import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -30,9 +31,12 @@ import com.arsys.netatmo.ui.theme.SurfaceContainerHigh
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
-private val BgColor       = Color(0xFF101419)
-private val GreenGood     = Color(0xFF62DF7D)
-private val RedBad        = Color(0xFFFFB4AB)
+private val BgColor
+    @Composable get() = MaterialTheme.colorScheme.background
+private val GreenGood
+    @Composable get() = MaterialTheme.colorScheme.tertiary
+private val RedBad
+    @Composable get() = MaterialTheme.colorScheme.error
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
