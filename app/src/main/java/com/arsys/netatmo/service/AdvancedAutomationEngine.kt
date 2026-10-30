@@ -16,6 +16,7 @@ import com.arsys.netatmo.data.repository.ThermostatRepository
 import android.os.Build
 import android.provider.CalendarContract
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -97,6 +98,10 @@ class AdvancedAutomationEngine @Inject constructor(
             val repeatMs = if (firedTrigger?.optString("type") == "time_window") 0L else MIN_REPEAT_MS
             runFired(automation, firedTrigger, repeatMs)
         } catch (e: Exception) {
+            // A cancelled run (e.g. the alarm broadcast's 8s window expiring) must not clear
+            // the fired/consumed marks: clearing them would make the fallback worker repeat
+            // actions that may already be applied. Real errors keep the previous behavior.
+            if (e is CancellationException) throw e
             recordFailure(automation, e)
         }
     }
@@ -147,6 +152,8 @@ class AdvancedAutomationEngine @Inject constructor(
                 DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: acciones terminadas sin errores de API")
             }
         } catch (e: Exception) {
+            // See above: cancellation keeps the marks so nothing is retried twice.
+            if (e is CancellationException) throw e
             recordFailure(automation, e)
         }
     }
