@@ -205,7 +205,8 @@ fun AutomationsScreen(
                                         "ADVANCED" -> navController.navigate("advanced_automation/${-automation.id}")
                                     }
                                 },
-                                onDelete = { viewModel.deleteAutomation(automation) }
+                                onDuplicate = { viewModel.duplicateAutomation(automation) },
+                                        onDelete = { viewModel.deleteAutomation(automation) }
                             )
                         }
                     }
@@ -238,7 +239,8 @@ fun AutomationsScreen(
                                                     "ADVANCED" -> navController.navigate("advanced_automation/${-automation.id}")
                                                 }
                                             },
-                                            onDelete = { viewModel.deleteAutomation(automation) }
+                                            onDuplicate = { viewModel.duplicateAutomation(automation) },
+                                        onDelete = { viewModel.deleteAutomation(automation) }
                                         )
                                     }
                                 }
@@ -440,6 +442,7 @@ fun AutomationCard(
     automation: AutomationEntity,
     onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -585,6 +588,18 @@ fun AutomationCard(
                     ),
                     modifier = Modifier.padding(horizontal = 2.dp)
                 )
+
+                IconButton(
+                    onClick = onDuplicate,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "Duplicar",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    )
+                }
 
                 IconButton(
                     onClick = { showDeleteDialog = true },

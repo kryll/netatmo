@@ -13,8 +13,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -214,10 +225,8 @@ fun TriggerEditorBottomSheet(
                             )
                         }
                     }
-                    SheetLabel("Desde (HH:MM)")
-                    SheetTextField(value = windowStart, onValueChange = { windowStart = it }, label = "Inicio")
-                    SheetLabel("Hasta (HH:MM)")
-                    SheetTextField(value = windowEnd, onValueChange = { windowEnd = it }, label = "Fin")
+                    TimePickerField(label = "Desde", value = windowStart, onValueChange = { windowStart = it })
+                    TimePickerField(label = "Hasta", value = windowEnd, onValueChange = { windowEnd = it })
                     Text(
                         "Se aplica de nuevo en cada comprobación mientras estés dentro de la franja.",
                         style = MaterialTheme.typography.bodySmall,
@@ -226,10 +235,8 @@ fun TriggerEditorBottomSheet(
                 }
 
                 "datetime" -> {
-                    SheetLabel("Fecha (AAAA-MM-DD)")
-                    SheetTextField(value = dateTimeDate, onValueChange = { dateTimeDate = it }, label = "Fecha")
-                    SheetLabel("Hora (HH:MM)")
-                    SheetTextField(value = dateTimeTime, onValueChange = { dateTimeTime = it }, label = "Hora")
+                    DatePickerField(label = "Fecha", value = dateTimeDate, onValueChange = { dateTimeDate = it })
+                    TimePickerField(label = "Hora", value = dateTimeTime, onValueChange = { dateTimeTime = it })
                     Text(
                         "Se ejecuta una sola vez, a partir de esa fecha y hora.",
                         style = MaterialTheme.typography.bodySmall,
@@ -569,3 +576,80 @@ internal fun queryDeviceCalendars(context: android.content.Context): List<Pair<L
     }
     return result
 }
+
+// ── Date/time picker fields ──────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun DatePickerField(label: String, value: String, onValueChange: (String) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    SheetLabel(label)
+    OutlinedButton(onClick = { show = true }, modifier = Modifier.fillMaxWidth()) {
+        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(8.dp))
+        Text(if (value.isEmpty()) "Elegir fecha" else formatDateEs(value))
+    }
+    if (show) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = utcMsFromYmd(value))
+        DatePickerDialog(
+            onDismissRequest = { show = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { onValueChange(ymdFromUtcMs(it)) }
+                    show = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancelar") } }
+        ) {
+            DatePicker(state = state)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TimePickerField(label: String, value: String, onValueChange: (String) -> Unit) {
+    var show by remember { mutableStateOf(false) }
+    SheetLabel(label)
+    OutlinedButton(onClick = { show = true }, modifier = Modifier.fillMaxWidth()) {
+        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(8.dp))
+        Text(value)
+    }
+    if (show) {
+        val parts = value.split(":")
+        val state = rememberTimePickerState(
+            initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 12,
+            initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { show = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    onValueChange("%02d:%02d".format(state.hour, state.minute))
+                    show = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = { TextButton(onClick = { show = false }) { Text("Cancelar") } },
+            text = { TimePicker(state = state) }
+        )
+    }
+}
+
+internal fun utcMsFromYmd(ymd: String): Long? = try {
+    val fmt = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+    fmt.timeZone = java.util.TimeZone.getTimeZone("UTC")
+    fmt.parse(ymd)?.time
+} catch (e: Exception) { null }
+
+internal fun ymdFromUtcMs(ms: Long): String {
+    val fmt = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+    fmt.timeZone = java.util.TimeZone.getTimeZone("UTC")
+    return fmt.format(java.util.Date(ms))
+}
+
+internal fun formatDateEs(ymd: String): String = try {
+    val p = ymd.split("-").map { it.toInt() }
+    "%02d/%02d/%04d".format(p[2], p[1], p[0])
+} catch (e: Exception) { ymd }
