@@ -36,7 +36,7 @@ data class SettingsUiState(
     val isExporting: Boolean = false,
     val isImporting: Boolean = false,
     val backupResult: String? = null,
-    val anomalyThreshold: Float = 3.0f,
+    val anomalyThreshold: Float = 2.0f,
     val exportedUri: Uri? = null,
     val exportError: String? = null,
     val thermostatType: ThermostatType = ThermostatType.STANDARD,
@@ -83,7 +83,7 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         autoRefresh = prefs[AUTO_REFRESH_KEY] ?: true,
                         notificationsEnabled = prefs[NOTIFICATIONS_KEY] ?: true,
-                        anomalyThreshold = prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f,
+                        anomalyThreshold = prefs[ANOMALY_THRESHOLD_KEY] ?: 2.0f,
                         openWindowEnabled = prefs[OPEN_WINDOW_KEY] ?: true,
                         openWindowOffAction = prefs[OPEN_WINDOW_OFF_ACTION_KEY] ?: true,
                         themeMode = ThemeMode.fromString(prefs[THEME_KEY])
