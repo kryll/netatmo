@@ -349,7 +349,7 @@ fun SettingsScreen(
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
-                                            "${"%.1f".format(uiState.anomalyThreshold)}°C de diferencia",
+                                            "${"%.1f".format(uiState.anomalyThreshold)}°C por debajo de la consigna",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
