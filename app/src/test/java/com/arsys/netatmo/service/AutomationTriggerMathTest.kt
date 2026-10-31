@@ -4,6 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
 import org.junit.Test
 import java.util.Calendar
 
@@ -249,5 +253,124 @@ class AutomationTriggerMathTest {
         assertEquals(123_000L, AutomationTriggerMath.nextDatetimeInstant(123_000L, false))
         assertNull(AutomationTriggerMath.nextDatetimeInstant(123_000L, true))
         assertNull(AutomationTriggerMath.nextDatetimeInstant(0L, false))
+    }
+
+    // ── Datetime migration: interleaving (real shared mutex, fake state store) ────
+
+    private class FakeDatetimeStore(initial: Map<String, Boolean>) {
+        val data = java.util.concurrent.ConcurrentHashMap(initial)
+        val logs = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val store = DatetimeStateStore(
+            allKeys = { data.keys.toSet() },
+            getBoolean = { data[it] ?: false },
+            commit = { removals, additions ->
+                removals.forEach { data.remove(it) }
+                data.putAll(additions)
+            }
+        )
+    }
+
+    private fun dtJson(vararg entries: Pair<String, Long>): String {
+        val arr = org.json.JSONArray()
+        for ((type, at) in entries) {
+            val obj = org.json.JSONObject()
+            obj.put("type", type)
+            if (type == "datetime") obj.put("at", at)
+            if (type == "time") obj.put("time", "08:00")
+            arr.put(obj)
+        }
+        return arr.toString()
+    }
+
+    @Test
+    fun `save migrates against the stored list before a structural overwrite`() = runBlocking {
+        val atMs = 1_800_000_000_000L
+        val stored = dtJsonOf("time" to 0L, "datetime" to atMs)
+        val edited = dtJsonOf("datetime" to atMs) // user deleted the leading time trigger
+        val fake = FakeDatetimeStore(mapOf("tdt_7_1" to true))
+        val storedHolder = java.util.concurrent.atomic.AtomicReference(stored)
+        // AdvancedAutomationViewModel.save order: migrate the STORED list, then overwrite.
+        saveAutomationStateMutex.withLock {
+            migrateDatetimeConsumptionLocked(7, { storedHolder.get() }, fake.store) { fake.logs.add(it) }
+            storedHolder.set(edited)
+        }
+        assertFalse(fake.data.containsKey("tdt_7_1"))
+        assertTrue(fake.data["tdt3_7_${atMs}_0"] == true)
+        assertTrue(fake.data["mig3_tdt_7"] == true)
+        assertEquals(1, fake.logs.size)
+        // The datetime shifted to index 0, but its occurrence-0 key is the migrated mark:
+        // it stays consumed instead of refiring, and no shifted mark suppresses it wrongly.
+        val editedPairs = parseDatetimeTypeAt(edited)
+        assertEquals(0, AutomationTriggerMath.datetimeOccurrence(editedPairs, 0))
+        assertFalse(AutomationTriggerMath.datetimeShouldFire(atMs, fake.data["tdt3_7_${atMs}_0"] == true, atMs + 1))
+    }
+
+    @Test
+    fun `concurrent save and engine migrations never interleave or double-apply`() = runBlocking {
+        repeat(20) {
+            val atMs = 1_800_000_000_000L
+            val stored = dtJsonOf("datetime" to atMs)
+            val fake = FakeDatetimeStore(mapOf("tdt_5_0" to true))
+            val jobSave = launch(Dispatchers.Default) {
+                saveAutomationStateMutex.withLock {
+                    migrateDatetimeConsumptionLocked(5, { stored }, fake.store) { fake.logs.add(it) }
+                }
+            }
+            val jobEngine = launch(Dispatchers.Default) {
+                saveAutomationStateMutex.withLock {
+                    migrateDatetimeConsumptionLocked(5, { stored }, fake.store) { fake.logs.add(it) }
+                }
+            }
+            jobSave.join(); jobEngine.join()
+            assertFalse(fake.data.containsKey("tdt_5_0"))
+            assertTrue(fake.data["tdt3_5_${atMs}_0"] == true)
+            assertTrue(fake.data["mig3_tdt_5"] == true)
+            assertEquals("migration applied exactly once", 1, fake.logs.size)
+        }
+    }
+
+    @Test
+    fun `in-flight evaluation on an old snapshot keeps marks coherent across a save`() = runBlocking {
+        val atMs = 1_800_000_000_000L
+        val editedAtMs = 1_800_000_600_000L
+        val stored = dtJsonOf("datetime" to atMs)
+        val fake = FakeDatetimeStore(mapOf("tdt_9_0" to true))
+        val storedHolder = java.util.concurrent.atomic.AtomicReference(stored)
+        // Engine path: migrate first, then read consumption for the snapshot it holds.
+        saveAutomationStateMutex.withLock {
+            migrateDatetimeConsumptionLocked(9, { storedHolder.get() }, fake.store) { fake.logs.add(it) }
+        }
+        val snapshotPairs = parseDatetimeTypeAt(stored)
+        val key = AutomationTriggerMath.datetimeConsumedKey(9, atMs, AutomationTriggerMath.datetimeOccurrence(snapshotPairs, 0))
+        assertTrue("migrated mark suppresses the already-fired trigger", fake.data[key] == true)
+        // A save edits the date: migration is a no-op (guard set), the write then lands.
+        saveAutomationStateMutex.withLock {
+            migrateDatetimeConsumptionLocked(9, { storedHolder.get() }, fake.store) { fake.logs.add(it) }
+            storedHolder.set(dtJsonOf("datetime" to editedAtMs))
+        }
+        // The edited trigger re-arms under its new instant; the old mark is orphaned but harmless.
+        val editedKey = AutomationTriggerMath.datetimeConsumedKey(9, editedAtMs, 0)
+        assertFalse(fake.data[editedKey] == true)
+        assertTrue(AutomationTriggerMath.datetimeShouldFire(editedAtMs, fake.data[editedKey] == true, editedAtMs + 1))
+        assertEquals(1, fake.logs.size)
+    }
+
+    @Test
+    fun `deleting one of two identical-instant datetimes shifts the survivor occurrence`() = runBlocking {
+        // Declared residual, documented as a test: identical instants are indistinguishable,
+        // so the survivor inherits the consumed mark of the deleted duplicate (suppressed).
+        // This matches legacy behavior and never causes an extra fire.
+        val atMs = 1_800_000_000_000L
+        val stored = dtJsonOf("datetime" to atMs, "datetime" to atMs)
+        val fake = FakeDatetimeStore(mapOf("tdt_4_0" to true)) // first duplicate fired, second pending
+        val storedHolder = java.util.concurrent.atomic.AtomicReference(stored)
+        saveAutomationStateMutex.withLock {
+            migrateDatetimeConsumptionLocked(4, { storedHolder.get() }, fake.store) { fake.logs.add(it) }
+            storedHolder.set(dtJsonOf("datetime" to atMs)) // user deletes the FIRST duplicate
+        }
+        val survivorPairs = parseDatetimeTypeAt(dtJsonOf("datetime" to atMs))
+        val survivorKey = AutomationTriggerMath.datetimeConsumedKey(4, atMs, AutomationTriggerMath.datetimeOccurrence(survivorPairs, 0))
+        assertTrue(fake.data[survivorKey] == true)
+        assertFalse(AutomationTriggerMath.datetimeShouldFire(atMs, fake.data[survivorKey] == true, atMs + 1))
     }
 }
