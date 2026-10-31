@@ -60,6 +60,7 @@ class AutomationAlarmScheduler @Inject constructor(
         var next: Long? = null
         val diag = StringBuilder()
         for (automation in advancedAutomationRepository.getEnabledAdvancedAutomations()) {
+            migrateDatetimeConsumption(context, automation.id, automation.triggersJson)
             val triggers = try {
                 JSONArray(automation.triggersJson)
             } catch (e: Exception) {
@@ -104,10 +105,13 @@ class AutomationAlarmScheduler @Inject constructor(
                 val firedToday = statePrefs.getString("tday_${automationId}_$index", null) == dayKey
                 AutomationTriggerMath.nextTimeTriggerInstant(days, minutes, firedToday, now)
             }
-            "datetime" -> AutomationTriggerMath.nextDatetimeInstant(
-                trigger.optLong("at", 0L),
-                statePrefs.getBoolean("tdt_${automationId}_$index", false)
-            )
+            "datetime" -> {
+                val at = trigger.optLong("at", 0L)
+                AutomationTriggerMath.nextDatetimeInstant(
+                    at,
+                    statePrefs.getBoolean(AutomationTriggerMath.datetimeConsumedKey(automationId, at), false)
+                )
+            }
             else -> null
         }
 
