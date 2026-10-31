@@ -7,11 +7,13 @@ import org.junit.Test
 class TemperatureAnomalyWorkerTest {
 
     // Rule confirmed by José (31 oct 2026): alert only when the room is BELOW the
-    // setpoint, never above it. Threshold stays the configurable setting (default 3.0).
+    // setpoint, never above it. Inclusive boundary and default threshold 2.0 approved by
+    // José for his example: setpoint 20, reading 18, threshold 2 must alert.
 
     @Test
     fun `below the setpoint by more than the threshold alerts`() {
         assertTrue(shouldAlertTemperatureAnomaly(16.9, 20.0, 3.0))
+        assertTrue(shouldAlertTemperatureAnomaly(18.0, 20.0, 2.0))
     }
 
     @Test
@@ -20,8 +22,9 @@ class TemperatureAnomalyWorkerTest {
     }
 
     @Test
-    fun `exactly at threshold distance does not alert`() {
-        assertFalse(shouldAlertTemperatureAnomaly(17.0, 20.0, 3.0))
+    fun `exactly at threshold distance alerts (inclusive boundary, Jose example 20 to 18 at 2)`() {
+        assertTrue(shouldAlertTemperatureAnomaly(18.0, 20.0, 2.0))
+        assertTrue(shouldAlertTemperatureAnomaly(17.0, 20.0, 3.0))
     }
 
     @Test
