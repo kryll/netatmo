@@ -76,6 +76,7 @@ class AdvancedAutomationEngine @Inject constructor(
      */
     suspend fun evaluateAndExecute(automation: AdvancedAutomationEntity) {
         try {
+            migrateDatetimeConsumption(context, automation.id, automation.triggersJson)
             val triggers = JSONArray(automation.triggersJson)
             var firedTrigger: JSONObject? = null
             val shouldRun: Boolean
@@ -162,7 +163,8 @@ class AdvancedAutomationEngine @Inject constructor(
         statePrefs.all.keys
             .filter {
                 it.startsWith("tact_${automation.id}_") || it.startsWith("tday_${automation.id}_") ||
-                    it.startsWith("tdt_${automation.id}_") || it.startsWith("tcal_${automation.id}_")
+                    it.startsWith("tdt_${automation.id}_") || it.startsWith("tdt2_${automation.id}_") ||
+                    it.startsWith("tcal_${automation.id}_")
             }
             .forEach { editor.remove(it) }
         editor.apply()
@@ -173,6 +175,7 @@ class AdvancedAutomationEngine @Inject constructor(
      * report of what it read and did. Used by the "Probar ahora" button.
      */
     suspend fun testRun(automation: AdvancedAutomationEntity): String {
+        migrateDatetimeConsumption(context, automation.id, automation.triggersJson)
         val report = StringBuilder()
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) {
@@ -216,7 +219,7 @@ class AdvancedAutomationEngine @Inject constructor(
                     }
                     "datetime" -> {
                         val at = trigger.optLong("at", 0L)
-                        val consumed = statePrefs.getBoolean("tdt_${automation.id}_$i", false)
+                        val consumed = statePrefs.getBoolean(AutomationTriggerMath.datetimeConsumedKey(automation.id, at), false)
                         report.appendLine("Disparador ${i + 1}: el ${formatDateTime(at)}" +
                             (if (consumed) " (ya se ejecutó)" else " (se evalúa a su hora, no se puede forzar aquí)"))
                     }
@@ -448,7 +451,7 @@ class AdvancedAutomationEngine @Inject constructor(
     /** One-shot trigger for a fixed instant; fires on the first check at or after [at]. */
     private fun datetimeTriggerFires(automationId: Long, index: Int, trigger: JSONObject): Boolean {
         val at = trigger.optLong("at", 0L)
-        val key = "tdt_${automationId}_$index"
+        val key = AutomationTriggerMath.datetimeConsumedKey(automationId, at)
         val consumed = statePrefs.getBoolean(key, false)
         val nowMs = System.currentTimeMillis()
         if (!AutomationTriggerMath.datetimeShouldFire(at, consumed, nowMs)) {
@@ -581,6 +584,13 @@ class AdvancedAutomationEngine @Inject constructor(
     private suspend fun executeActions(automation: AdvancedAutomationEntity, alert: TemperatureAlert?): List<Int> {
         val actions = JSONArray(automation.actionsJson)
         val postedNotificationIds = mutableListOf<Int>()
+        // Diagnostic: record what the stored automation actually asks to run. Without this
+        // line a missing/unsaved action is indistinguishable from one that ran silently
+        // (v212 field log: notification arrived, no ACCION lines, mode not applied).
+        val types = (0 until actions.length()).map {
+            actions.getJSONObject(it).optString("type").ifBlank { "?" }
+        }
+        DiagnosticLog.log(context, "ACCION", "Ejecutando ${actions.length()} acción(es): ${types.joinToString(", ")}")
         for (i in 0 until actions.length()) {
             executeAction(actions.getJSONObject(i), alert, automation.name)?.let { postedNotificationIds.add(it) }
         }
@@ -634,11 +644,17 @@ class AdvancedAutomationEngine @Inject constructor(
             }
             "delay" -> {
                 val minutes = action.optLong("minutes", 1)
+                DiagnosticLog.log(context, "ACCION", "Espera de $minutes min")
                 delay(minutes * 60_000L)
             }
             "apply_scenario" -> {
                 val scenarioId = action.optLong("scenarioId")
-                val scenario = automationRepository.getScenarioById(scenarioId) ?: return null
+                val scenario = automationRepository.getScenarioById(scenarioId)
+                if (scenario == null) {
+                    DiagnosticLog.log(context, "ACCION", "Escenario $scenarioId no encontrado: se ignora")
+                    return null
+                }
+                DiagnosticLog.log(context, "ACCION", "Aplicando escenario '${scenario.name}' (${JSONArray(scenario.actionsJson).length()} acción(es))")
                 val scenarioActions = JSONArray(scenario.actionsJson)
                 for (i in 0 until scenarioActions.length()) {
                     val scenarioAction = scenarioActions.getJSONObject(i)
@@ -649,6 +665,7 @@ class AdvancedAutomationEngine @Inject constructor(
                     }
                 }
             }
+            else -> DiagnosticLog.log(context, "ACCION", "Tipo de acción desconocido '${action.optString("type")}': se ignora")
         }
         return null
     }
