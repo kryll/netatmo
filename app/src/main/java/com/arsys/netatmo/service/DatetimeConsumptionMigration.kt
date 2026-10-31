@@ -1,6 +1,7 @@
 package com.arsys.netatmo.service
 
 import android.content.Context
+import com.arsys.netatmo.data.repository.AdvancedAutomationRepository
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -8,32 +9,47 @@ import org.json.JSONArray
 private const val STATE_PREFS = "advanced_automation_state"
 
 /**
- * Serializes only the migration (a few SharedPreferences reads and one atomic commit, in the
- * millisecond range) between the engine, the alarm scheduler and the test report, so a first
- * migration cannot interleave with a second one. It is never held during evaluation or
- * actions, so a running automation (including long "delay" actions) never blocks behind it.
+ * One short critical section shared by the two writers of datetime-consumption state:
+ * saving an automation (the Room write only, in AdvancedAutomationViewModel.save) and the
+ * legacy-mark migration below (its fresh DB read plus its prefs commit). Held for
+ * milliseconds, never during evaluation or actions, so a running automation (including
+ * long "delay" actions) never blocks a save, and a save never interleaves with the
+ * snapshot a migration translates.
  */
-private val migrationMutex = Mutex()
+internal val saveAutomationStateMutex = Mutex()
 
 /**
  * Translates an automation's legacy datetime consumption marks ("tdt_<id>_<index>", without
- * the instant) to instant-qualified keys, once per automation (guard key "mig2_tdt_<id>").
- * The whole translation (legacy scan, key writes, legacy removal and the guard) lands in ONE
- * SharedPreferences commit, so a crash either leaves the legacy state untouched or the
- * migration fully applied; a partial migration is never marked complete. A save that lands
- * mid-migration can only make the translation conservative (a stale consumed key on an
- * instant that no longer exists is garbage but harmless; an instant edited during the
- * migration simply stays unconsumed and fires at its new time, which matches the new
- * edit-to-rearm semantics).
+ * the instant) to instant+occurrence keys, once per automation (guard "mig3_tdt_<id>").
+ * The trigger list is re-read from the DB INSIDE saveAutomationStateMutex, so the
+ * translated snapshot never interleaves with a concurrent save. The whole translation
+ * (legacy scan, new keys, legacy removal, guard) lands in ONE SharedPreferences commit:
+ * a crash leaves either the legacy state untouched or the migration fully applied.
+ *
+ * Declared residual: the legacy marks are positional, so a STRUCTURAL edit (deleting a
+ * trigger placed before a fired datetime) made between the fire and the first post-upgrade
+ * run can mis-assign the mark: the fired trigger may lose it (it would fire once more if
+ * still past-dated) and the trigger that shifted into its place may inherit it (suppressed
+ * until its next date edit). Date edits, additions and reorders are all exact.
  */
-internal suspend fun migrateDatetimeConsumption(context: Context, automationId: Long, triggersJson: String) {
+internal suspend fun migrateDatetimeConsumption(
+    context: Context,
+    repository: AdvancedAutomationRepository,
+    automationId: Long
+) {
     val statePrefs = context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
-    val guardKey = "mig2_tdt_$automationId"
+    val guardKey = "mig3_tdt_$automationId"
     if (statePrefs.getBoolean(guardKey, false)) return
-    migrationMutex.withLock {
+    saveAutomationStateMutex.withLock {
         if (statePrefs.getBoolean(guardKey, false)) return@withLock
+        val triggersJson = repository.getById(automationId)?.triggersJson
+        if (triggersJson == null) {
+            // Automation deleted: nothing to translate; set the guard so we stop rescanning.
+            statePrefs.edit().putBoolean(guardKey, true).apply()
+            return@withLock
+        }
         val legacyPrefix = "tdt_${automationId}_"
-        // Legacy keys end at the index (bare digits); "tdt2_" keys never match this prefix.
+        // Legacy keys end at the index (bare digits); "tdt3_" keys never match this prefix.
         val legacyIndices = statePrefs.all.keys.mapNotNull { key ->
             if (!key.startsWith(legacyPrefix)) return@mapNotNull null
             key.removePrefix(legacyPrefix).toIntOrNull()
