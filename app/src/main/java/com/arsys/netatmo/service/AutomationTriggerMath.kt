@@ -40,6 +40,38 @@ object AutomationTriggerMath {
         atMs > 0 && !consumed && nowMs >= atMs
 
     /**
+     * Consumption key for a one-shot datetime trigger, identified by its INSTANT alone (no
+     * index): editing the date/time of an already-fired trigger re-arms it on its own (the new
+     * instant's key was never consumed), and inserting, deleting, reordering or swapping
+     * triggers never replays an intact one, because its key does not depend on its position.
+     * Two datetime triggers with the exact same instant in one automation share one key:
+     * the automation fires once for that instant (in legacy builds it fired a second time
+     * when the evaluation reached the duplicate). The "tdt2_" prefix keeps these keys
+     * textually distinct from legacy "tdt_<id>_<index>" marks, so the migration scanner can
+     * never mistake one for a legacy index.
+     */
+    fun datetimeConsumedKey(automationId: Long, atMs: Long): String =
+        "tdt2_${automationId}_$atMs"
+
+    /**
+     * One-time translation of legacy consumption marks (keyed "tdt_<id>_<index>", without the
+     * instant) to instant-qualified keys ("tdt2_<id>_<atMs>"): each consumed legacy index marks
+     * the datetime trigger currently sitting at that index, at its CURRENT instant. A trigger whose date was edited
+     * after it fired stays consumed under its edited date (conservative: it never replays on
+     * upgrade; it re-arms the next time its date is edited, or when recreated). Legacy indices
+     * that no longer hold a datetime trigger are dropped.
+     */
+    fun datetimeKeyMigration(
+        automationId: Long,
+        legacyConsumedIndices: Set<Int>,
+        triggers: List<Pair<String, Long>>
+    ): Set<String> = legacyConsumedIndices.mapNotNull { index ->
+        val trigger = triggers.getOrNull(index) ?: return@mapNotNull null
+        if (trigger.first != "datetime") return@mapNotNull null
+        datetimeConsumedKey(automationId, trigger.second)
+    }.toSet()
+
+    /**
      * Next instant a recurring "time" trigger should be evaluated: the start of its next
      * window, or [nowMs] when its window is open and it has not fired today ([firedToday]).
      * Null when [days] is an empty set. Already-fired and already-past windows are skipped,
