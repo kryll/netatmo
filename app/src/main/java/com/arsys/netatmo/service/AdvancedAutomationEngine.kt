@@ -76,7 +76,7 @@ class AdvancedAutomationEngine @Inject constructor(
      */
     suspend fun evaluateAndExecute(automation: AdvancedAutomationEntity) {
         try {
-            migrateDatetimeConsumption(context, automation.id, automation.triggersJson)
+            migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
             val triggers = JSONArray(automation.triggersJson)
             var firedTrigger: JSONObject? = null
             val shouldRun: Boolean
@@ -163,7 +163,7 @@ class AdvancedAutomationEngine @Inject constructor(
         statePrefs.all.keys
             .filter {
                 it.startsWith("tact_${automation.id}_") || it.startsWith("tday_${automation.id}_") ||
-                    it.startsWith("tdt_${automation.id}_") || it.startsWith("tdt2_${automation.id}_") ||
+                    it.startsWith("tdt_${automation.id}_") || it.startsWith("tdt3_${automation.id}_") ||
                     it.startsWith("tcal_${automation.id}_")
             }
             .forEach { editor.remove(it) }
@@ -175,7 +175,7 @@ class AdvancedAutomationEngine @Inject constructor(
      * report of what it read and did. Used by the "Probar ahora" button.
      */
     suspend fun testRun(automation: AdvancedAutomationEntity): String {
-        migrateDatetimeConsumption(context, automation.id, automation.triggersJson)
+        migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
         val report = StringBuilder()
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) {
@@ -186,6 +186,10 @@ class AdvancedAutomationEngine @Inject constructor(
         evaluationMutex.withLock {
         try {
             val triggers = JSONArray(automation.triggersJson)
+            val typeAtPairs = (0 until triggers.length()).map {
+                val t = triggers.getJSONObject(it)
+                t.optString("type") to t.optLong("at", 0L)
+            }
             var triggerActive = triggers.length() == 0
             var activeTrigger: JSONObject? = null
             if (triggers.length() == 0) report.appendLine("Sin disparadores: se evalúan solo las condiciones.")
@@ -219,7 +223,8 @@ class AdvancedAutomationEngine @Inject constructor(
                     }
                     "datetime" -> {
                         val at = trigger.optLong("at", 0L)
-                        val consumed = statePrefs.getBoolean(AutomationTriggerMath.datetimeConsumedKey(automation.id, at), false)
+                        val occurrence = AutomationTriggerMath.datetimeOccurrence(typeAtPairs, i)
+                        val consumed = statePrefs.getBoolean(AutomationTriggerMath.datetimeConsumedKey(automation.id, at, occurrence), false)
                         report.appendLine("Disparador ${i + 1}: el ${formatDateTime(at)}" +
                             (if (consumed) " (ya se ejecutó)" else " (se evalúa a su hora, no se puede forzar aquí)"))
                     }
@@ -367,6 +372,10 @@ class AdvancedAutomationEngine @Inject constructor(
      * Every trigger is evaluated so its stored state stays current.
      */
     private suspend fun findFiringTrigger(automationId: Long, triggers: JSONArray): JSONObject? {
+        val typeAtPairs = (0 until triggers.length()).map {
+            val t = triggers.getJSONObject(it)
+            t.optString("type") to t.optLong("at", 0L)
+        }
         var fired: JSONObject? = null
         for (i in 0 until triggers.length()) {
             val trigger = triggers.getJSONObject(i)
@@ -381,7 +390,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 }
                 "time_window" -> timeWindowActive(trigger)
                 "calendar" -> calendarTriggerFires(automationId, i, trigger)
-                "datetime" -> datetimeTriggerFires(automationId, i, trigger)
+                "datetime" -> datetimeTriggerFires(automationId, AutomationTriggerMath.datetimeOccurrence(typeAtPairs, i), trigger)
                 else -> false // "sun" is not evaluated yet; "geofence" runs from onZoneTransition
             }
             if (fires && fired == null) fired = trigger
@@ -449,9 +458,9 @@ class AdvancedAutomationEngine @Inject constructor(
     }
 
     /** One-shot trigger for a fixed instant; fires on the first check at or after [at]. */
-    private fun datetimeTriggerFires(automationId: Long, index: Int, trigger: JSONObject): Boolean {
+    private fun datetimeTriggerFires(automationId: Long, occurrence: Int, trigger: JSONObject): Boolean {
         val at = trigger.optLong("at", 0L)
-        val key = AutomationTriggerMath.datetimeConsumedKey(automationId, at)
+        val key = AutomationTriggerMath.datetimeConsumedKey(automationId, at, occurrence)
         val consumed = statePrefs.getBoolean(key, false)
         val nowMs = System.currentTimeMillis()
         if (!AutomationTriggerMath.datetimeShouldFire(at, consumed, nowMs)) {
