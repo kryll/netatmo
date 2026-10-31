@@ -16,9 +16,18 @@ import com.arsys.netatmo.NetatmoApp
 import com.arsys.netatmo.data.local.dao.HomeCacheDao
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import kotlin.math.absoluteValue
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
+
+
+/**
+ * The temperature-anomaly decision, extracted pure for tests. Alerts only when the room is
+ * BELOW its setpoint by at least [threshold] (inclusive: setpoint 20, reading 18, threshold 2
+ * alerts - Jose, 31 oct 2026): a cold room despite a heating demand can be a real fault
+ * (valve, boiler, open window). Never alerts over the setpoint.
+ */
+internal fun shouldAlertTemperatureAnomaly(current: Double, target: Double, threshold: Double): Boolean =
+    (target - current) >= threshold
 
 @HiltWorker
 class TemperatureAnomalyWorker @AssistedInject constructor(
@@ -65,7 +74,7 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
             (prefs[VACATION_FROZEN_ALERTS_KEY] ?: true) &&
             now in (prefs[VACATION_START_MS_KEY] ?: 0L)..(prefs[VACATION_END_MS_KEY] ?: 0L)
 
-        val threshold = (prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f).toDouble()
+        val threshold = (prefs[ANOMALY_THRESHOLD_KEY] ?: 2.0f).toDouble()
         val homeId = authRepository.selectedHomeId.first() ?: return Result.success()
 
         val homeCache = homeCacheDao.getHome(homeId) ?: return Result.success()
@@ -102,7 +111,10 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
             }
 
             if (currentTemp == null || targetTemp == null) continue
-            if ((currentTemp - targetTemp).absoluteValue <= threshold) continue
+            // Only UNDER-target alerts: heating cannot cool, so a reading above the
+            // setpoint (e.g. an away/eco setpoint on a mild day) is not an anomaly
+            // (José, 31 oct 2026). Over-target readings never notify.
+            if (!shouldAlertTemperatureAnomaly(currentTemp, targetTemp, threshold)) continue
 
             val notifId = (name.hashCode() and 0x7FFFFFFF) % 1000 + 2000
 
