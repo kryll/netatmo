@@ -373,4 +373,35 @@ class AutomationTriggerMathTest {
         assertTrue(fake.data[survivorKey] == true)
         assertFalse(AutomationTriggerMath.datetimeShouldFire(atMs, fake.data[survivorKey] == true, atMs + 1))
     }
+
+    @Test
+    fun `upgrade never reactivates a legacy-consumed trigger, only genuine pendings fire`() = runBlocking {
+        val past = 1_000_000_000_000L
+        val pastEdited = 1_100_000_000_000L
+        // A: fired and untouched. B: fired then date EDITED pre-upgrade (the rearm bug victim:
+        // its legacy mark outlived the edit). C: never fired, instant already past (genuinely
+        // pending: v212 would fire it at its next evaluation too). D: fired duplicate of A.
+        val stored = dtJsonOf(
+            "datetime" to past,        // idx0 A: mark
+            "datetime" to pastEdited,  // idx1 B: mark (edited after firing, mark kept)
+            "datetime" to past,        // idx2 C: NO mark
+            "datetime" to past         // idx3 D: mark (fired second duplicate of the past instant)
+        )
+        val fake = FakeDatetimeStore(mapOf("tdt_3_0" to true, "tdt_3_1" to true, "tdt_3_3" to true))
+        saveAutomationStateMutex.withLock {
+            migrateDatetimeConsumptionLocked(3, { stored }, fake.store) { fake.logs.add(it) }
+        }
+        fun consumed(index: Int, at: Long): Boolean {
+            val pairs = parseDatetimeTypeAt(stored)
+            val key = AutomationTriggerMath.datetimeConsumedKey(3, at, AutomationTriggerMath.datetimeOccurrence(pairs, index))
+            return fake.data[key] == true
+        }
+        val now = pastEdited + 1
+        assertFalse("A fired+untouched stays consumed", AutomationTriggerMath.datetimeShouldFire(past, consumed(0, past), now))
+        assertFalse("B fired then edited pre-upgrade stays consumed at its current instant", AutomationTriggerMath.datetimeShouldFire(pastEdited, consumed(1, pastEdited), now))
+        assertTrue("C genuinely pending still fires (same as v212)", AutomationTriggerMath.datetimeShouldFire(past, consumed(2, past), now))
+        assertFalse("D fired duplicate stays consumed", AutomationTriggerMath.datetimeShouldFire(past, consumed(3, past), now))
+        assertTrue("legacy marks removed", fake.data.keys.none { it.startsWith("tdt_3_") })
+        assertTrue(fake.data["mig3_tdt_3"] == true)
+    }
 }
