@@ -60,15 +60,19 @@ class AutomationAlarmScheduler @Inject constructor(
         var next: Long? = null
         val diag = StringBuilder()
         for (automation in advancedAutomationRepository.getEnabledAdvancedAutomations()) {
-            migrateDatetimeConsumption(context, automation.id, automation.triggersJson)
+            migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
             val triggers = try {
                 JSONArray(automation.triggersJson)
             } catch (e: Exception) {
                 continue
             }
+            val typeAtPairs = (0 until triggers.length()).map {
+                val t = triggers.getJSONObject(it)
+                t.optString("type") to t.optLong("at", 0L)
+            }
             for (i in 0 until triggers.length()) {
                 val trg = triggers.getJSONObject(i)
-                val instant = nextInstant(automation.id, i, trg, now)
+                val instant = nextInstant(automation.id, i, AutomationTriggerMath.datetimeOccurrence(typeAtPairs, i), trg, now)
                 if (trg.optString("type") == "time" || trg.optString("type") == "datetime") {
                     diag.append("\n    «${automation.name}» disparador ${i + 1} (${trg.optString("type")}): próximo ${instant?.let { DiagnosticLog.fmt(it) } ?: "ninguno"}")
                 }
@@ -94,7 +98,7 @@ class AutomationAlarmScheduler @Inject constructor(
         statePrefs.edit().putLong(KEY_NEXT_AT, armedAt).apply()
     }
 
-    private fun nextInstant(automationId: Long, index: Int, trigger: JSONObject, now: Long): Long? =
+    private fun nextInstant(automationId: Long, index: Int, occurrence: Int, trigger: JSONObject, now: Long): Long? =
         when (trigger.optString("type")) {
             "time" -> {
                 val minutes = parseTimeToMinutes(trigger.optString("time", "")) ?: return null
@@ -109,7 +113,7 @@ class AutomationAlarmScheduler @Inject constructor(
                 val at = trigger.optLong("at", 0L)
                 AutomationTriggerMath.nextDatetimeInstant(
                     at,
-                    statePrefs.getBoolean(AutomationTriggerMath.datetimeConsumedKey(automationId, at), false)
+                    statePrefs.getBoolean(AutomationTriggerMath.datetimeConsumedKey(automationId, at, occurrence), false)
                 )
             }
             else -> null
