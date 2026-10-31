@@ -8,6 +8,9 @@ import com.arsys.netatmo.data.local.entities.AdvancedAutomationEntity
 import com.arsys.netatmo.data.repository.AdvancedAutomationRepository
 import com.arsys.netatmo.service.AdvancedAutomationEngine
 import com.arsys.netatmo.service.AdvancedAutomationWorker
+import com.arsys.netatmo.service.migrateDatetimeConsumptionLocked
+import com.arsys.netatmo.service.saveAutomationStateMutex
+import kotlinx.coroutines.sync.withLock
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -151,7 +154,14 @@ class AdvancedAutomationViewModel @Inject constructor(
                 actionsJson = mapsToJsonArray(actions),
                 triggerMode = triggerMode
             )
-            repository.save(entity)
+            // Inside the short shared section: migrate the legacy marks against the STORED
+            // trigger list BEFORE overwriting it, so the positional marks are always
+            // translated against the structure they were written for, even when this save
+            // adds, deletes or reorders triggers (see DatetimeConsumptionMigration).
+            saveAutomationStateMutex.withLock {
+                if (existing != null) migrateDatetimeConsumptionLocked(context, repository, entity.id)
+                repository.save(entity)
+            }
             zoneRepository.syncGeofences()
             alarmScheduler.reschedule()
             AdvancedAutomationWorker.runNow(context)

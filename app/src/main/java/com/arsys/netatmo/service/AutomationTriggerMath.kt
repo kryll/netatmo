@@ -40,6 +40,52 @@ object AutomationTriggerMath {
         atMs > 0 && !consumed && nowMs >= atMs
 
     /**
+     * Consumption key for a one-shot datetime trigger, identified by its instant and its
+     * OCCURRENCE among the datetime triggers sharing that instant (0-based), never by its
+     * position in the trigger list: editing the date of a fired trigger re-arms it (the new
+     * instant's key was never consumed); inserting, deleting, reordering or swapping other
+     * triggers never replays an intact one; duplicates with the exact same instant keep
+     * their legacy multiplicity (distinct occurrence keys, each fires once); editing back to
+     * an instant+occurrence that already fired stays consumed (no refire).
+     * The "tdt3_" prefix is textually distinct from legacy "tdt_<id>_<index>" marks.
+     */
+    fun datetimeConsumedKey(automationId: Long, atMs: Long, occurrence: Int): String =
+        "tdt3_${automationId}_${atMs}_$occurrence"
+
+    /**
+     * Occurrence of the datetime trigger at [index] among the triggers sharing its instant,
+     * counting only earlier positions. Stable under insertion, deletion and reordering of
+     * any trigger that does not share the exact same instant.
+     */
+    fun datetimeOccurrence(triggers: List<Pair<String, Long>>, index: Int): Int {
+        val at = triggers.getOrNull(index)?.takeIf { it.first == "datetime" }?.second ?: return 0
+        var occurrence = 0
+        for (i in 0 until index) {
+            if (triggers[i].first == "datetime" && triggers[i].second == at) occurrence++
+        }
+        return occurrence
+    }
+
+    /**
+     * One-time translation of legacy consumption marks ("tdt_<id>_<index>", without the
+     * instant) to instant+occurrence keys: each consumed legacy index marks the datetime
+     * trigger currently sitting at that index, at its current instant and occurrence.
+     * Exact for every history whose trigger list kept its structure since the mark was
+     * written (date edits included: they keep the index). Legacy indices that no longer
+     * hold a datetime trigger are dropped. See DatetimeConsumptionMigration for the
+     * declared residual on structural edits made between the fire and the migration.
+     */
+    fun datetimeKeyMigration(
+        automationId: Long,
+        legacyConsumedIndices: Set<Int>,
+        triggers: List<Pair<String, Long>>
+    ): Set<String> = legacyConsumedIndices.mapNotNull { index ->
+        val trigger = triggers.getOrNull(index) ?: return@mapNotNull null
+        if (trigger.first != "datetime") return@mapNotNull null
+        datetimeConsumedKey(automationId, trigger.second, datetimeOccurrence(triggers, index))
+    }.toSet()
+
+    /**
      * Next instant a recurring "time" trigger should be evaluated: the start of its next
      * window, or [nowMs] when its window is open and it has not fired today ([firedToday]).
      * Null when [days] is an empty set. Already-fired and already-past windows are skipped,
