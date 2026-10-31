@@ -22,11 +22,12 @@ import org.json.JSONArray
 
 /**
  * The temperature-anomaly decision, extracted pure for tests. Alerts only when the room is
- * BELOW its setpoint by more than [threshold]: a cold room despite a heating demand can be a
- * real fault (valve, boiler, open window). Never alerts over the setpoint.
+ * BELOW its setpoint by at least [threshold] (inclusive: setpoint 20, reading 18, threshold 2
+ * alerts - Jose, 31 oct 2026): a cold room despite a heating demand can be a real fault
+ * (valve, boiler, open window). Never alerts over the setpoint.
  */
 internal fun shouldAlertTemperatureAnomaly(current: Double, target: Double, threshold: Double): Boolean =
-    (target - current) > threshold
+    (target - current) >= threshold
 
 @HiltWorker
 class TemperatureAnomalyWorker @AssistedInject constructor(
@@ -73,7 +74,7 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
             (prefs[VACATION_FROZEN_ALERTS_KEY] ?: true) &&
             now in (prefs[VACATION_START_MS_KEY] ?: 0L)..(prefs[VACATION_END_MS_KEY] ?: 0L)
 
-        val threshold = (prefs[ANOMALY_THRESHOLD_KEY] ?: 3.0f).toDouble()
+        val threshold = (prefs[ANOMALY_THRESHOLD_KEY] ?: 2.0f).toDouble()
         val homeId = authRepository.selectedHomeId.first() ?: return Result.success()
 
         val homeCache = homeCacheDao.getHome(homeId) ?: return Result.success()
