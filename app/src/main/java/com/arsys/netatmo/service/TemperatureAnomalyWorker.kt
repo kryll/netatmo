@@ -16,9 +16,17 @@ import com.arsys.netatmo.NetatmoApp
 import com.arsys.netatmo.data.local.dao.HomeCacheDao
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import kotlin.math.absoluteValue
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
+
+
+/**
+ * The temperature-anomaly decision, extracted pure for tests. Alerts only when the room is
+ * BELOW its setpoint by more than [threshold]: a cold room despite a heating demand can be a
+ * real fault (valve, boiler, open window). Never alerts over the setpoint.
+ */
+internal fun shouldAlertTemperatureAnomaly(current: Double, target: Double, threshold: Double): Boolean =
+    (target - current) > threshold
 
 @HiltWorker
 class TemperatureAnomalyWorker @AssistedInject constructor(
@@ -102,7 +110,10 @@ class TemperatureAnomalyWorker @AssistedInject constructor(
             }
 
             if (currentTemp == null || targetTemp == null) continue
-            if ((currentTemp - targetTemp).absoluteValue <= threshold) continue
+            // Only UNDER-target alerts: heating cannot cool, so a reading above the
+            // setpoint (e.g. an away/eco setpoint on a mild day) is not an anomaly
+            // (José, 31 oct 2026). Over-target readings never notify.
+            if (!shouldAlertTemperatureAnomaly(currentTemp, targetTemp, threshold)) continue
 
             val notifId = (name.hashCode() and 0x7FFFFFFF) % 1000 + 2000
 
