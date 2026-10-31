@@ -99,86 +99,102 @@ class AutomationTriggerMathTest {
         assertFalse(AutomationTriggerMath.datetimeShouldFire(0L, false, now))
     }
 
-    // ── Instant-qualified consumption keys (re-arm on date edit, no replay) ──
+    // ── Instant+occurrence consumption keys (re-arm on date edit, no replay) ──
 
-    private fun consumed(vararg keys: String) = setOf(*keys)
+    private fun dt(atMs: Long): Pair<String, Long> = "datetime" to atMs
 
     @Test
-    fun `datetime consumption key is the instant alone so position never matters`() {
-        assertEquals("tdt2_7_1000", AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L))
+    fun `datetime key is instant plus occurrence among identical instants, never position`() {
+        assertEquals("tdt3_7_1000_0", AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0))
+        assertTrue(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0) != AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 1))
+        assertTrue(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0) != AutomationTriggerMath.datetimeConsumedKey(7L, 2_000L, 0))
+        assertTrue(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0) != AutomationTriggerMath.datetimeConsumedKey(8L, 1_000L, 0))
         assertEquals(
-            AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L),
-            AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L)
+            AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 1),
+            AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 1)
         )
-        assertTrue(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L) != AutomationTriggerMath.datetimeConsumedKey(7L, 2_000L))
-        assertTrue(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L) != AutomationTriggerMath.datetimeConsumedKey(8L, 1_000L))
+    }
+
+    @Test
+    fun `occurrence is stable when other triggers are inserted deleted or reordered`() {
+        val before = listOf(dt(1_000L), "time" to 600L)
+        val after = listOf("time" to 600L, "geofence" to 0L, dt(1_000L))
+        // A slid from index 0 to index 2; no identical instant in front in either layout.
+        assertEquals(AutomationTriggerMath.datetimeOccurrence(before, 0), AutomationTriggerMath.datetimeOccurrence(after, 2))
+        assertEquals(0, AutomationTriggerMath.datetimeOccurrence(after, 2))
     }
 
     @Test
     fun `consumed datetime does not replay when another trigger is inserted before it`() {
-        // Trigger A fired at 1000 (consumed). User inserts another trigger in front of it:
-        // A slides from index 0 to index 1 with its instant intact.
-        val consumedKeys = consumed(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L))
-        // The evaluation reads the key from the instant, wherever the trigger sits now.
-        val keyAfterInsert = AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L)
-        assertTrue(consumedKeys.contains(keyAfterInsert))
-        assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, consumedKeys.contains(keyAfterInsert), 2_000L))
+        // A fired at 1000 (consumed). The user inserts other triggers in front of it.
+        val key = AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0)
+        val consumedKeys = setOf(key)
+        val after = listOf("time" to 600L, dt(1_000L))
+        val keyAfter = AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, AutomationTriggerMath.datetimeOccurrence(after, 1))
+        assertTrue(consumedKeys.contains(keyAfter))
+        assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, true, 2_000L))
     }
 
     @Test
     fun `swapping two consumed datetime triggers replays neither`() {
-        val keyA = AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L)
-        val keyB = AutomationTriggerMath.datetimeConsumedKey(7L, 2_000L)
-        val consumedKeys = consumed(keyA, keyB)
-        // After the swap, B sits where A was and vice versa; both keys are still consumed.
-        assertFalse(AutomationTriggerMath.datetimeShouldFire(2_000L, consumedKeys.contains(keyB), 3_000L))
+        val keyA = AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0)
+        val keyB = AutomationTriggerMath.datetimeConsumedKey(7L, 2_000L, 0)
+        val consumedKeys = setOf(keyA, keyB)
         assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, consumedKeys.contains(keyA), 3_000L))
+        assertFalse(AutomationTriggerMath.datetimeShouldFire(2_000L, consumedKeys.contains(keyB), 3_000L))
     }
 
     @Test
-    fun `editing the date re-arms because the new instant was never consumed`() {
-        val consumedKeys = consumed(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L))
-        val editedKey = AutomationTriggerMath.datetimeConsumedKey(7L, 5_000L)
+    fun `a pending intact datetime is not suppressed by edits around it`() {
+        // A fired at 1000 (consumed); B is pending at 9000. Reorder everything: B's key is
+        // unchanged, still unconsumed, still fires when its time comes.
+        val consumedKeys = setOf(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0))
+        val after = listOf(dt(9_000L), "time" to 600L, dt(1_000L))
+        val keyB = AutomationTriggerMath.datetimeConsumedKey(7L, 9_000L, AutomationTriggerMath.datetimeOccurrence(after, 0))
+        assertFalse(consumedKeys.contains(keyB))
+        assertTrue(AutomationTriggerMath.datetimeShouldFire(9_000L, consumedKeys.contains(keyB), 9_000L))
+    }
+
+    @Test
+    fun `editing the date re-arms and editing back stays consumed`() {
+        val consumedKeys = setOf(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0))
+        // Edit 1000 -> 5000: new instant key was never consumed, fires when due.
+        val editedKey = AutomationTriggerMath.datetimeConsumedKey(7L, 5_000L, 0)
         assertTrue(AutomationTriggerMath.datetimeShouldFire(5_000L, consumedKeys.contains(editedKey), 5_000L))
+        // Edit back to 1000: the original key exists, no refire.
+        assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, consumedKeys.contains(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0)), 6_000L))
     }
 
     @Test
-    fun `editing back to an instant that already fired stays consumed and does not refire`() {
-        // Date edited 1000 -> 5000 (re-armed, fired), then edited back to 1000:
-        // the original key exists, so the trigger does not fire a second time for 1000.
-        val consumedKeys = consumed(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L))
-        assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, consumedKeys.contains(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L)), 6_000L))
+    fun `duplicate datetime triggers keep legacy multiplicity with distinct occurrence keys`() {
+        val triggers = listOf(dt(1_000L), dt(1_000L))
+        val first = AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, AutomationTriggerMath.datetimeOccurrence(triggers, 0))
+        val second = AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, AutomationTriggerMath.datetimeOccurrence(triggers, 1))
+        assertTrue(first != second)
+        // Each fires once: after the first fires, the second still fires (legacy semantics).
+        val afterFirst = setOf(first)
+        assertTrue(AutomationTriggerMath.datetimeShouldFire(1_000L, afterFirst.contains(second), 1_000L))
+        assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, afterFirst.contains(first), 1_000L))
     }
 
     @Test
-    fun `duplicate datetime triggers share one key and fire once per instant`() {
-        // Two legacy marks for the same instant collapse into a single migrated key.
+    fun `legacy migration maps each consumed index to its current instant and occurrence`() {
         val migrated = AutomationTriggerMath.datetimeKeyMigration(
-            7L, setOf(0, 1), listOf("datetime" to 1_000L, "datetime" to 1_000L)
+            7L, setOf(0), listOf(dt(1_000L), "time" to 600L)
         )
-        assertEquals(setOf("tdt2_7_1000"), migrated)
-        // After the first duplicate fires, the second reads the same key as consumed.
-        val afterFirstFire = migrated
-        val secondKey = AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L)
-        assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, afterFirstFire.contains(secondKey), 2_000L))
-    }
-
-    @Test
-    fun `legacy migration keeps fired datetimes consumed so nothing replays on upgrade`() {
-        val migrated = AutomationTriggerMath.datetimeKeyMigration(
-            7L, setOf(0), listOf("datetime" to 1_000L, "time" to 600L)
-        )
-        assertEquals(setOf("tdt2_7_1000"), migrated)
-        val consumedNow = migrated.contains(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L))
+        assertEquals(setOf("tdt3_7_1000_0"), migrated)
+        val consumedNow = migrated.contains(AutomationTriggerMath.datetimeConsumedKey(7L, 1_000L, 0))
         assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, consumedNow, 2_000L))
+        // Duplicates: consumed second occurrence maps to occurrence 1.
+        val dup = AutomationTriggerMath.datetimeKeyMigration(7L, setOf(1), listOf(dt(1_000L), dt(1_000L)))
+        assertEquals(setOf("tdt3_7_1000_1"), dup)
     }
 
     @Test
     fun `migration drops legacy indices that no longer hold a datetime trigger`() {
-        // Index out of range (trigger deleted) and index now holding a non-datetime trigger.
-        assertTrue(AutomationTriggerMath.datetimeKeyMigration(7L, setOf(3), listOf("datetime" to 1_000L)).isEmpty())
+        assertTrue(AutomationTriggerMath.datetimeKeyMigration(7L, setOf(3), listOf(dt(1_000L))).isEmpty())
         assertTrue(AutomationTriggerMath.datetimeKeyMigration(7L, setOf(0), listOf("time" to 600L)).isEmpty())
-        assertTrue(AutomationTriggerMath.datetimeKeyMigration(7L, emptySet(), listOf("datetime" to 1_000L)).isEmpty())
+        assertTrue(AutomationTriggerMath.datetimeKeyMigration(7L, emptySet(), listOf(dt(1_000L))).isEmpty())
     }
 
     // ── Next scheduled instant (alarm scheduler) ─────────────────────────────
