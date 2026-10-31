@@ -270,7 +270,7 @@ class AutomationTriggerMathTest {
         )
     }
 
-    private fun dtJson(vararg entries: Pair<String, Long>): String {
+    private fun dtJsonOf(vararg entries: Pair<String, Long>): String {
         val arr = org.json.JSONArray()
         for ((type, at) in entries) {
             val obj = org.json.JSONObject()
