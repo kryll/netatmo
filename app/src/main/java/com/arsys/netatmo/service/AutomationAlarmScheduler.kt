@@ -63,7 +63,7 @@ class AutomationAlarmScheduler @Inject constructor(
         val diag = StringBuilder()
         for (automation in advancedAutomationRepository.getEnabledAdvancedAutomations()) {
             migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
-            migrateCalendarConsumption(context, automation.id)
+            migrateCalendarConsumption(context, advancedAutomationRepository, automation.id)
             val triggers = try {
                 JSONArray(automation.triggersJson)
             } catch (e: Exception) {
@@ -127,13 +127,14 @@ class AutomationAlarmScheduler @Inject constructor(
                 val calendarId = trigger.optLong("calendarId", -1L)
                 if (calendarId < 0) return null
                 val minutesBefore = trigger.optInt("minutesBefore", 30).coerceAtLeast(0)
+                val attrs = AutomationTriggerMath.CalendarTriggerAttrs(calendarId, minutesBefore, trigger.optString("title"))
                 CalendarEventQuery.queryEvents(
                     context, calendarId,
                     trigger.optString("title").ifBlank { null },
                     now, now + CALENDAR_LOOKAHEAD_MS
                 ).firstOrNull { event ->
                     event.startMs - minutesBefore * 60_000L > now &&
-                        !statePrefs.getBoolean(AutomationTriggerMath.calendarConsumedKey(automationId, event.startMs), false)
+                        !statePrefs.getBoolean(AutomationTriggerMath.calendarConsumedKey(automationId, event.startMs, attrs), false)
                 }?.let { it.startMs - minutesBefore * 60_000L }
             }
             else -> null
