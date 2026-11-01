@@ -138,6 +138,18 @@ class AdvancedAutomationViewModel @Inject constructor(
         }
     }
 
+    fun moveTrigger(index: Int, delta: Int) {
+        _uiState.update { it.copy(triggers = it.triggers.movedWithin(index, delta)) }
+    }
+
+    fun moveCondition(index: Int, delta: Int) {
+        _uiState.update { it.copy(conditions = it.conditions.movedWithin(index, delta)) }
+    }
+
+    fun moveAction(index: Int, delta: Int) {
+        _uiState.update { it.copy(actions = it.actions.movedWithin(index, delta)) }
+    }
+
     fun setTriggerMode(mode: String) {
         _uiState.update { it.copy(triggerMode = mode) }
     }
