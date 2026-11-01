@@ -18,6 +18,10 @@ val buildVersionCode = (project.findProperty("versionCode") as? String)?.toIntOr
 val buildVersionName = "1.0.$buildVersionCode"
 
 android {
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     namespace = "com.arsys.netatmo"
     compileSdk = 35
 
@@ -131,6 +135,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
