@@ -90,6 +90,20 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Publish Compose captures to branch ci/compose-shots
+        if: always()
+        run: |
+          if [ -d app/build/outputs/compose-shots ] && ls app/build/outputs/compose-shots/*.png >/dev/null 2>&1; then
+            git config user.email ci@local
+            git config user.name ci
+            git checkout -B ci/compose-shots
+            mkdir -p shots
+            cp app/build/outputs/compose-shots/*.png shots/
+            git add shots
+            git commit -m "Compose captures from run ${{ github.run_number }}" || true
+            git push -f origin ci/compose-shots
+          fi
+
       - name: Upload Compose UI captures
         if: always()
         uses: actions/upload-artifact@v4
