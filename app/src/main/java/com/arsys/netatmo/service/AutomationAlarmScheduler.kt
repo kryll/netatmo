@@ -30,6 +30,8 @@ class AutomationAlarmScheduler @Inject constructor(
         // Same prefs file the engine uses for fired/consumed marks.
         private const val STATE_PREFS = "advanced_automation_state"
         private const val KEY_NEXT_AT = "alarm_next_at"
+        // How far ahead calendar triggers look for their next matching event when arming.
+        private const val CALENDAR_LOOKAHEAD_MS = 7L * 24 * 60 * 60 * 1000
     }
 
     private val alarmManager: AlarmManager?
@@ -61,6 +63,7 @@ class AutomationAlarmScheduler @Inject constructor(
         val diag = StringBuilder()
         for (automation in advancedAutomationRepository.getEnabledAdvancedAutomations()) {
             migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
+            migrateCalendarConsumption(context, automation.id)
             val triggers = try {
                 JSONArray(automation.triggersJson)
             } catch (e: Exception) {
@@ -73,7 +76,7 @@ class AutomationAlarmScheduler @Inject constructor(
             for (i in 0 until triggers.length()) {
                 val trg = triggers.getJSONObject(i)
                 val instant = nextInstant(automation.id, i, AutomationTriggerMath.datetimeOccurrence(typeAtPairs, i), trg, now)
-                if (trg.optString("type") == "time" || trg.optString("type") == "datetime") {
+                if (trg.optString("type") in listOf("time", "datetime", "calendar")) {
                     diag.append("\n    «${automation.name}» disparador ${i + 1} (${trg.optString("type")}): próximo ${instant?.let { DiagnosticLog.fmt(it) } ?: "ninguno"}")
                 }
                 if (instant == null) continue
@@ -116,6 +119,23 @@ class AutomationAlarmScheduler @Inject constructor(
                     statePrefs.getBoolean(AutomationTriggerMath.datetimeConsumedKey(automationId, at, occurrence), false)
                 )
             }
+            "calendar" -> {
+                // Next unconsumed matching event whose trigger instant is still ahead. The
+                // exact alarm makes calendar triggers punctual instead of depending on the
+                // (battery-deferrable) periodic pass; the engine's consumption marks and
+                // since-last-check window still decide the fire, so nothing fires twice.
+                val calendarId = trigger.optLong("calendarId", -1L)
+                if (calendarId < 0) return null
+                val minutesBefore = trigger.optInt("minutesBefore", 30).coerceAtLeast(0)
+                CalendarEventQuery.queryEvents(
+                    context, calendarId,
+                    trigger.optString("title").ifBlank { null },
+                    now, now + CALENDAR_LOOKAHEAD_MS
+                ).firstOrNull { event ->
+                    event.startMs - minutesBefore * 60_000L > now &&
+                        !statePrefs.getBoolean(AutomationTriggerMath.calendarConsumedKey(automationId, event.startMs), false)
+                }?.let { it.startMs - minutesBefore * 60_000L }
+            }
             else -> null
         }
 
@@ -127,3 +147,4 @@ class AutomationAlarmScheduler @Inject constructor(
         null
     }
 }
+
