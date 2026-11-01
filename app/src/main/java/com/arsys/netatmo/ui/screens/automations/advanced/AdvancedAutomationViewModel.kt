@@ -87,6 +87,13 @@ class AdvancedAutomationViewModel @Inject constructor(
         _uiState.update { it.copy(triggers = it.triggers + trigger) }
     }
 
+    fun updateTrigger(index: Int, trigger: Map<String, Any>) {
+        _uiState.update {
+            if (index !in it.triggers.indices) it
+            else it.copy(triggers = it.triggers.toMutableList().also { list -> list[index] = trigger })
+        }
+    }
+
     fun removeTrigger(index: Int) {
         _uiState.update {
             it.copy(triggers = it.triggers.toMutableList().also { list -> list.removeAt(index) })
@@ -97,6 +104,13 @@ class AdvancedAutomationViewModel @Inject constructor(
         _uiState.update { it.copy(conditions = it.conditions + condition) }
     }
 
+    fun updateCondition(index: Int, condition: Map<String, Any>) {
+        _uiState.update {
+            if (index !in it.conditions.indices) it
+            else it.copy(conditions = it.conditions.toMutableList().also { list -> list[index] = condition })
+        }
+    }
+
     fun removeCondition(index: Int) {
         _uiState.update {
             it.copy(conditions = it.conditions.toMutableList().also { list -> list.removeAt(index) })
@@ -105,6 +119,13 @@ class AdvancedAutomationViewModel @Inject constructor(
 
     fun addAction(action: Map<String, Any>) {
         _uiState.update { it.copy(actions = it.actions + action) }
+    }
+
+    fun updateAction(index: Int, action: Map<String, Any>) {
+        _uiState.update {
+            if (index !in it.actions.indices) it
+            else it.copy(actions = it.actions.toMutableList().also { list -> list[index] = action })
+        }
     }
 
     fun removeAction(index: Int) {
