@@ -9,6 +9,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
 import com.arsys.netatmo.ui.theme.NetatmoTheme
 import org.junit.Assert.assertEquals
@@ -34,7 +35,7 @@ import java.util.Calendar
 // Plain Application: booting the real NetatmoApp would run Hilt injection, which
 // opens EncryptedSharedPreferences (AndroidKeyStore) - not available under Robolectric
 // and not needed by these sheets.
-@Config(sdk = [34], application = Application::class, qualifiers = "w360dp-h2400dp-420dpi")
+@Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AutomationEditorsUiTest {
 
@@ -75,12 +76,14 @@ class AutomationEditorsUiTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Editar disparador", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("2026-11-15", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("08:30", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).assertIsDisplayed()
+        // Normal phone viewport: these sit below the fold and must be reachable by
+        // scrolling the sheet, exactly like a user would.
+        composeRule.onNodeWithText("2026-11-15", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("08:30", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         captureSheet("trigger-edit-datetime")
 
-        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals("datetime", saved?.get("type"))
         assertEquals(at, saved?.get("at"))
@@ -119,9 +122,9 @@ class AutomationEditorsUiTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Editar condición", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("22:30", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("06:15", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("22:30", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("06:15", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         captureSheet("condition-edit-timewindow")
     }
 
@@ -150,9 +153,9 @@ class AutomationEditorsUiTest {
         captureSheet("action-edit-scenario")
 
         // Change the scenario and save: the stored map must point at the new scenario.
-        composeRule.onNodeWithText("Día", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithText("Día", useUnmergedTree = true).performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals("apply_scenario", saved?.get("type"))
         assertEquals(1L, saved?.get("scenarioId"))
