@@ -134,7 +134,8 @@ class AutomationAlarmScheduler @Inject constructor(
                     now, now + CALENDAR_LOOKAHEAD_MS
                 ).firstOrNull { event ->
                     event.startMs - minutesBefore * 60_000L > now &&
-                        !statePrefs.getBoolean(AutomationTriggerMath.calendarConsumedKey(automationId, event.startMs, attrs), false)
+                        AutomationTriggerMath.calendarConsumptionKeys(automationId, event.eventId, event.startMs, attrs)
+                            .none { statePrefs.getBoolean(it, false) }
                 }?.let { it.startMs - minutesBefore * 60_000L }
             }
             else -> null
