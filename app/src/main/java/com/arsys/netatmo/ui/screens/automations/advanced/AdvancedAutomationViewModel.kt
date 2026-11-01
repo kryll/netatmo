@@ -45,6 +45,7 @@ class AdvancedAutomationViewModel @Inject constructor(
     private val engine: AdvancedAutomationEngine,
     private val classicAutomationMigrator: com.arsys.netatmo.service.ClassicAutomationMigrator,
     private val zoneRepository: com.arsys.netatmo.data.repository.ZoneRepository,
+    private val automationRepository: com.arsys.netatmo.data.repository.AutomationRepository,
     private val alarmScheduler: com.arsys.netatmo.service.AutomationAlarmScheduler,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
@@ -57,6 +58,9 @@ class AdvancedAutomationViewModel @Inject constructor(
 
     val zones: StateFlow<List<com.arsys.netatmo.data.local.entities.ZoneEntity>> =
         zoneRepository.observeZones().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val scenarios: StateFlow<List<com.arsys.netatmo.data.local.entities.ScenarioEntity>> =
+        automationRepository.getAllScenarios().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         if (automationId != -1L) {
