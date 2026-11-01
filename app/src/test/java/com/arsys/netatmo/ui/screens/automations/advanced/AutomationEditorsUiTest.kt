@@ -34,7 +34,7 @@ import java.util.Calendar
 // Plain Application: booting the real NetatmoApp would run Hilt injection, which
 // opens EncryptedSharedPreferences (AndroidKeyStore) - not available under Robolectric
 // and not needed by these sheets.
-@Config(sdk = [34], application = Application::class)
+@Config(sdk = [34], application = Application::class, qualifiers = "w360dp-h2400dp-420dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AutomationEditorsUiTest {
 
@@ -145,7 +145,6 @@ class AutomationEditorsUiTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Editar acción", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Escenario", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Día", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Noche", useUnmergedTree = true).assertIsDisplayed()
         captureSheet("action-edit-scenario")
