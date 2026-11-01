@@ -62,42 +62,48 @@ fun TriggerEditorBottomSheet(
     onDismiss: () -> Unit,
     onAdd: (Map<String, Any>) -> Unit,
     zones: List<ZoneEntity> = emptyList(),
-    onManageZones: () -> Unit = {}
+    onManageZones: () -> Unit = {},
+    initial: Map<String, Any>? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var selectedType by remember { mutableStateOf("time") }
+    // When editing an existing trigger, start from its stored values.
+    val prefill = remember { initial?.let { prefillTrigger(it) } }
+
+    var selectedType by remember { mutableStateOf(prefill?.type?.ifBlank { "time" } ?: "time") }
 
     // Time
-    var time by remember { mutableStateOf("07:00") }
-    val days = remember { mutableStateListOf(1, 2, 3, 4, 5) }
+    var time by remember { mutableStateOf(prefill?.time ?: "07:00") }
+    val days = remember {
+        mutableStateListOf<Int>().also { it.addAll(prefill?.days ?: listOf(1, 2, 3, 4, 5)) }
+    }
 
     // Numeric state
-    var numericEntity by remember { mutableStateOf("outdoor_temp") }
-    var numericCondition by remember { mutableStateOf("below") }
-    var threshold by remember { mutableFloatStateOf(5f) }
+    var numericEntity by remember { mutableStateOf(prefill?.numericEntity ?: "outdoor_temp") }
+    var numericCondition by remember { mutableStateOf(prefill?.numericCondition ?: "below") }
+    var threshold by remember { mutableFloatStateOf(prefill?.threshold ?: 5f) }
 
     // Sun
-    var sunEvent by remember { mutableStateOf("sunset") }
-    var sunOffset by remember { mutableStateOf("0") }
+    var sunEvent by remember { mutableStateOf(prefill?.sunEvent ?: "sunset") }
+    var sunOffset by remember { mutableStateOf(prefill?.sunOffset ?: "0") }
 
     // Geofence
-    var geofenceEvent by remember { mutableStateOf("enter") }
-    var geofenceZoneId by remember { mutableStateOf("") }
+    var geofenceEvent by remember { mutableStateOf(prefill?.geofenceEvent ?: "enter") }
+    var geofenceZoneId by remember { mutableStateOf(prefill?.geofenceZoneId ?: "") }
 
     // Time window (franja)
-    var windowStart by remember { mutableStateOf("22:00") }
-    var windowEnd by remember { mutableStateOf("07:00") }
+    var windowStart by remember { mutableStateOf(prefill?.windowStart ?: "22:00") }
+    var windowEnd by remember { mutableStateOf(prefill?.windowEnd ?: "07:00") }
 
     // Date & time (one-shot)
-    var dateTimeDate by remember { mutableStateOf("") } // AAAA-MM-DD
-    var dateTimeTime by remember { mutableStateOf("12:00") }
+    var dateTimeDate by remember { mutableStateOf(prefill?.date ?: "") } // AAAA-MM-DD
+    var dateTimeTime by remember { mutableStateOf(prefill?.dateTime ?: "12:00") }
 
     // Calendar
     var calendars by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
-    var calendarId by remember { mutableStateOf(-1L) }
-    var calendarTitle by remember { mutableStateOf("") }
-    var calendarMinutesBefore by remember { mutableStateOf("30") }
+    var calendarId by remember { mutableStateOf(prefill?.calendarId ?: -1L) }
+    var calendarTitle by remember { mutableStateOf(prefill?.calendarTitle ?: "") }
+    var calendarMinutesBefore by remember { mutableStateOf(prefill?.calendarMinutesBefore ?: "30") }
     var calendarPermissionDenied by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val calendarPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -121,7 +127,11 @@ fun TriggerEditorBottomSheet(
         "geofence" to "Zona",
         "calendar" to "Calendario",
         "datetime" to "Fecha"
-    )
+    ) + if (prefill?.type == "sun") listOf("sun" to "Sol") else emptyList()
+
+    // A stored trigger whose type this editor does not know is left untouched:
+    // better read-only than silently replacing it with an empty map.
+    val unknownType = initial != null && triggerTypes.none { it.first == prefill?.type }
 
     val dayLabels = listOf(1 to "L", 2 to "M", 3 to "X", 4 to "J", 5 to "V", 6 to "S", 7 to "D")
 
@@ -144,11 +154,20 @@ fun TriggerEditorBottomSheet(
         ) {
             // Title
             Text(
-                text = "Añadir disparador",
+                text = if (initial == null) "Añadir disparador" else "Editar disparador",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
+            if (unknownType) {
+                Text(
+                    "Este disparador («${prefill?.type}») no se puede editar aquí. " +
+                        "Elimínalo y créalo de nuevo si necesitas cambiarlo.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else {
 
             // Type selector
             SheetLabel("Tipo de disparador")
@@ -378,9 +397,12 @@ fun TriggerEditorBottomSheet(
                 }
             }
 
+            }
+
+            if (!unknownType) {
             Spacer(Modifier.height(4.dp))
 
-            // Add button
+            // Add/save button
             Button(
                 enabled = when (selectedType) {
                     "geofence" -> zones.any { it.id == geofenceZoneId }
@@ -430,7 +452,8 @@ fun TriggerEditorBottomSheet(
                         "calendar" -> buildMap {
                             put("type", "calendar")
                             put("calendarId", calendarId)
-                            put("calendarName", calendars.firstOrNull { it.first == calendarId }?.second ?: "")
+                            put("calendarName", calendars.firstOrNull { it.first == calendarId }?.second
+                                ?: prefill?.calendarName ?: "")
                             put("title", calendarTitle.trim())
                             put("minutesBefore", calendarMinutesBefore.toIntOrNull()?.coerceAtLeast(0) ?: 30)
                         }
@@ -447,7 +470,12 @@ fun TriggerEditorBottomSheet(
                     contentColor = MaterialTheme.colorScheme.onSurface
                 )
             ) {
-                Text("Añadir disparador", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (initial == null) "Añadir disparador" else "Guardar cambios",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             }
 
             TextButton(
