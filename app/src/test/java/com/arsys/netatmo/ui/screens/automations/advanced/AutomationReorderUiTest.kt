@@ -7,6 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
@@ -29,8 +32,9 @@ import java.io.FileOutputStream
 
 /**
  * José's case: he added the notification before the away-mode action by mistake and
- * wants to swap their order. Renders real action pills with the reorder arrows,
- * captures PNGs before/after the move into app/build/outputs/compose-shots/.
+ * wants to swap their order. Renders real action pills inside the real section card
+ * and theme (dark is the app default), captures PNGs before/after the move into
+ * app/build/outputs/compose-shots/.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -50,30 +54,38 @@ class AutomationReorderUiTest {
         FileOutputStream(File(dir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Test
-    fun actionPills_reorderArrows_swapNotificationAndAwayMode() {
-        val notify = AutomationAction(type = "notify", title = "Aviso convivencia")
-        val away = AutomationAction(type = "set_home_mode", mode = "away", durationHours = 3.5)
-        val temp = AutomationAction(type = "set_temperature", temperature = 19.5)
-        val actions = mutableStateOf(listOf(notify, away, temp))
+    private val notify = AutomationAction(type = "notify", title = "Aviso convivencia")
+    private val away = AutomationAction(type = "set_home_mode", mode = "away", durationHours = 3.5)
+    private val temp = AutomationAction(type = "set_temperature", temperature = 19.5)
 
+    private fun renderPills(actions: androidx.compose.runtime.MutableState<List<AutomationAction>>, dark: Boolean) {
         composeRule.setContent {
-            NetatmoTheme {
-                Column {
-                    actions.value.forEachIndexed { index, action ->
-                        ActionPill(
-                            action = action,
-                            onEdit = {},
-                            onDelete = {},
-                            onMoveUp = if (index > 0) ({ actions.value = actions.value.movedWithin(index, -1) }) else null,
-                            onMoveDown = if (index < actions.value.lastIndex) ({ actions.value = actions.value.movedWithin(index, 1) }) else null
-                        )
-                        Spacer(Modifier.height(8.dp))
+            NetatmoTheme(darkTheme = dark) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        AutomationSectionCard {
+                            actions.value.forEachIndexed { index, action ->
+                                ActionPill(
+                                    action = action,
+                                    onEdit = {},
+                                    onDelete = {},
+                                    onMoveUp = if (index > 0) ({ actions.value = actions.value.movedWithin(index, -1) }) else null,
+                                    onMoveDown = if (index < actions.value.lastIndex) ({ actions.value = actions.value.movedWithin(index, 1) }) else null
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
                     }
                 }
             }
         }
         composeRule.waitForIdle()
+    }
+
+    @Test
+    fun actionPills_reorderArrows_swapNotificationAndAwayMode() {
+        val actions = mutableStateOf(listOf(notify, away, temp))
+        renderPills(actions, dark = true)
 
         // Three actions: the middle one has both arrows, edges have one each.
         composeRule.onAllNodesWithContentDescription("Subir").assertCountEquals(2)
@@ -96,6 +108,14 @@ class AutomationReorderUiTest {
         val awayAfter = topOf("Modo de la casa: Ausente durante 3,5 h")
         assertTrue("notification should end below away mode", notifyAfter > awayAfter)
         composeRule.onNodeWithText("Fijar temperatura a 19.5°C").assertIsDisplayed()
+    }
+
+    @Test
+    fun actionPills_lightTheme_capturesForContrastReview() {
+        val actions = mutableStateOf(listOf(notify, away, temp))
+        renderPills(actions, dark = false)
+        composeRule.onAllNodesWithContentDescription("Bajar").assertCountEquals(2)
+        captureActivity("reorder-actions-light")
     }
 
     @Test
