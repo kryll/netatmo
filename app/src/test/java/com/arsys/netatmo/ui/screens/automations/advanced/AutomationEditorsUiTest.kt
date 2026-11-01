@@ -79,7 +79,7 @@ class AutomationEditorsUiTest {
         composeRule.onNodeWithText("Editar disparador", useUnmergedTree = true).assertIsDisplayed()
         // Normal phone viewport: these sit below the fold and must be reachable by
         // scrolling the sheet, exactly like a user would.
-        composeRule.onNodeWithText("2026-11-15", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("15/11/2026", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("08:30", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
 
