@@ -1,5 +1,6 @@
 package com.arsys.netatmo.ui.screens.automations.advanced
 
+import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
@@ -30,7 +31,10 @@ import java.util.Calendar
  * app/build/outputs/compose-shots/ for visual inspection from CI artifacts.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+// Plain Application: booting the real NetatmoApp would run Hilt injection, which
+// opens EncryptedSharedPreferences (AndroidKeyStore) - not available under Robolectric
+// and not needed by these sheets.
+@Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AutomationEditorsUiTest {
 
