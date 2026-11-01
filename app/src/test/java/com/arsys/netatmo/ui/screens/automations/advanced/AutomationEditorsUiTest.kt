@@ -74,6 +74,7 @@ class AutomationEditorsUiTest {
             }
         }
         composeRule.waitForIdle()
+        captureSheet("trigger-edit-datetime")
 
         composeRule.onNodeWithText("Editar disparador", useUnmergedTree = true).assertIsDisplayed()
         // Normal phone viewport: these sit below the fold and must be reachable by
@@ -81,7 +82,6 @@ class AutomationEditorsUiTest {
         composeRule.onNodeWithText("2026-11-15", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("08:30", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
-        captureSheet("trigger-edit-datetime")
 
         composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().performClick()
         composeRule.waitForIdle()
@@ -101,11 +101,11 @@ class AutomationEditorsUiTest {
             }
         }
         composeRule.waitForIdle()
+        captureSheet("trigger-edit-sun")
 
         composeRule.onNodeWithText("Editar disparador", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Sol", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Salida del sol", useUnmergedTree = true).assertIsDisplayed()
-        captureSheet("trigger-edit-sun")
     }
 
     @Test
@@ -120,12 +120,12 @@ class AutomationEditorsUiTest {
             }
         }
         composeRule.waitForIdle()
+        captureSheet("condition-edit-timewindow")
 
         composeRule.onNodeWithText("Editar condición", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("22:30", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("06:15", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
-        captureSheet("condition-edit-timewindow")
     }
 
     @Test
@@ -146,11 +146,11 @@ class AutomationEditorsUiTest {
             }
         }
         composeRule.waitForIdle()
+        captureSheet("action-edit-scenario")
 
         composeRule.onNodeWithText("Editar acción", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Día", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Noche", useUnmergedTree = true).assertIsDisplayed()
-        captureSheet("action-edit-scenario")
 
         // Change the scenario and save: the stored map must point at the new scenario.
         composeRule.onNodeWithText("Día", useUnmergedTree = true).performScrollTo().performClick()
@@ -174,9 +174,9 @@ class AutomationEditorsUiTest {
             }
         }
         composeRule.waitForIdle()
+        captureSheet("action-edit-settemp")
 
         composeRule.onNodeWithText("Editar acción", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNode(hasText("21", substring = true), useUnmergedTree = true).assertIsDisplayed()
-        captureSheet("action-edit-settemp")
     }
 }
