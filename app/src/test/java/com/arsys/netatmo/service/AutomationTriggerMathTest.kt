@@ -404,4 +404,50 @@ class AutomationTriggerMathTest {
         assertTrue("legacy marks removed", fake.data.keys.none { it.startsWith("tdt_3_") })
         assertTrue(fake.data["mig3_tdt_3"] == true)
     }
+
+    // ── Calendar: window anchored at the previous evaluation ────────────────
+
+    @Test
+    fun `calendar with zero minutes before fires on the first check after the event starts`() {
+        val now = 1_000_000_000_000L
+        val event = now - 5 * 60_000L // started 5 min ago; trigger instant = event start
+        assertTrue(AutomationTriggerMath.calendarShouldFire(event, 0, now))
+    }
+
+    @Test
+    fun `calendar with zero minutes before does not fire before the event starts`() {
+        val now = 1_000_000_000_000L
+        val event = now + 5 * 60_000L
+        assertFalse(AutomationTriggerMath.calendarShouldFire(event, 0, now))
+    }
+
+    @Test
+    fun `calendar fires late when the previous check was long ago instead of never`() {
+        val now = 1_000_000_000_000L
+        val lastCheck = now - 45 * 60_000L // battery delayed the worker 45 min
+        val event = now // trigger instant (30 min ago) is inside (lastCheck, now]
+        assertTrue(AutomationTriggerMath.calendarShouldFire(event, 30, now, lastCheck))
+    }
+
+    @Test
+    fun `calendar does not replay an instant already covered by the previous check`() {
+        val now = 1_000_000_000_000L
+        val lastCheck = now - 10 * 60_000L
+        val event = now - 40 * 60_000L // trigger instant (70 min ago) precedes the last check: already covered
+        assertFalse(AutomationTriggerMath.calendarShouldFire(event, 30, now, lastCheck))
+    }
+
+    @Test
+    fun `calendar consumed key is per event instant and independent of trigger position`() {
+        assertEquals("tcal2_7_1730000000000", AutomationTriggerMath.calendarConsumedKey(7L, 1_730_000_000_000L))
+    }
+
+    @Test
+    fun `legacy positional calendar marks migrate to per-event keys keeping their instants`() {
+        val legacy = setOf("tcal_7_0_1730000000000", "tcal_7_2_1730003600000", "tcal2_7_1", "tcal_8_0_1730000000000")
+        assertEquals(
+            setOf("tcal2_7_1730000000000", "tcal2_7_1730003600000"),
+            AutomationTriggerMath.calendarKeyMigration(7L, legacy)
+        )
+    }
 }
