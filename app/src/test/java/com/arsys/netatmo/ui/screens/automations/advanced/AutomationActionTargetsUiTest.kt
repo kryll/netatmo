@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -177,14 +178,18 @@ class AutomationActionTargetsUiTest {
         openSheet(onAdd = { saved = it })
         composeRule.onNodeWithText("Automatización", useUnmergedTree = true).performScrollTo().performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithText("Noche fría", useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.waitForIdle()
 
         composeRule.onAllNodesWithText("Añadir acción", useUnmergedTree = true).onLast().performScrollTo()
         composeRule.waitForIdle()
         captureSheet("action-add-automatizacion-footer")
 
         composeRule.onAllNodesWithText("Añadir acción", useUnmergedTree = true).onLast().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Añadir acción", useUnmergedTree = true).onLast().assertIsEnabled()
         composeRule.onAllNodesWithText("Añadir acción", useUnmergedTree = true).onLast().performClick()
         composeRule.waitForIdle()
         assertEquals("run_automation", saved?.get("type"))
+        assertEquals(9L, saved?.get("automationId"))
     }
 }
