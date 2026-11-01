@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
@@ -480,7 +482,9 @@ fun AdvancedAutomationScreen(
                         TriggerPill(
                             trigger = map.toAutoTrigger(),
                             onEdit = { triggerSheetFor = index },
-                            onDelete = { viewModel.removeTrigger(index) }
+                            onDelete = { viewModel.removeTrigger(index) },
+                            onMoveUp = if (index > 0) ({ viewModel.moveTrigger(index, -1) }) else null,
+                            onMoveDown = if (index < uiState.triggers.lastIndex) ({ viewModel.moveTrigger(index, 1) }) else null
                         )
                         Spacer(Modifier.height(8.dp))
                     }
@@ -538,7 +542,9 @@ fun AdvancedAutomationScreen(
                         ConditionPill(
                             condition = map.toAutoCondition(),
                             onEdit = { conditionSheetFor = index },
-                            onDelete = { viewModel.removeCondition(index) }
+                            onDelete = { viewModel.removeCondition(index) },
+                            onMoveUp = if (index > 0) ({ viewModel.moveCondition(index, -1) }) else null,
+                            onMoveDown = if (index < uiState.conditions.lastIndex) ({ viewModel.moveCondition(index, 1) }) else null
                         )
                         Spacer(Modifier.height(8.dp))
                     }
@@ -565,7 +571,9 @@ fun AdvancedAutomationScreen(
                         ActionPill(
                             action = map.toAutoAction(),
                             onEdit = { actionSheetFor = index },
-                            onDelete = { viewModel.removeAction(index) }
+                            onDelete = { viewModel.removeAction(index) },
+                            onMoveUp = if (index > 0) ({ viewModel.moveAction(index, -1) }) else null,
+                            onMoveDown = if (index < uiState.actions.lastIndex) ({ viewModel.moveAction(index, 1) }) else null
                         )
                         Spacer(Modifier.height(8.dp))
                     }
@@ -701,7 +709,13 @@ private fun AddItemButton(label: String, onClick: () -> Unit) {
 // ── Pill composables ──────────────────────────────────────────────────────────
 
 @Composable
-private fun TriggerPill(trigger: AutomationTrigger, onEdit: () -> Unit, onDelete: () -> Unit) {
+internal fun TriggerPill(
+    trigger: AutomationTrigger,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?
+) {
     val primary = MaterialTheme.colorScheme.primary
     ItemPill(
         icon = triggerIcon(trigger.type),
@@ -711,12 +725,20 @@ private fun TriggerPill(trigger: AutomationTrigger, onEdit: () -> Unit, onDelete
         borderColor = primary.copy(alpha = 0.35f),
         textColor = primary,
         onEdit = onEdit,
-        onDelete = onDelete
+        onDelete = onDelete,
+        onMoveUp = onMoveUp,
+        onMoveDown = onMoveDown
     )
 }
 
 @Composable
-private fun ConditionPill(condition: AutomationCondition, onEdit: () -> Unit, onDelete: () -> Unit) {
+internal fun ConditionPill(
+    condition: AutomationCondition,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?
+) {
     val tertiary = MaterialTheme.colorScheme.tertiary
     ItemPill(
         icon = conditionIcon(condition.type),
@@ -726,12 +748,20 @@ private fun ConditionPill(condition: AutomationCondition, onEdit: () -> Unit, on
         borderColor = tertiary.copy(alpha = 0.35f),
         textColor = tertiary,
         onEdit = onEdit,
-        onDelete = onDelete
+        onDelete = onDelete,
+        onMoveUp = onMoveUp,
+        onMoveDown = onMoveDown
     )
 }
 
 @Composable
-private fun ActionPill(action: AutomationAction, onEdit: () -> Unit, onDelete: () -> Unit) {
+internal fun ActionPill(
+    action: AutomationAction,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?
+) {
     val secondary = MaterialTheme.colorScheme.secondary
     val secondaryContainer = MaterialTheme.colorScheme.secondaryContainer
     ItemPill(
@@ -742,7 +772,9 @@ private fun ActionPill(action: AutomationAction, onEdit: () -> Unit, onDelete: (
         borderColor = secondary.copy(alpha = 0.35f),
         textColor = secondary,
         onEdit = onEdit,
-        onDelete = onDelete
+        onDelete = onDelete,
+        onMoveUp = onMoveUp,
+        onMoveDown = onMoveDown
     )
 }
 
@@ -755,7 +787,9 @@ private fun ItemPill(
     borderColor: Color,
     textColor: Color,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
@@ -787,6 +821,32 @@ private fun ItemPill(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.width(4.dp))
+            if (onMoveUp != null) {
+                IconButton(
+                    onClick = onMoveUp,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Subir",
+                        tint = textColor.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            if (onMoveDown != null) {
+                IconButton(
+                    onClick = onMoveDown,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Bajar",
+                        tint = textColor.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
             IconButton(
                 onClick = onEdit,
                 modifier = Modifier.size(28.dp)
