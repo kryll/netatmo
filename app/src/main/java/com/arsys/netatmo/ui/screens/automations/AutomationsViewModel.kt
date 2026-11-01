@@ -59,6 +59,12 @@ class AutomationsViewModel @Inject constructor(
             if (id < 0) {
                 advancedAutomationRepository.getById(-id)
                     ?.let { advancedAutomationRepository.update(it.copy(enabled = enabled)) }
+                if (enabled) {
+                    // Calendar triggers of a re-enabled automation never fire matches from
+                    // before this moment (see AdvancedAutomationEngine.calendarWindowStart).
+                    context.getSharedPreferences("advanced_automation_state", Context.MODE_PRIVATE)
+                        .edit().putLong("tcal_since_${-id}", System.currentTimeMillis()).apply()
+                }
                 zoneRepository.syncGeofences()
                 return@launch
             }
@@ -144,3 +150,4 @@ private fun AdvancedAutomationEntity.toListItem(): AutomationEntity {
         lastTriggeredAt = lastTriggeredAt
     )
 }
+
