@@ -101,8 +101,8 @@ class AutomationAlarmScheduler @Inject constructor(
         statePrefs.edit().putLong(KEY_NEXT_AT, armedAt).apply()
     }
 
-    private fun nextInstant(automationId: Long, index: Int, occurrence: Int, trigger: JSONObject, now: Long): Long? =
-        when (trigger.optString("type")) {
+    private fun nextInstant(automationId: Long, index: Int, occurrence: Int, trigger: JSONObject, now: Long): Long? {
+        return when (trigger.optString("type")) {
             "time" -> {
                 val minutes = parseTimeToMinutes(trigger.optString("time", "")) ?: return null
                 val days = trigger.optJSONArray("days")
@@ -140,6 +140,7 @@ class AutomationAlarmScheduler @Inject constructor(
             }
             else -> null
         }
+    }
 
     private fun parseTimeToMinutes(hhmm: String): Int? = try {
         val parts = hhmm.split(":")
