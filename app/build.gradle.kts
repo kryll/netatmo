@@ -81,6 +81,8 @@ android {
     }
 }
 
+val robolectricDeps = configurations.create("robolectricDeps")
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -152,8 +154,6 @@ dependencies {
 // fetches its android-all jar at TEST RUNTIME with its own HTTP client (two runs
 // failed on that fetch). Resolve the jar through Gradle instead (cached by
 // setup-gradle) and run Robolectric offline against it.
-val robolectricDeps = configurations.create("robolectricDeps")
-
 tasks.withType<Test>().configureEach {
     val depsDir = File(layout.buildDirectory.get().asFile, "robolectric-deps")
     doFirst {
