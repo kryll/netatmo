@@ -637,7 +637,7 @@ fun AdvancedAutomationScreen(
 // ── Reusable layout ───────────────────────────────────────────────────────────
 
 @Composable
-private fun AutomationSectionCard(content: @Composable () -> Unit) {
+internal fun AutomationSectionCard(content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
