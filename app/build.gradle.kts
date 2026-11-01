@@ -18,6 +18,10 @@ val buildVersionCode = (project.findProperty("versionCode") as? String)?.toIntOr
 val buildVersionName = "1.0.$buildVersionCode"
 
 android {
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     namespace = "com.arsys.netatmo"
     compileSdk = 35
 
@@ -77,6 +81,11 @@ android {
     }
 }
 
+// Two separate configurations: same module, different versions - one shared
+// configuration would let Gradle conflict resolution drop the lower version.
+val robolectricDeps34 = configurations.create("robolectricDeps34")
+val robolectricDeps35 = configurations.create("robolectricDeps35")
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -131,10 +140,32 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
+    testImplementation(libs.robolectric)
+    "robolectricDeps34"("org.robolectric:android-all-instrumented:14-robolectric-10818077-i7")
+    "robolectricDeps35"("org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
+    testImplementation(libs.androidx.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+// CI runners have flaky access to Maven Central from the test JVM, and Robolectric
+// fetches its android-all jar at TEST RUNTIME with its own HTTP client (two runs
+// failed on that fetch). Resolve the jar through Gradle instead (cached by
+// setup-gradle) and run Robolectric offline against it.
+tasks.withType<Test>().configureEach {
+    val depsDir = File(layout.buildDirectory.get().asFile, "robolectric-deps")
+    doFirst {
+        depsDir.mkdirs()
+        (robolectricDeps34.files + robolectricDeps35.files).forEach {
+            it.copyTo(File(depsDir, it.name), overwrite = true)
+        }
+    }
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", depsDir.absolutePath)
 }

@@ -2,6 +2,7 @@ package com.arsys.netatmo.ui.screens.automations.advanced
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HourglassEmpty
@@ -125,6 +127,7 @@ data class AutomationAction(
     val title: String = "",
     val minutes: Int = 0,
     val scenarioId: String = "",
+    val scenarioName: String = "",
     val endAt: Long = 0L,
     val durationHours: Double = 0.0
 )
@@ -171,7 +174,8 @@ private fun Map<String, Any>.toAutoAction() = AutomationAction(
     mode = this["mode"] as? String ?: "",
     title = this["title"] as? String ?: "",
     minutes = (this["minutes"] as? Number)?.toInt() ?: 0,
-    scenarioId = this["scenarioId"] as? String ?: "",
+    scenarioId = this["scenarioId"]?.toString() ?: "",
+    scenarioName = this["scenarioName"] as? String ?: "",
     endAt = (this["endAt"] as? Number)?.toLong() ?: 0L,
     durationHours = (this["durationHours"] as? Number)?.toDouble() ?: 0.0
 )
@@ -187,14 +191,16 @@ fun AdvancedAutomationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val zones by viewModel.zones.collectAsState()
+    val scenarios by viewModel.scenarios.collectAsState()
 
     var name by remember { mutableStateOf(uiState.name) }
     var triggerMode by remember { mutableStateOf(uiState.triggerMode) }
     var enabled by remember { mutableStateOf(uiState.enabled) }
 
-    var showTriggerSheet by remember { mutableStateOf(false) }
-    var showConditionSheet by remember { mutableStateOf(false) }
-    var showActionSheet by remember { mutableStateOf(false) }
+    // Index of the item being edited in its sheet; -1 = new item, null = sheet closed.
+    var triggerSheetFor by remember { mutableStateOf<Int?>(null) }
+    var conditionSheetFor by remember { mutableStateOf<Int?>(null) }
+    var actionSheetFor by remember { mutableStateOf<Int?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRevertDialog by remember { mutableStateOf(false) }
 
@@ -280,35 +286,45 @@ fun AdvancedAutomationScreen(
     }
 
     // ── Bottom sheets ─────────────────────────────────────────────────────────
-    if (showTriggerSheet) {
+    triggerSheetFor?.let { editingIndex ->
+        val editing = if (editingIndex >= 0) uiState.triggers.getOrNull(editingIndex) else null
         TriggerEditorBottomSheet(
-            onDismiss = { showTriggerSheet = false },
+            initial = editing,
+            onDismiss = { triggerSheetFor = null },
             onAdd = { map ->
-                viewModel.addTrigger(map)
-                showTriggerSheet = false
+                if (editing != null) viewModel.updateTrigger(editingIndex, map)
+                else viewModel.addTrigger(map)
+                triggerSheetFor = null
             },
             zones = zones,
             onManageZones = {
-                showTriggerSheet = false
+                triggerSheetFor = null
                 navController.navigate("zones")
             }
         )
     }
-    if (showConditionSheet) {
+    conditionSheetFor?.let { editingIndex ->
+        val editing = if (editingIndex >= 0) uiState.conditions.getOrNull(editingIndex) else null
         ConditionEditorBottomSheet(
-            onDismiss = { showConditionSheet = false },
+            initial = editing,
+            onDismiss = { conditionSheetFor = null },
             onAdd = { map ->
-                viewModel.addCondition(map)
-                showConditionSheet = false
+                if (editing != null) viewModel.updateCondition(editingIndex, map)
+                else viewModel.addCondition(map)
+                conditionSheetFor = null
             }
         )
     }
-    if (showActionSheet) {
+    actionSheetFor?.let { editingIndex ->
+        val editing = if (editingIndex >= 0) uiState.actions.getOrNull(editingIndex) else null
         ActionEditorBottomSheet(
-            onDismiss = { showActionSheet = false },
+            initial = editing,
+            scenarios = scenarios,
+            onDismiss = { actionSheetFor = null },
             onAdd = { map ->
-                viewModel.addAction(map)
-                showActionSheet = false
+                if (editing != null) viewModel.updateAction(editingIndex, map)
+                else viewModel.addAction(map)
+                actionSheetFor = null
             }
         )
     }
@@ -463,6 +479,7 @@ fun AdvancedAutomationScreen(
                     uiState.triggers.forEachIndexed { index, map ->
                         TriggerPill(
                             trigger = map.toAutoTrigger(),
+                            onEdit = { triggerSheetFor = index },
                             onDelete = { viewModel.removeTrigger(index) }
                         )
                         Spacer(Modifier.height(8.dp))
@@ -470,7 +487,7 @@ fun AdvancedAutomationScreen(
 
                     AddItemButton(
                         label = "Añadir disparador",
-                        onClick = { showTriggerSheet = true }
+                        onClick = { triggerSheetFor = -1 }
                     )
                 }
             }
@@ -520,6 +537,7 @@ fun AdvancedAutomationScreen(
                     uiState.conditions.forEachIndexed { index, map ->
                         ConditionPill(
                             condition = map.toAutoCondition(),
+                            onEdit = { conditionSheetFor = index },
                             onDelete = { viewModel.removeCondition(index) }
                         )
                         Spacer(Modifier.height(8.dp))
@@ -527,7 +545,7 @@ fun AdvancedAutomationScreen(
 
                     AddItemButton(
                         label = "Añadir condición",
-                        onClick = { showConditionSheet = true }
+                        onClick = { conditionSheetFor = -1 }
                     )
                 }
             }
@@ -546,6 +564,7 @@ fun AdvancedAutomationScreen(
                     uiState.actions.forEachIndexed { index, map ->
                         ActionPill(
                             action = map.toAutoAction(),
+                            onEdit = { actionSheetFor = index },
                             onDelete = { viewModel.removeAction(index) }
                         )
                         Spacer(Modifier.height(8.dp))
@@ -553,7 +572,7 @@ fun AdvancedAutomationScreen(
 
                     AddItemButton(
                         label = "Añadir acción",
-                        onClick = { showActionSheet = true }
+                        onClick = { actionSheetFor = -1 }
                     )
                 }
             }
@@ -682,7 +701,7 @@ private fun AddItemButton(label: String, onClick: () -> Unit) {
 // ── Pill composables ──────────────────────────────────────────────────────────
 
 @Composable
-private fun TriggerPill(trigger: AutomationTrigger, onDelete: () -> Unit) {
+private fun TriggerPill(trigger: AutomationTrigger, onEdit: () -> Unit, onDelete: () -> Unit) {
     val primary = MaterialTheme.colorScheme.primary
     ItemPill(
         icon = triggerIcon(trigger.type),
@@ -691,12 +710,13 @@ private fun TriggerPill(trigger: AutomationTrigger, onDelete: () -> Unit) {
         bgColor = primary.copy(alpha = 0.12f),
         borderColor = primary.copy(alpha = 0.35f),
         textColor = primary,
+        onEdit = onEdit,
         onDelete = onDelete
     )
 }
 
 @Composable
-private fun ConditionPill(condition: AutomationCondition, onDelete: () -> Unit) {
+private fun ConditionPill(condition: AutomationCondition, onEdit: () -> Unit, onDelete: () -> Unit) {
     val tertiary = MaterialTheme.colorScheme.tertiary
     ItemPill(
         icon = conditionIcon(condition.type),
@@ -705,12 +725,13 @@ private fun ConditionPill(condition: AutomationCondition, onDelete: () -> Unit) 
         bgColor = tertiary.copy(alpha = 0.12f),
         borderColor = tertiary.copy(alpha = 0.35f),
         textColor = tertiary,
+        onEdit = onEdit,
         onDelete = onDelete
     )
 }
 
 @Composable
-private fun ActionPill(action: AutomationAction, onDelete: () -> Unit) {
+private fun ActionPill(action: AutomationAction, onEdit: () -> Unit, onDelete: () -> Unit) {
     val secondary = MaterialTheme.colorScheme.secondary
     val secondaryContainer = MaterialTheme.colorScheme.secondaryContainer
     ItemPill(
@@ -720,6 +741,7 @@ private fun ActionPill(action: AutomationAction, onDelete: () -> Unit) {
         bgColor = secondaryContainer.copy(alpha = 0.18f),
         borderColor = secondary.copy(alpha = 0.35f),
         textColor = secondary,
+        onEdit = onEdit,
         onDelete = onDelete
     )
 }
@@ -732,13 +754,16 @@ private fun ItemPill(
     bgColor: Color,
     borderColor: Color,
     textColor: Color,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = bgColor,
         border = BorderStroke(1.dp, borderColor),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEdit)
     ) {
         Row(
             modifier = Modifier
@@ -762,6 +787,17 @@ private fun ItemPill(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.width(4.dp))
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Editar",
+                    tint = textColor.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
             IconButton(
                 onClick = onDelete,
                 modifier = Modifier.size(28.dp)
@@ -839,7 +875,7 @@ private fun actionSummary(action: AutomationAction): String = when (action.type)
         else if (action.endAt > 0) " hasta ${formatTriggerDateTime(action.endAt)}" else "")
     "notify" -> "Notificación: ${action.title.ifBlank { "(sin título)" }}"
     "delay" -> "Esperar ${action.minutes} min"
-    "apply_scenario" -> "Escenario: ${action.scenarioId}"
+    "apply_scenario" -> "Escenario: ${action.scenarioName.ifBlank { action.scenarioId }}"
     else -> action.type
 }
 

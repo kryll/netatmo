@@ -40,39 +40,49 @@ import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 @Composable
 fun ActionEditorBottomSheet(
     onDismiss: () -> Unit,
-    onAdd: (Map<String, Any>) -> Unit
+    onAdd: (Map<String, Any>) -> Unit,
+    initial: Map<String, Any>? = null,
+    scenarios: List<com.arsys.netatmo.data.local.entities.ScenarioEntity> = emptyList()
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var selectedType by remember { mutableStateOf("set_temperature") }
+    // When editing an existing action, start from its stored values.
+    val prefill = remember { initial?.let { prefillAction(it) } }
+
+    var selectedType by remember { mutableStateOf(prefill?.type?.ifBlank { "set_temperature" } ?: "set_temperature") }
 
     // set_temperature
-    var temperature by remember { mutableFloatStateOf(20f) }
-    var homeId by remember { mutableStateOf("") }
-    var roomId by remember { mutableStateOf("") }
+    var temperature by remember { mutableFloatStateOf(prefill?.temperature ?: 20f) }
+    var homeId by remember { mutableStateOf(prefill?.homeId ?: "") }
+    var roomId by remember { mutableStateOf(prefill?.roomId ?: "") }
 
     // set_mode
-    var selectedMode by remember { mutableStateOf("schedule") }
+    var selectedMode by remember { mutableStateOf(prefill?.mode ?: "schedule") }
 
     // notify
-    var notifyTitle by remember { mutableStateOf("") }
-    var notifyMessage by remember { mutableStateOf("") }
+    var notifyTitle by remember { mutableStateOf(prefill?.notifyTitle ?: "") }
+    var notifyMessage by remember { mutableStateOf(prefill?.notifyMessage ?: "") }
 
     // delay
-    var delayMinutes by remember { mutableStateOf("5") }
+    var delayMinutes by remember { mutableStateOf(prefill?.delayMinutes ?: "5") }
+
+    // apply_scenario
+    var scenarioId by remember { mutableStateOf(prefill?.scenarioId ?: -1L) }
 
     // set_home_mode / set_mode
-    var homeMode by remember { mutableStateOf("schedule") }
-    var modeHours by remember { mutableStateOf("") }
+    var homeMode by remember { mutableStateOf(prefill?.mode ?: "schedule") }
+    var modeHours by remember { mutableStateOf(prefill?.durationText ?: "") }
     var modeHoursError by remember { mutableStateOf(false) }
 
+    // "apply_scenario" is not offered for new actions (scenarios have their own screen);
+    // it appears only when editing an action that already applies one.
     val actionTypes = listOf(
         "set_temperature" to "Temperatura",
         "set_mode" to "Modo",
         "set_home_mode" to "Modo de la casa",
         "notify" to "Notificación",
         "delay" to "Esperar"
-    )
+    ) + if (prefill?.type == "apply_scenario") listOf("apply_scenario" to "Escenario") else emptyList()
 
     // Netatmo home modes (setthermmode); "heating"/"cooling" are not valid values there.
     val modes = listOf(
@@ -81,6 +91,10 @@ fun ActionEditorBottomSheet(
         "hg" to "Anticongelación",
         "off" to "Apagado"
     )
+
+    // A stored action whose type this editor does not know is left untouched:
+    // better read-only than silently replacing it with an empty map.
+    val unknownType = initial != null && actionTypes.none { it.first == prefill?.type }
 
     val secondary = MaterialTheme.colorScheme.secondary
     val secondaryContainer = MaterialTheme.colorScheme.secondaryContainer
@@ -101,11 +115,20 @@ fun ActionEditorBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Añadir acción",
+                text = if (initial == null) "Añadir acción" else "Editar acción",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
+            if (unknownType) {
+                Text(
+                    "Esta acción («${prefill?.type}») no se puede editar aquí. " +
+                        "Elimínala y créala de nuevo si necesitas cambiarla.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else {
 
             SheetLabel("Tipo de acción")
             FlowRow(
@@ -201,6 +224,7 @@ fun ActionEditorBottomSheet(
                             color = MaterialTheme.colorScheme.error
                         )
                     }
+                    LegacyEndAtNote(prefill)
                 }
 
                 "notify" -> {
@@ -273,6 +297,7 @@ fun ActionEditorBottomSheet(
                             color = MaterialTheme.colorScheme.error
                         )
                     }
+                    LegacyEndAtNote(prefill)
                 }
 
                 "delay" -> {
@@ -283,11 +308,51 @@ fun ActionEditorBottomSheet(
                         label = "Minutos"
                     )
                 }
+
+                "apply_scenario" -> {
+                    SheetLabel("Escenario")
+                    if (scenarios.isEmpty()) {
+                        Text(
+                            "No hay escenarios guardados. Créalos desde la pantalla de escenarios.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            scenarios.forEach { scenario ->
+                                FilterChip(
+                                    selected = scenarioId == scenario.id,
+                                    onClick = { scenarioId = scenario.id },
+                                    label = { Text(scenario.name, style = MaterialTheme.typography.labelMedium) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = secondaryContainer.copy(alpha = 0.20f),
+                                        selectedLabelColor = secondary,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = scenarioId == scenario.id,
+                                        selectedBorderColor = secondary.copy(alpha = 0.45f),
+                                        borderColor = OutlineVariant
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
+            }
+
+            if (!unknownType) {
             Spacer(Modifier.height(4.dp))
 
             Button(
+                enabled = selectedType != "apply_scenario" || scenarios.any { it.id == scenarioId },
                 onClick = {
                     if (selectedType == "set_home_mode" || selectedType == "set_mode") {
                         // Never save an invalid duration silently as "until changed":
@@ -310,8 +375,12 @@ fun ActionEditorBottomSheet(
                             put("mode", selectedMode)
                             // Same semantics as set_home_mode: the engine computes the
                             // end from the duration when the trigger fires.
-                            modeHours.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0.0 }?.let {
-                                put("durationHours", it)
+                            val hours = modeHours.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0.0 }
+                            if (hours != null) {
+                                put("durationHours", hours)
+                            } else {
+                                // No duration entered: keep the fixed end it was saved with.
+                                prefill?.legacyEndAt?.takeIf { it > 0L }?.let { put("endAt", it) }
                             }
                         }
                         "notify" -> mapOf(
@@ -324,13 +393,22 @@ fun ActionEditorBottomSheet(
                             put("mode", homeMode)
                             // Store the duration, not a fixed end: the engine computes the
                             // end when the trigger fires, not when the automation is saved.
-                            modeHours.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0.0 }?.let {
-                                put("durationHours", it)
+                            val hours = modeHours.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0.0 }
+                            if (hours != null) {
+                                put("durationHours", hours)
+                            } else {
+                                // No duration entered: keep the fixed end it was saved with.
+                                prefill?.legacyEndAt?.takeIf { it > 0L }?.let { put("endAt", it) }
                             }
                         }
                         "delay" -> mapOf(
                             "type" to "delay",
                             "minutes" to (delayMinutes.toIntOrNull() ?: 5)
+                        )
+                        "apply_scenario" -> mapOf(
+                            "type" to "apply_scenario",
+                            "scenarioId" to scenarioId,
+                            "scenarioName" to (scenarios.firstOrNull { it.id == scenarioId }?.name ?: "")
                         )
                         else -> emptyMap()
                     }
@@ -345,7 +423,12 @@ fun ActionEditorBottomSheet(
                     contentColor = MaterialTheme.colorScheme.onSurface
                 )
             ) {
-                Text("Añadir acción", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (initial == null) "Añadir acción" else "Guardar cambios",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             }
 
             TextButton(
@@ -357,4 +440,21 @@ fun ActionEditorBottomSheet(
             }
         }
     }
+}
+
+/** Note shown while editing an action saved with a fixed end date instead of a duration. */
+@Composable
+private fun LegacyEndAtNote(prefill: ActionPrefill?) {
+    val endAt = prefill?.legacyEndAt ?: return
+    if (endAt <= 0L) return
+    val c = java.util.Calendar.getInstance().apply { timeInMillis = endAt }
+    val whenText = "%02d/%02d/%04d %02d:%02d".format(
+        c.get(java.util.Calendar.DAY_OF_MONTH), c.get(java.util.Calendar.MONTH) + 1,
+        c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE)
+    )
+    Text(
+        "Guardada con fin fijo: el $whenText. Si escribes una duración, se usará en su lugar.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
