@@ -62,6 +62,19 @@ object AutomationTriggerMath {
         }.toSet()
     }
 
+    /**
+     * Device-zone start of an all-day calendar event, whose instance BEGIN comes as UTC
+     * midnight of the event's date: an all-day "Nov 2" triggers at 00:00 local on Nov 2,
+     * not at 01:00/02:00 (UTC midnight shifted, e.g. in Europe/Madrid).
+     */
+    fun allDayLocalStart(utcMidnightMs: Long, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): Long {
+        val utc = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcMidnightMs }
+        return java.util.Calendar.getInstance(zone).apply {
+            clear()
+            set(utc.get(java.util.Calendar.YEAR), utc.get(java.util.Calendar.MONTH), utc.get(java.util.Calendar.DAY_OF_MONTH), 0, 0, 0)
+        }.timeInMillis
+    }
+
     /** One-shot instant trigger: fires at or after [atMs], only once (not when [consumed]). */
     fun datetimeShouldFire(atMs: Long, consumed: Boolean, nowMs: Long): Boolean =
         atMs > 0 && !consumed && nowMs >= atMs
