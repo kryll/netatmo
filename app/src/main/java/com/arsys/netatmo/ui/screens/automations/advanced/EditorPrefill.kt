@@ -141,7 +141,9 @@ data class ActionPrefill(
     val legacyEndAt: Long,
     val notifyTitle: String,
     val notifyMessage: String,
-    val delayMinutes: String
+    val delayMinutes: String,
+    val scenarioId: Long,
+    val scenarioName: String
 )
 
 internal fun prefillAction(map: Map<String, Any>): ActionPrefill {
@@ -157,6 +159,8 @@ internal fun prefillAction(map: Map<String, Any>): ActionPrefill {
         legacyEndAt = if (duration <= 0.0 && endAt > 0L) endAt else 0L,
         notifyTitle = mapString(map, "title"),
         notifyMessage = mapString(map, "message"),
-        delayMinutes = (mapNumber(map, "minutes")?.toInt() ?: 5).toString()
+        delayMinutes = (mapNumber(map, "minutes")?.toInt() ?: 5).toString(),
+        scenarioId = mapNumber(map, "scenarioId")?.toLong() ?: -1L,
+        scenarioName = mapString(map, "scenarioName")
     )
 }
