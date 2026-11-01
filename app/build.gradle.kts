@@ -81,7 +81,10 @@ android {
     }
 }
 
-val robolectricDeps = configurations.create("robolectricDeps")
+// Two separate configurations: same module, different versions - one shared
+// configuration would let Gradle conflict resolution drop the lower version.
+val robolectricDeps34 = configurations.create("robolectricDeps34")
+val robolectricDeps35 = configurations.create("robolectricDeps35")
 
 dependencies {
     implementation(libs.androidx.core.ktx)
@@ -138,8 +141,8 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
     testImplementation(libs.robolectric)
-    "robolectricDeps"("org.robolectric:android-all-instrumented:14-robolectric-10818077-i7")
-    "robolectricDeps"("org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
+    "robolectricDeps34"("org.robolectric:android-all-instrumented:14-robolectric-10818077-i7")
+    "robolectricDeps35"("org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
     testImplementation(libs.androidx.junit)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.ui.test.junit4)
@@ -159,7 +162,7 @@ tasks.withType<Test>().configureEach {
     val depsDir = File(layout.buildDirectory.get().asFile, "robolectric-deps")
     doFirst {
         depsDir.mkdirs()
-        configurations.getByName("robolectricDeps").files.forEach {
+        (robolectricDeps34.files + robolectricDeps35.files).forEach {
             it.copyTo(File(depsDir, it.name), overwrite = true)
         }
     }
