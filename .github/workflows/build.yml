@@ -91,6 +91,23 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+
+      # TEMP (rama de extracción de evidencia): publica las capturas en la rama
+      # ci/compose-shots para poder leerlas por raw.githubusercontent.com; los
+      # artifacts de Actions no se descargan sin token.
+      - name: Publish Compose captures to ci/compose-shots
+        if: always()
+        run: |
+          git config user.name ci
+          git config user.email ci@localhost
+          git fetch origin ci/compose-shots || true
+          git checkout -B ci/compose-shots origin/ci/compose-shots || git checkout --orphan ci/compose-shots
+          mkdir -p shots
+          cp app/build/outputs/compose-shots/*.png shots/ || true
+          git add shots
+          git commit -m "shots $GITHUB_SHA" --allow-empty
+          git push origin ci/compose-shots
+
       - name: Build debug APK
         run: ./gradlew assembleDebug -PversionCode=${{ github.run_number }} --no-daemon
 
