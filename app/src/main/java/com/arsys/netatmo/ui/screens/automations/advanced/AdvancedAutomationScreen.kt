@@ -709,7 +709,7 @@ private fun AddItemButton(label: String, onClick: () -> Unit) {
 // ── Pill composables ──────────────────────────────────────────────────────────
 
 @Composable
-private fun TriggerPill(
+internal fun TriggerPill(
     trigger: AutomationTrigger,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -732,7 +732,7 @@ private fun TriggerPill(
 }
 
 @Composable
-private fun ConditionPill(
+internal fun ConditionPill(
     condition: AutomationCondition,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -755,7 +755,7 @@ private fun ConditionPill(
 }
 
 @Composable
-private fun ActionPill(
+internal fun ActionPill(
     action: AutomationAction,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
