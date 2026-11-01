@@ -197,7 +197,14 @@ class AdvancedAutomationViewModel @Inject constructor(
             // adds, deletes or reorders triggers (see DatetimeConsumptionMigration).
             saveAutomationStateMutex.withLock {
                 if (existing != null) migrateDatetimeConsumptionLocked(context, repository, entity.id)
-                repository.save(entity)
+                val savedId = repository.save(entity)
+                // Calendar triggers never fire matches from before this save: the engine's
+                // fire window for this automation starts at the latest of the previous
+                // evaluation, the automation's creation and this mark.
+                context.getSharedPreferences("advanced_automation_state", Context.MODE_PRIVATE)
+                    .edit()
+                    .putLong("tcal_since_${if (entity.id != 0L) entity.id else savedId}", System.currentTimeMillis())
+                    .apply()
             }
             zoneRepository.syncGeofences()
             alarmScheduler.reschedule()
@@ -277,3 +284,4 @@ class AdvancedAutomationViewModel @Inject constructor(
         return result
     }
 }
+
