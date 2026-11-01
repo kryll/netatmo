@@ -23,16 +23,43 @@ object AutomationTriggerMath {
 
     /**
      * Whether a calendar event starting at [eventStartMs] triggers now: its trigger instant
-     * ([minutesBefore] before the start) fell inside the last poll window ending at [nowMs].
+     * ([minutesBefore] before the start) falls after the previous evaluation ([windowStartMs])
+     * and not after [nowMs]. With the default window this is the last poll period; the engine
+     * passes the real previous-check time, so a check delayed by the battery fires late instead
+     * of never, and a "0 minutes before" trigger fires on the first check after the event starts.
      */
     fun calendarShouldFire(
         eventStartMs: Long,
         minutesBefore: Int,
         nowMs: Long,
-        pollMs: Long = DEFAULT_POLL_MS
+        windowStartMs: Long = nowMs - DEFAULT_POLL_MS
     ): Boolean {
         val triggerTime = eventStartMs - minutesBefore * 60_000L
-        return triggerTime in (nowMs - pollMs)..nowMs
+        return triggerTime in (windowStartMs + 1)..nowMs
+    }
+
+    /**
+     * Consumption key for a calendar trigger, per EVENT instant and independent of the
+     * trigger's position in the list: reordering, inserting or deleting triggers never
+     * replays an already-fired event. "tcal2_" is textually distinct from the legacy
+     * positional "tcal_<id>_<index>_<startMs>" marks.
+     */
+    fun calendarConsumedKey(automationId: Long, eventStartMs: Long): String =
+        "tcal2_${automationId}_$eventStartMs"
+
+    /**
+     * One-time translation of legacy positional calendar marks ("tcal_<id>_<index>_<startMs>")
+     * to per-event keys: each consumed event keeps its consumption whatever its trigger's
+     * position. Exact for every history because the event instant is part of both formats.
+     */
+    fun calendarKeyMigration(automationId: Long, legacyKeys: Set<String>): Set<String> {
+        val legacyPrefix = "tcal_${automationId}_"
+        return legacyKeys.mapNotNull { key ->
+            if (!key.startsWith(legacyPrefix)) return@mapNotNull null
+            val startMs = key.removePrefix(legacyPrefix).substringAfter('_').toLongOrNull()
+                ?: return@mapNotNull null
+            calendarConsumedKey(automationId, startMs)
+        }.toSet()
     }
 
     /** One-shot instant trigger: fires at or after [atMs], only once (not when [consumed]). */
@@ -115,3 +142,4 @@ object AutomationTriggerMath {
     fun nextDatetimeInstant(atMs: Long, consumed: Boolean): Long? =
         if (atMs > 0 && !consumed) atMs else null
 }
+
