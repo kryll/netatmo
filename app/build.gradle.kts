@@ -136,6 +136,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
     testImplementation(libs.robolectric)
+    "robolectricDeps"("org.robolectric:android-all-instrumented:14-robolectric-10818077-i7")
     testImplementation(libs.androidx.junit)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.ui.test.junit4)
@@ -145,4 +146,22 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+// CI runners have flaky access to Maven Central from the test JVM, and Robolectric
+// fetches its android-all jar at TEST RUNTIME with its own HTTP client (two runs
+// failed on that fetch). Resolve the jar through Gradle instead (cached by
+// setup-gradle) and run Robolectric offline against it.
+val robolectricDeps = configurations.create("robolectricDeps")
+
+tasks.withType<Test>().configureEach {
+    val depsDir = File(layout.buildDirectory.get().asFile, "robolectric-deps")
+    doFirst {
+        depsDir.mkdirs()
+        configurations.getByName("robolectricDeps").files.forEach {
+            it.copyTo(File(depsDir, it.name), overwrite = true)
+        }
+    }
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", depsDir.absolutePath)
 }
