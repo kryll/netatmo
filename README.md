@@ -96,6 +96,10 @@ app/
 
 ---
 
+## Automatizaciones avanzadas
+
+En el editor avanzado, los disparadores, las condiciones y las acciones de cada automatización se pueden reordenar con las flechas ▲▼ de cada elemento (por ejemplo, para que la notificación avise antes o después del cambio de modo). Las flechas solo aparecen cuando el elemento puede moverse en esa dirección.
+
 ## Permisos requeridos
 
 | Permiso | Uso |
