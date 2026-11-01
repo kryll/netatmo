@@ -36,13 +36,21 @@ import androidx.compose.ui.unit.dp
 import com.arsys.netatmo.ui.theme.OutlineVariant
 import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 
+/** A Netatmo heating schedule ("programa") offered by the Programa action picker. */
+data class ScheduleOption(val homeId: String, val id: String, val name: String)
+
+/** Another saved automation offered by the Automatización action picker (never the one being edited). */
+data class AutomationOption(val id: Long, val name: String)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ActionEditorBottomSheet(
     onDismiss: () -> Unit,
     onAdd: (Map<String, Any>) -> Unit,
     initial: Map<String, Any>? = null,
-    scenarios: List<com.arsys.netatmo.data.local.entities.ScenarioEntity> = emptyList()
+    scenarios: List<com.arsys.netatmo.data.local.entities.ScenarioEntity> = emptyList(),
+    schedules: List<ScheduleOption> = emptyList(),
+    automations: List<AutomationOption> = emptyList()
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -69,20 +77,27 @@ fun ActionEditorBottomSheet(
     // apply_scenario
     var scenarioId by remember { mutableStateOf(prefill?.scenarioId ?: -1L) }
 
+    // set_schedule
+    var scheduleId by remember { mutableStateOf(prefill?.scheduleId ?: "") }
+
+    // run_automation
+    var targetAutomationId by remember { mutableStateOf(prefill?.automationId ?: -1L) }
+
     // set_home_mode / set_mode
     var homeMode by remember { mutableStateOf(prefill?.mode ?: "schedule") }
     var modeHours by remember { mutableStateOf(prefill?.durationText ?: "") }
     var modeHoursError by remember { mutableStateOf(false) }
 
-    // "apply_scenario" is not offered for new actions (scenarios have their own screen);
-    // it appears only when editing an action that already applies one.
     val actionTypes = listOf(
         "set_temperature" to "Temperatura",
         "set_mode" to "Modo",
         "set_home_mode" to "Modo de la casa",
+        "set_schedule" to "Programa",
+        "apply_scenario" to "Escenario",
+        "run_automation" to "Automatización",
         "notify" to "Notificación",
         "delay" to "Esperar"
-    ) + if (prefill?.type == "apply_scenario") listOf("apply_scenario" to "Escenario") else emptyList()
+    )
 
     // Netatmo home modes (setthermmode); "heating"/"cooling" are not valid values there.
     val modes = listOf(
@@ -344,6 +359,92 @@ fun ActionEditorBottomSheet(
                         }
                     }
                 }
+
+                "set_schedule" -> {
+                    SheetLabel("Programa de calefacción")
+                    if (schedules.isEmpty()) {
+                        Text(
+                            "No se encontraron programas en la instalación (o no se pudieron cargar). " +
+                                "Cierra y vuelve a abrir esta ventana para reintentar.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            schedules.forEach { schedule ->
+                                FilterChip(
+                                    selected = scheduleId == schedule.id,
+                                    onClick = { scheduleId = schedule.id },
+                                    label = { Text(schedule.name, style = MaterialTheme.typography.labelMedium) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = secondaryContainer.copy(alpha = 0.20f),
+                                        selectedLabelColor = secondary,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = scheduleId == schedule.id,
+                                        selectedBorderColor = secondary.copy(alpha = 0.45f),
+                                        borderColor = OutlineVariant
+                                    )
+                                )
+                            }
+                        }
+                        Text(
+                            "Al ejecutarse se activa el programa elegido y la casa vuelve al modo programado.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                "run_automation" -> {
+                    SheetLabel("Automatización a ejecutar")
+                    if (automations.isEmpty()) {
+                        Text(
+                            "No hay otras automatizaciones guardadas. Crea primero la que quieras invocar.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            automations.forEach { automation ->
+                                FilterChip(
+                                    selected = targetAutomationId == automation.id,
+                                    onClick = { targetAutomationId = automation.id },
+                                    label = { Text(automation.name, style = MaterialTheme.typography.labelMedium) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = secondaryContainer.copy(alpha = 0.20f),
+                                        selectedLabelColor = secondary,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = targetAutomationId == automation.id,
+                                        selectedBorderColor = secondary.copy(alpha = 0.45f),
+                                        borderColor = OutlineVariant
+                                    )
+                                )
+                            }
+                        }
+                        Text(
+                            "Ejecuta las acciones de la automatización elegida, solo si está activa " +
+                                "y sus condiciones se cumplen en ese momento. Sus disparadores no se " +
+                                "evalúan: quien manda es esta automatización. Las referencias en bucle " +
+                                "se detectan y se omiten (todo queda registrado en el diagnóstico).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
 
             }
@@ -352,7 +453,12 @@ fun ActionEditorBottomSheet(
             Spacer(Modifier.height(4.dp))
 
             Button(
-                enabled = selectedType != "apply_scenario" || scenarios.any { it.id == scenarioId },
+                enabled = when (selectedType) {
+                    "apply_scenario" -> scenarios.any { it.id == scenarioId }
+                    "set_schedule" -> schedules.any { it.id == scheduleId }
+                    "run_automation" -> automations.any { it.id == targetAutomationId }
+                    else -> true
+                },
                 onClick = {
                     if (selectedType == "set_home_mode" || selectedType == "set_mode") {
                         // Never save an invalid duration silently as "until changed":
@@ -409,6 +515,17 @@ fun ActionEditorBottomSheet(
                             "type" to "apply_scenario",
                             "scenarioId" to scenarioId,
                             "scenarioName" to (scenarios.firstOrNull { it.id == scenarioId }?.name ?: "")
+                        )
+                        "set_schedule" -> mapOf(
+                            "type" to "set_schedule",
+                            "scheduleId" to scheduleId,
+                            "scheduleName" to (schedules.firstOrNull { it.id == scheduleId }?.name ?: ""),
+                            "homeId" to (schedules.firstOrNull { it.id == scheduleId }?.homeId ?: "")
+                        )
+                        "run_automation" -> mapOf(
+                            "type" to "run_automation",
+                            "automationId" to targetAutomationId,
+                            "automationName" to (automations.firstOrNull { it.id == targetAutomationId }?.name ?: "")
                         )
                         else -> emptyMap()
                     }

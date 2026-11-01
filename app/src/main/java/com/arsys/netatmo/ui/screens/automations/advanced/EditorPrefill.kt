@@ -143,7 +143,11 @@ data class ActionPrefill(
     val notifyMessage: String,
     val delayMinutes: String,
     val scenarioId: Long,
-    val scenarioName: String
+    val scenarioName: String,
+    val scheduleId: String,
+    val scheduleName: String,
+    val automationId: Long,
+    val automationName: String
 )
 
 internal fun prefillAction(map: Map<String, Any>): ActionPrefill {
@@ -161,6 +165,10 @@ internal fun prefillAction(map: Map<String, Any>): ActionPrefill {
         notifyMessage = mapString(map, "message"),
         delayMinutes = (mapNumber(map, "minutes")?.toInt() ?: 5).toString(),
         scenarioId = mapNumber(map, "scenarioId")?.toLong() ?: -1L,
-        scenarioName = mapString(map, "scenarioName")
+        scenarioName = mapString(map, "scenarioName"),
+        scheduleId = mapString(map, "scheduleId"),
+        scheduleName = mapString(map, "scheduleName"),
+        automationId = mapNumber(map, "automationId")?.toLong() ?: -1L,
+        automationName = mapString(map, "automationName")
     )
 }

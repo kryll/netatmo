@@ -100,6 +100,12 @@ app/
 
 En el editor avanzado, los disparadores, las condiciones y las acciones de cada automatización se pueden reordenar con las flechas ▲▼ de cada elemento (por ejemplo, para que la notificación avise antes o después del cambio de modo). Las flechas solo aparecen cuando el elemento puede moverse en esa dirección.
 
+Las acciones disponibles incluyen, además de temperatura, modos, notificación y espera:
+
+- **Programa**: activa uno de los programas (horarios) de la instalación Netatmo y devuelve la casa al modo programado, igual que al activarlo desde la pantalla Programas.
+- **Escenario**: aplica un escenario guardado en la app.
+- **Automatización**: ejecuta las acciones de otra automatización guardada, solo si está activa y sus condiciones se cumplen en ese momento (sus disparadores no se evalúan: quien manda es la automatización que invoca). Las referencias en bucle o cadenas de más de 10 automatizaciones se detectan, se omiten y quedan registradas en el diagnóstico, para que una cadena nunca repita acciones de calefacción.
+
 ## Permisos requeridos
 
 | Permiso | Uso |

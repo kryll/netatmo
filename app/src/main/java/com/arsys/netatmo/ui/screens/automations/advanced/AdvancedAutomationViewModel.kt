@@ -46,6 +46,7 @@ class AdvancedAutomationViewModel @Inject constructor(
     private val classicAutomationMigrator: com.arsys.netatmo.service.ClassicAutomationMigrator,
     private val zoneRepository: com.arsys.netatmo.data.repository.ZoneRepository,
     private val automationRepository: com.arsys.netatmo.data.repository.AutomationRepository,
+    private val thermostatRepository: com.arsys.netatmo.data.repository.ThermostatRepository,
     private val alarmScheduler: com.arsys.netatmo.service.AutomationAlarmScheduler,
     @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
@@ -62,7 +63,16 @@ class AdvancedAutomationViewModel @Inject constructor(
     val scenarios: StateFlow<List<com.arsys.netatmo.data.local.entities.ScenarioEntity>> =
         automationRepository.getAllScenarios().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Every saved automation; the screen filters out the one being edited for the picker. */
+    val automations: StateFlow<List<AdvancedAutomationEntity>> =
+        repository.getAllAdvancedAutomations().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _schedules = MutableStateFlow<List<ScheduleOption>>(emptyList())
+    /** Netatmo heating schedules ("programas") for the Programa action picker. */
+    val schedules: StateFlow<List<ScheduleOption>> = _schedules.asStateFlow()
+
     init {
+        loadSchedules()
         if (automationId != -1L) {
             viewModelScope.launch {
                 _uiState.update { it.copy(isLoading = true) }
@@ -82,6 +92,27 @@ class AdvancedAutomationViewModel @Inject constructor(
                     }
                 } else {
                     _uiState.update { it.copy(isLoading = false) }
+                }
+            }
+        }
+    }
+
+    /** Loads the installation's heating schedules once (best effort: empty list on error). */
+    private fun loadSchedules() {
+        viewModelScope.launch {
+            val result = thermostatRepository.getHomesData()
+            if (result is com.arsys.netatmo.data.repository.ApiResult.Success) {
+                val homes = result.data
+                _schedules.value = homes.flatMap { home ->
+                    home.schedules.orEmpty()
+                        .filter { it.type == null || it.type == "therm" }
+                        .map { schedule ->
+                            ScheduleOption(
+                                homeId = home.id,
+                                id = schedule.id,
+                                name = if (homes.size > 1) "${schedule.name} (${home.name})" else schedule.name
+                            )
+                        }
                 }
             }
         }
