@@ -465,10 +465,11 @@ class AdvancedAutomationEngine @Inject constructor(
      * instant must fall after the previous evaluation ([windowStartMs], never before the
      * automation existed) and not after now: a "0 minutes before" trigger fires on the first
      * check after the event starts, and a battery-delayed check fires late instead of never.
-     * Consumed events are remembered per event instant and trigger identity (calendar,
+     * Consumed events are remembered per event, occurrence and trigger identity (calendar,
      * anticipation, title filter), never by trigger position, so they cannot fire twice even
-     * if the trigger list is edited or reordered. Every evaluation logs what the trigger saw,
-     * so the diagnostic is never blind for calendar triggers.
+     * if the trigger list is edited or reordered, and a different event later synced with the
+     * same start instant still fires (its event id differs). Every evaluation logs what the
+     * trigger saw, so the diagnostic is never blind for calendar triggers.
      */
     private fun calendarTriggerFires(automationId: Long, trigger: JSONObject, windowStartMs: Long): Boolean {
         val calendarId = trigger.optLong("calendarId", -1L)
@@ -492,9 +493,11 @@ class AdvancedAutomationEngine @Inject constructor(
         var fires = false
         for (event in events) {
             if (AutomationTriggerMath.calendarShouldFire(event.startMs, minutesBefore, now, windowStartMs)) {
-                val key = AutomationTriggerMath.calendarConsumedKey(automationId, event.startMs, attrs)
-                if (!statePrefs.getBoolean(key, false)) {
-                    statePrefs.edit().putBoolean(key, true).apply()
+                val keys = AutomationTriggerMath.calendarConsumptionKeys(automationId, event.eventId, event.startMs, attrs)
+                if (keys.none { statePrefs.getBoolean(it, false) }) {
+                    statePrefs.edit().putBoolean(
+                        AutomationTriggerMath.calendarConsumedKey(automationId, event.eventId, event.startMs, attrs), true
+                    ).apply()
                     fires = true
                     DiagnosticLog.log(context, "MOTOR", "$label: evento «${event.title}» del ${formatDateTime(event.startMs)}: TOCA, se ejecuta (retraso ${(now - (event.startMs - minutesBefore * 60_000L)) / 1000}s)")
                 }
