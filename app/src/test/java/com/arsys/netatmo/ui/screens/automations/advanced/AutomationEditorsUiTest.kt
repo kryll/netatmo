@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
 import com.arsys.netatmo.ui.theme.NetatmoTheme
 import org.junit.Assert.assertEquals
@@ -109,12 +110,13 @@ class AutomationEditorsUiTest {
     }
 
     @Test
-    fun conditionEditor_editingTimeWindow_prefillsHours() {
+    fun conditionEditor_editingTimeWindow_prefillsAndSavesEditedValue() {
+        var saved: Map<String, Any>? = null
         composeRule.setContent {
             NetatmoTheme {
                 ConditionEditorBottomSheet(
                     onDismiss = {},
-                    onAdd = {},
+                    onAdd = { saved = it },
                     initial = mapOf("type" to "time_range", "after" to "22:30", "before" to "06:15")
                 )
             }
@@ -125,7 +127,16 @@ class AutomationEditorsUiTest {
         composeRule.onNodeWithText("Editar condición", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("22:30", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("06:15", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+
+        // Edit the start hour, scroll down like a user, and save: the stored map
+        // must carry the edited value, not the original one.
+        composeRule.onNodeWithText("22:30", useUnmergedTree = true).performTextReplacement("23:15")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Guardar cambios", useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals("time_range", saved?.get("type"))
+        assertEquals("23:15", saved?.get("after"))
+        assertEquals("06:15", saved?.get("before"))
     }
 
     @Test
