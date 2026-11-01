@@ -14,7 +14,6 @@ import com.arsys.netatmo.data.repository.ApiResult
 import com.arsys.netatmo.data.repository.AutomationRepository
 import com.arsys.netatmo.data.repository.ThermostatRepository
 import android.os.Build
-import android.provider.CalendarContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -47,6 +46,7 @@ class AdvancedAutomationEngine @Inject constructor(
 ) {
     private companion object {
         const val STATE_PREFS = "advanced_automation_state"
+        const val KEY_LAST_EVAL_MS = "last_eval_ms"
         // Avoids re-running when a value hovers around its threshold.
         const val MIN_REPEAT_MS = 60L * 60 * 1000
         val BOOST_STEPS = listOf(1.0, 1.5, 2.0)
@@ -62,21 +62,58 @@ class AdvancedAutomationEngine @Inject constructor(
 
     suspend fun evaluateAndExecuteAll() {
         evaluationMutex.withLock {
+            val now = System.currentTimeMillis()
+            if (statePrefs.getLong(KEY_LAST_EVAL_MS, 0L) <= 0L) {
+                // No reliable evaluation history (fresh install, upgrade from a version
+                // without windowing, or app-data reset): the fire window starts NOW and is
+                // persisted BEFORE anything evaluates, so events whose trigger instant lies
+                // in the unknown past never fire; only future instants do.
+                statePrefs.edit().putLong(KEY_LAST_EVAL_MS, now).apply()
+            }
+            val windowStartMs = calendarWindowStart(now)
             val automations = advancedAutomationRepository.getEnabledAdvancedAutomations()
             DiagnosticLog.log(context, "MOTOR", "Evaluando ${automations.size} automatización(es) activas")
             automations.forEach { automation ->
-                evaluateAndExecute(automation)
+                evaluateAndExecute(automation, windowStartMs)
             }
+            statePrefs.edit().putLong(KEY_LAST_EVAL_MS, now).apply()
         }
     }
+
+    /**
+     * Start of the fire window for calendar triggers: the previous evaluation (periodic,
+     * immediate or alarm-driven), or NOW when there is no reliable history (first run after
+     * install, upgrade or app-data reset; evaluateAndExecuteAll persists that boundary before
+     * evaluating, so the unknown past can never re-fire). Each automation narrows it further:
+     * never before its own creation nor before its last save or re-enable (see the overload
+     * below).
+     */
+    private fun calendarWindowStart(nowMs: Long): Long {
+        val last = statePrefs.getLong(KEY_LAST_EVAL_MS, 0L)
+        return if (last > 0) last else nowMs
+    }
+
+    /**
+     * Per-automation fire-window start for calendar triggers: never before the global previous
+     * evaluation, never before the automation was created, and never before its last save or
+     * re-enable ("tcal_since_<id>", written by the editor and the enable toggle). Enabling an
+     * old automation or changing its calendar or title filter cannot re-fire matches from
+     * before that moment; only matches since then fire, late rather than never.
+     */
+    private fun calendarWindowStart(automation: AdvancedAutomationEntity, globalWindowStartMs: Long): Long =
+        maxOf(globalWindowStartMs, automation.createdAt, statePrefs.getLong("tcal_since_${automation.id}", 0L))
 
     /**
      * An automation runs when one of its triggers fires and its conditions hold. Without triggers
      * it runs when its conditions start being met. Never on every periodic check.
      */
-    suspend fun evaluateAndExecute(automation: AdvancedAutomationEntity) {
+    suspend fun evaluateAndExecute(
+        automation: AdvancedAutomationEntity,
+        windowStartMs: Long = calendarWindowStart(System.currentTimeMillis())
+    ) {
         try {
             migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
+            migrateCalendarConsumption(context, advancedAutomationRepository, automation.id)
             val triggers = JSONArray(automation.triggersJson)
             var firedTrigger: JSONObject? = null
             val shouldRun: Boolean
@@ -87,7 +124,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 statePrefs.edit().putBoolean(metKey, conditionsMet).apply()
                 shouldRun = conditionsMet && !wasMet
             } else {
-                firedTrigger = findFiringTrigger(automation.id, triggers)
+                firedTrigger = findFiringTrigger(automation.id, triggers, calendarWindowStart(automation, windowStartMs))
                 shouldRun = firedTrigger != null && evaluateConditions(automation)
             }
             if (firedTrigger != null || triggers.length() == 0) {
@@ -176,6 +213,7 @@ class AdvancedAutomationEngine @Inject constructor(
      */
     suspend fun testRun(automation: AdvancedAutomationEntity): String {
         migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
+        migrateCalendarConsumption(context, advancedAutomationRepository, automation.id)
         val report = StringBuilder()
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) {
@@ -210,15 +248,17 @@ class AdvancedAutomationEngine @Inject constructor(
                         if (inside && activeTrigger == null) { triggerActive = true; activeTrigger = trigger }
                     }
                     "calendar" -> {
-                        val next = queryUpcomingEvents(
+                        val next = CalendarEventQuery.queryEvents(
+                            context,
                             trigger.optLong("calendarId", -1L),
                             trigger.optString("title").ifBlank { null },
-                            System.currentTimeMillis(), 7L * 24 * 60 * 60 * 1000
+                            System.currentTimeMillis(), System.currentTimeMillis() + 7L * 24 * 60 * 60 * 1000
                         ).firstOrNull()
                         report.appendLine("Disparador ${i + 1}: calendario «${trigger.optString("calendarName")}»" +
                             (trigger.optString("title").ifBlank { "" }.let { if (it.isEmpty()) "" else " con «$it»" }) +
                             ", ${trigger.optInt("minutesBefore", 30)} min antes: " +
                             (next?.let { "próximo evento «${it.title}» el ${formatDateTime(it.startMs)}" } ?: "sin eventos próximos en 7 días") +
+                            (if (CalendarEventQuery.hasCalendarPermission(context)) "" else " AVISO: sin permiso de lectura de calendario; no se puede comprobar.") +
                             " (se evalúa cuando toca, no se puede forzar aquí)")
                     }
                     "datetime" -> {
@@ -371,7 +411,7 @@ class AdvancedAutomationEngine @Inject constructor(
      * window after their time; temperature triggers fire when the value crosses the threshold.
      * Every trigger is evaluated so its stored state stays current.
      */
-    private suspend fun findFiringTrigger(automationId: Long, triggers: JSONArray): JSONObject? {
+    private suspend fun findFiringTrigger(automationId: Long, triggers: JSONArray, windowStartMs: Long): JSONObject? {
         val typeAtPairs = (0 until triggers.length()).map {
             val t = triggers.getJSONObject(it)
             t.optString("type") to t.optLong("at", 0L)
@@ -389,7 +429,7 @@ class AdvancedAutomationEngine @Inject constructor(
                     active == true && !wasActive
                 }
                 "time_window" -> timeWindowActive(trigger)
-                "calendar" -> calendarTriggerFires(automationId, i, trigger)
+                "calendar" -> calendarTriggerFires(automationId, trigger, windowStartMs)
                 "datetime" -> datetimeTriggerFires(automationId, AutomationTriggerMath.datetimeOccurrence(typeAtPairs, i), trigger)
                 else -> false // "sun" is not evaluated yet; "geofence" runs from onZoneTransition
             }
@@ -430,29 +470,53 @@ class AdvancedAutomationEngine @Inject constructor(
     }
 
     /**
-     * Fires once per matching calendar event, [minutesBefore] before it starts. The periodic
-     * worker polls every ~15 min; a consumed event is remembered so it cannot fire twice.
+     * Fires once per matching calendar event, [minutesBefore] before it starts. The trigger
+     * instant must fall after the previous evaluation ([windowStartMs], never before the
+     * automation existed) and not after now: a "0 minutes before" trigger fires on the first
+     * check after the event starts, and a battery-delayed check fires late instead of never.
+     * Consumed events are remembered per event, occurrence and trigger identity (calendar,
+     * anticipation, title filter), never by trigger position, so they cannot fire twice even
+     * if the trigger list is edited or reordered, and a different event later synced with the
+     * same start instant still fires (its event id differs). Every evaluation logs what the
+     * trigger saw, so the diagnostic is never blind for calendar triggers.
      */
-    private fun calendarTriggerFires(automationId: Long, index: Int, trigger: JSONObject): Boolean {
+    private fun calendarTriggerFires(automationId: Long, trigger: JSONObject, windowStartMs: Long): Boolean {
         val calendarId = trigger.optLong("calendarId", -1L)
         if (calendarId < 0) return false
         val minutesBefore = trigger.optInt("minutesBefore", 30).coerceAtLeast(0)
+        val label = "Disparador calendario «${trigger.optString("calendarName")}»" +
+            trigger.optString("title").ifBlank { "" }.let { if (it.isEmpty()) "" else " con «$it»" } +
+            ", $minutesBefore min antes"
+        val attrs = AutomationTriggerMath.CalendarTriggerAttrs(calendarId, minutesBefore, trigger.optString("title"))
+        if (!CalendarEventQuery.hasCalendarPermission(context)) {
+            DiagnosticLog.log(context, "MOTOR", "$label: SIN PERMISO de lectura de calendario; no se puede evaluar. Concédelo en Ajustes del móvil > Aplicaciones > Netatmo Smart > Permisos.")
+            return false
+        }
         val now = System.currentTimeMillis()
-        val events = queryUpcomingEvents(
+        val events = CalendarEventQuery.queryEvents(
+            context,
             calendarId,
             trigger.optString("title").ifBlank { null },
-            now,
-            (minutesBefore + 15) * 60_000L
+            windowStartMs, now + 7L * 24 * 60 * 60 * 1000
         )
         var fires = false
         for (event in events) {
-            if (AutomationTriggerMath.calendarShouldFire(event.startMs, minutesBefore, now)) {
-                val key = "tcal_${automationId}_${index}_${event.startMs}"
-                if (!statePrefs.getBoolean(key, false)) {
-                    statePrefs.edit().putBoolean(key, true).apply()
+            if (AutomationTriggerMath.calendarShouldFire(event.startMs, minutesBefore, now, windowStartMs)) {
+                val keys = AutomationTriggerMath.calendarConsumptionKeys(automationId, event.eventId, event.startMs, attrs)
+                if (keys.none { statePrefs.getBoolean(it, false) }) {
+                    statePrefs.edit().putBoolean(
+                        AutomationTriggerMath.calendarConsumedKey(automationId, event.eventId, event.startMs, attrs), true
+                    ).apply()
                     fires = true
+                    DiagnosticLog.log(context, "MOTOR", "$label: evento «${event.title}» del ${formatDateTime(event.startMs)}: TOCA, se ejecuta (retraso ${(now - (event.startMs - minutesBefore * 60_000L)) / 1000}s)")
                 }
             }
+        }
+        if (!fires) {
+            val next = events.firstOrNull { it.startMs - minutesBefore * 60_000L > now }
+            DiagnosticLog.log(context, "MOTOR", "$label: " +
+                (next?.let { "próximo evento «${it.title}» el ${formatDateTime(it.startMs)}, aún no toca" }
+                    ?: "sin eventos que coincidan entre la última comprobación y 7 días"))
         }
         return fires
     }
@@ -472,34 +536,6 @@ class AdvancedAutomationEngine @Inject constructor(
         DiagnosticLog.log(context, "MOTOR", "Disparador fecha ${DiagnosticLog.fmt(at)}: VENCIDO, se ejecuta (retraso ${(nowMs - at) / 1000}s)")
         statePrefs.edit().putBoolean(key, true).apply()
         return true
-    }
-
-    private data class CalendarEventReading(val title: String, val startMs: Long)
-
-    private fun queryUpcomingEvents(calendarId: Long, titleFilter: String?, nowMs: Long, withinMs: Long): List<CalendarEventReading> {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALENDAR) !=
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) return emptyList()
-        val events = mutableListOf<CalendarEventReading>()
-        val projection = arrayOf(CalendarContract.Events.TITLE, CalendarContract.Events.DTSTART)
-        val selection = "${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.DTSTART} BETWEEN ? AND ?"
-        val args = arrayOf(calendarId.toString(), nowMs.toString(), (nowMs + withinMs).toString())
-        try {
-            context.contentResolver.query(
-                CalendarContract.Events.CONTENT_URI, projection, selection, args,
-                "${CalendarContract.Events.DTSTART} ASC"
-            )?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val title = cursor.getString(0) ?: ""
-                    if (titleFilter == null || title.contains(titleFilter, ignoreCase = true)) {
-                        events.add(CalendarEventReading(title, cursor.getLong(1)))
-                    }
-                }
-            }
-        } catch (e: SecurityException) {
-            // Calendar permission revoked meanwhile.
-        }
-        return events
     }
 
     private fun formatDateTime(ms: Long): String {
@@ -828,3 +864,4 @@ class AdvancedAutomationEngine @Inject constructor(
     private fun formatTemp(value: Double): String =
         if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(Locale("es", "ES"), value)
 }
+

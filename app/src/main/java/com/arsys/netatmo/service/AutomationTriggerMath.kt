@@ -23,16 +23,100 @@ object AutomationTriggerMath {
 
     /**
      * Whether a calendar event starting at [eventStartMs] triggers now: its trigger instant
-     * ([minutesBefore] before the start) fell inside the last poll window ending at [nowMs].
+     * ([minutesBefore] before the start) falls after the previous evaluation ([windowStartMs])
+     * and not after [nowMs]. With the default window this is the last poll period; the engine
+     * passes the real previous-check time, so a check delayed by the battery fires late instead
+     * of never, and a "0 minutes before" trigger fires on the first check after the event starts.
      */
     fun calendarShouldFire(
         eventStartMs: Long,
         minutesBefore: Int,
         nowMs: Long,
-        pollMs: Long = DEFAULT_POLL_MS
+        windowStartMs: Long = nowMs - DEFAULT_POLL_MS
     ): Boolean {
         val triggerTime = eventStartMs - minutesBefore * 60_000L
-        return triggerTime in (nowMs - pollMs)..nowMs
+        return triggerTime in (windowStartMs + 1)..nowMs
+    }
+
+    /** Attributes identifying a calendar trigger, independent of its position in the list. */
+    data class CalendarTriggerAttrs(val calendarId: Long, val minutesBefore: Int, val titleFilter: String)
+
+    /**
+     * Consumption key for a calendar trigger, per EVENT + OCCURRENCE + trigger identity
+     * (calendar, anticipation and title filter), never by list position: reordering,
+     * inserting or deleting triggers never replays an already-fired event; two triggers with
+     * different calendars, filters or anticipations fire independently for the same event;
+     * two DIFFERENT events starting at the same instant fire independently (their event ids
+     * differ), even when one was consumed before the other was created or synced.
+     * "tcal2_" is textually distinct from the legacy positional "tcal_<id>_<index>_<startMs>"
+     * marks and from the migrated "tcalm_" tombstones below.
+     */
+    fun calendarConsumedKey(automationId: Long, eventId: Long, eventStartMs: Long, attrs: CalendarTriggerAttrs): String =
+        "tcal2_${automationId}_${eventId}_${eventStartMs}_${attrs.calendarId}_${attrs.minutesBefore}_${attrs.titleFilter}"
+
+    /**
+     * Suppression-only tombstone produced by the migration of a legacy positional mark: the
+     * legacy format kept no event id, so it suppresses ANY event at that start instant for
+     * that trigger identity. Deliberately conservative (never re-fires a consumed event);
+     * the declared residual is that a genuinely different event created or synced later with
+     * the EXACT same start instant under the same trigger is suppressed too.
+     */
+    fun calendarMigratedKey(automationId: Long, eventStartMs: Long, attrs: CalendarTriggerAttrs): String =
+        "tcalm_${automationId}_${eventStartMs}_${attrs.calendarId}_${attrs.minutesBefore}_${attrs.titleFilter}"
+
+    /**
+     * Keys that mark [eventStartMs]/[eventId] as consumed for [attrs]: the per-event key and
+     * the migration tombstone. An event is consumed when ANY of them is present.
+     */
+    fun calendarConsumptionKeys(automationId: Long, eventId: Long, eventStartMs: Long, attrs: CalendarTriggerAttrs): Set<String> =
+        setOf(
+            calendarConsumedKey(automationId, eventId, eventStartMs, attrs),
+            calendarMigratedKey(automationId, eventStartMs, attrs)
+        )
+
+    /**
+     * One-time translation of legacy positional calendar marks ("tcal_<id>_<index>_<startMs>")
+     * to suppression tombstones, using the trigger CURRENTLY at each legacy index (same
+     * conservative rule as the datetime migration: exact for every history whose trigger list
+     * kept its structure since the mark was written; legacy indices that no longer hold a
+     * calendar trigger are dropped). All-day events fired under the legacy code were marked
+     * with their UTC-midnight start while the new code keys them by local midnight, so for
+     * UTC-midnight instants BOTH tombstones are written: an already-fired all-day event can
+     * only be suppressed, never re-fired.
+     */
+    fun calendarKeyMigration(
+        automationId: Long,
+        legacyKeys: Set<String>,
+        calendarTriggersByIndex: Map<Int, CalendarTriggerAttrs>,
+        zone: java.util.TimeZone = java.util.TimeZone.getDefault()
+    ): Set<String> {
+        val legacyPrefix = "tcal_${automationId}_"
+        return legacyKeys.flatMap { key ->
+            if (!key.startsWith(legacyPrefix)) return@flatMap emptySet()
+            val rest = key.removePrefix(legacyPrefix)
+            val index = rest.substringBefore('_').toIntOrNull() ?: return@flatMap emptySet()
+            val startMs = rest.substringAfter('_').toLongOrNull() ?: return@flatMap emptySet()
+            val attrs = calendarTriggersByIndex[index] ?: return@flatMap emptySet()
+            buildSet {
+                add(calendarMigratedKey(automationId, startMs, attrs))
+                if (startMs % 86_400_000L == 0L) {
+                    add(calendarMigratedKey(automationId, allDayLocalStart(startMs, zone), attrs))
+                }
+            }
+        }.toSet()
+    }
+
+    /**
+     * Device-zone start of an all-day calendar event, whose instance BEGIN comes as UTC
+     * midnight of the event's date: an all-day "Nov 2" triggers at 00:00 local on Nov 2,
+     * not at 01:00/02:00 (UTC midnight shifted, e.g. in Europe/Madrid).
+     */
+    fun allDayLocalStart(utcMidnightMs: Long, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): Long {
+        val utc = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcMidnightMs }
+        return java.util.Calendar.getInstance(zone).apply {
+            clear()
+            set(utc.get(java.util.Calendar.YEAR), utc.get(java.util.Calendar.MONTH), utc.get(java.util.Calendar.DAY_OF_MONTH), 0, 0, 0)
+        }.timeInMillis
     }
 
     /** One-shot instant trigger: fires at or after [atMs], only once (not when [consumed]). */
@@ -115,3 +199,4 @@ object AutomationTriggerMath {
     fun nextDatetimeInstant(atMs: Long, consumed: Boolean): Long? =
         if (atMs > 0 && !consumed) atMs else null
 }
+

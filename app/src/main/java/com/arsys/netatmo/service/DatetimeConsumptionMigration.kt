@@ -136,3 +136,75 @@ internal suspend fun migrateDatetimeConsumption(
 ) = saveAutomationStateMutex.withLock {
     migrateDatetimeConsumptionLocked(context, repository, automationId)
 }
+
+/** Legacy calendar marks are "tcal_<id>_<index>_<startMs>"; "tcal2_" keys never match this scan. */
+internal fun legacyCalendarKeys(automationId: Long, keys: Set<String>): Set<String> {
+    val legacyPrefix = "tcal_${automationId}_"
+    return keys.filter { it.startsWith(legacyPrefix) }.toSet()
+}
+
+/** Index -> calendar trigger attributes, parsed from the stored trigger list. */
+internal fun parseCalendarTriggerAttrs(triggersJson: String): Map<Int, AutomationTriggerMath.CalendarTriggerAttrs> = try {
+    val arr = JSONArray(triggersJson)
+    (0 until arr.length()).mapNotNull { i ->
+        val trigger = arr.getJSONObject(i)
+        if (trigger.optString("type") != "calendar") return@mapNotNull null
+        i to AutomationTriggerMath.CalendarTriggerAttrs(
+            calendarId = trigger.optLong("calendarId", -1L),
+            minutesBefore = trigger.optInt("minutesBefore", 30).coerceAtLeast(0),
+            titleFilter = trigger.optString("title")
+        )
+    }.toMap()
+} catch (e: Exception) {
+    emptyMap()
+}
+
+/**
+ * One-time translation of an automation's legacy calendar consumption marks
+ * ("tcal_<id>_<index>_<startMs>", positional) to suppression tombstones ("tcalm_...", without
+ * event id: the legacy format kept none). Runs before the first consumption read of each
+ * engine path (evaluate, test, reschedule), like the datetime migration. CALLER MUST HOLD
+ * saveAutomationStateMutex. [readTriggersJson] must return the trigger list CURRENTLY STORED
+ * (fresh read): the legacy marks are positional, so their translation is only exact against
+ * the structure they were written for. The whole translation lands in ONE commit: a crash
+ * leaves either the legacy state untouched or the migration fully applied.
+ * Tombstones only suppress, never fire: an already-consumed event cannot re-run its actions
+ * after the upgrade. Declared residual: a genuinely different event created or synced AFTER
+ * the upgrade with the EXACT same start instant under the same trigger identity is suppressed
+ * too; the legacy marks carry no event id to tell them apart, and re-firing heating actions
+ * is the worse error. Legacy indices that no longer hold a calendar trigger are dropped.
+ */
+internal suspend fun migrateCalendarConsumptionLocked(
+    automationId: Long,
+    readTriggersJson: suspend () -> String?,
+    store: DatetimeStateStore,
+    log: (String) -> Unit
+) {
+    val guardKey = "mig2_tcal_$automationId"
+    if (store.getBoolean(guardKey)) return
+    val triggersJson = readTriggersJson()
+    if (triggersJson == null) {
+        // Automation deleted: nothing to translate; set the guard so we stop rescanning.
+        store.commit(emptySet(), mapOf(guardKey to true))
+        return
+    }
+    val legacy = legacyCalendarKeys(automationId, store.allKeys())
+    val migrated = AutomationTriggerMath.calendarKeyMigration(automationId, legacy, parseCalendarTriggerAttrs(triggersJson))
+    store.commit(legacy, migrated.associateWith { true } + (guardKey to true))
+    if (legacy.isNotEmpty()) {
+        log("Automatización $automationId: ${legacy.size} marca(s) de disparador calendario migradas al nuevo formato (conservan su consumo)")
+    }
+}
+
+internal suspend fun migrateCalendarConsumption(
+    context: Context,
+    repository: AdvancedAutomationRepository,
+    automationId: Long
+) = saveAutomationStateMutex.withLock {
+    val statePrefs = context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+    migrateCalendarConsumptionLocked(
+        automationId = automationId,
+        readTriggersJson = { repository.getById(automationId)?.triggersJson },
+        store = prefsStateStore(statePrefs)
+    ) { message -> DiagnosticLog.log(context, "MOTOR", message) }
+}
