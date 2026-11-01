@@ -168,4 +168,23 @@ class AutomationActionTargetsUiTest {
         assertEquals(7L, saved?.get("automationId"))
         assertEquals("Convivencia fuera", saved?.get("automationName"))
     }
+
+    @Test
+    fun actionEditor_automationAction_footerReachableByScroll() {
+        // The sheet must scroll so the note and the save button are reachable at
+        // narrow sizes; capture the scrolled footer for visual inspection.
+        var saved: Map<String, Any>? = null
+        openSheet(onAdd = { saved = it })
+        composeRule.onNodeWithText("Automatización", useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onAllNodesWithText("Añadir acción", useUnmergedTree = true).onLast().performScrollTo()
+        composeRule.waitForIdle()
+        captureSheet("action-add-automatizacion-footer")
+
+        composeRule.onAllNodesWithText("Añadir acción", useUnmergedTree = true).onLast().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Añadir acción", useUnmergedTree = true).onLast().performClick()
+        composeRule.waitForIdle()
+        assertEquals("run_automation", saved?.get("type"))
+    }
 }
