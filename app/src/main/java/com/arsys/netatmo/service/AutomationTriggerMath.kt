@@ -42,25 +42,47 @@ object AutomationTriggerMath {
     data class CalendarTriggerAttrs(val calendarId: Long, val minutesBefore: Int, val titleFilter: String)
 
     /**
-     * Consumption key for a calendar trigger, per EVENT instant and trigger identity
+     * Consumption key for a calendar trigger, per EVENT + OCCURRENCE + trigger identity
      * (calendar, anticipation and title filter), never by list position: reordering,
-     * inserting or deleting triggers never replays an already-fired event, and two triggers
-     * with different calendars, filters or anticipations fire independently for the same
-     * event, exactly as the legacy positional keys did. "tcal2_" is textually distinct from
-     * the legacy positional "tcal_<id>_<index>_<startMs>" marks.
+     * inserting or deleting triggers never replays an already-fired event; two triggers with
+     * different calendars, filters or anticipations fire independently for the same event;
+     * two DIFFERENT events starting at the same instant fire independently (their event ids
+     * differ), even when one was consumed before the other was created or synced.
+     * "tcal2_" is textually distinct from the legacy positional "tcal_<id>_<index>_<startMs>"
+     * marks and from the migrated "tcalm_" tombstones below.
      */
-    fun calendarConsumedKey(automationId: Long, eventStartMs: Long, attrs: CalendarTriggerAttrs): String =
-        "tcal2_${automationId}_${eventStartMs}_${attrs.calendarId}_${attrs.minutesBefore}_${attrs.titleFilter}"
+    fun calendarConsumedKey(automationId: Long, eventId: Long, eventStartMs: Long, attrs: CalendarTriggerAttrs): String =
+        "tcal2_${automationId}_${eventId}_${eventStartMs}_${attrs.calendarId}_${attrs.minutesBefore}_${attrs.titleFilter}"
+
+    /**
+     * Suppression-only tombstone produced by the migration of a legacy positional mark: the
+     * legacy format kept no event id, so it suppresses ANY event at that start instant for
+     * that trigger identity. Deliberately conservative (never re-fires a consumed event);
+     * the declared residual is that a genuinely different event created or synced later with
+     * the EXACT same start instant under the same trigger is suppressed too.
+     */
+    fun calendarMigratedKey(automationId: Long, eventStartMs: Long, attrs: CalendarTriggerAttrs): String =
+        "tcalm_${automationId}_${eventStartMs}_${attrs.calendarId}_${attrs.minutesBefore}_${attrs.titleFilter}"
+
+    /**
+     * Keys that mark [eventStartMs]/[eventId] as consumed for [attrs]: the per-event key and
+     * the migration tombstone. An event is consumed when ANY of them is present.
+     */
+    fun calendarConsumptionKeys(automationId: Long, eventId: Long, eventStartMs: Long, attrs: CalendarTriggerAttrs): Set<String> =
+        setOf(
+            calendarConsumedKey(automationId, eventId, eventStartMs, attrs),
+            calendarMigratedKey(automationId, eventStartMs, attrs)
+        )
 
     /**
      * One-time translation of legacy positional calendar marks ("tcal_<id>_<index>_<startMs>")
-     * to per-event keys, using the trigger CURRENTLY at each legacy index (same conservative
-     * rule as the datetime migration: exact for every history whose trigger list kept its
-     * structure since the mark was written; legacy indices that no longer hold a calendar
-     * trigger are dropped). All-day events fired under the legacy code were marked with their
-     * UTC-midnight start while the new code keys them by local midnight, so for UTC-midnight
-     * instants BOTH keys are written: an already-fired all-day event can only be suppressed,
-     * never re-fired.
+     * to suppression tombstones, using the trigger CURRENTLY at each legacy index (same
+     * conservative rule as the datetime migration: exact for every history whose trigger list
+     * kept its structure since the mark was written; legacy indices that no longer hold a
+     * calendar trigger are dropped). All-day events fired under the legacy code were marked
+     * with their UTC-midnight start while the new code keys them by local midnight, so for
+     * UTC-midnight instants BOTH tombstones are written: an already-fired all-day event can
+     * only be suppressed, never re-fired.
      */
     fun calendarKeyMigration(
         automationId: Long,
@@ -76,9 +98,9 @@ object AutomationTriggerMath {
             val startMs = rest.substringAfter('_').toLongOrNull() ?: return@flatMap emptySet()
             val attrs = calendarTriggersByIndex[index] ?: return@flatMap emptySet()
             buildSet {
-                add(calendarConsumedKey(automationId, startMs, attrs))
+                add(calendarMigratedKey(automationId, startMs, attrs))
                 if (startMs % 86_400_000L == 0L) {
-                    add(calendarConsumedKey(automationId, allDayLocalStart(startMs, zone), attrs))
+                    add(calendarMigratedKey(automationId, allDayLocalStart(startMs, zone), attrs))
                 }
             }
         }.toSet()
