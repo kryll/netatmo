@@ -3,7 +3,6 @@ package com.arsys.netatmo.ui.screens.automations.advanced
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -171,7 +170,7 @@ class AutomationEditorsUiTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Editar acción", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNode(hasText("21", substring = true), useUnmergedTree = true).assertExists()
+        composeRule.onNode(hasText("21", substring = true), useUnmergedTree = true).assertIsDisplayed()
         captureSheet("action-edit-settemp")
     }
 }
