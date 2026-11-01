@@ -63,6 +63,13 @@ class AdvancedAutomationEngine @Inject constructor(
     suspend fun evaluateAndExecuteAll() {
         evaluationMutex.withLock {
             val now = System.currentTimeMillis()
+            if (statePrefs.getLong(KEY_LAST_EVAL_MS, 0L) <= 0L) {
+                // No reliable evaluation history (fresh install, upgrade from a version
+                // without windowing, or app-data reset): the fire window starts NOW and is
+                // persisted BEFORE anything evaluates, so events whose trigger instant lies
+                // in the unknown past never fire; only future instants do.
+                statePrefs.edit().putLong(KEY_LAST_EVAL_MS, now).apply()
+            }
             val windowStartMs = calendarWindowStart(now)
             val automations = advancedAutomationRepository.getEnabledAdvancedAutomations()
             DiagnosticLog.log(context, "MOTOR", "Evaluando ${automations.size} automatización(es) activas")
@@ -75,13 +82,15 @@ class AdvancedAutomationEngine @Inject constructor(
 
     /**
      * Start of the fire window for calendar triggers: the previous evaluation (periodic,
-     * immediate or alarm-driven), or one default poll period back when there is none (first
-     * run after install or app-data reset). Each automation narrows it further: never before
-     * its own creation nor before its last save or re-enable (see the overload below).
+     * immediate or alarm-driven), or NOW when there is no reliable history (first run after
+     * install, upgrade or app-data reset; evaluateAndExecuteAll persists that boundary before
+     * evaluating, so the unknown past can never re-fire). Each automation narrows it further:
+     * never before its own creation nor before its last save or re-enable (see the overload
+     * below).
      */
     private fun calendarWindowStart(nowMs: Long): Long {
         val last = statePrefs.getLong(KEY_LAST_EVAL_MS, 0L)
-        return if (last > 0) last else nowMs - AutomationTriggerMath.DEFAULT_POLL_MS
+        return if (last > 0) last else nowMs
     }
 
     /**
