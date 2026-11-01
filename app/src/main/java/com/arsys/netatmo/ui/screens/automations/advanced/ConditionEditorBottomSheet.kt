@@ -34,22 +34,29 @@ import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 @Composable
 fun ConditionEditorBottomSheet(
     onDismiss: () -> Unit,
-    onAdd: (Map<String, Any>) -> Unit
+    onAdd: (Map<String, Any>) -> Unit,
+    initial: Map<String, Any>? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var selectedType by remember { mutableStateOf("time_range") }
-    var fromTime by remember { mutableStateOf("06:00") }
-    var toTime by remember { mutableStateOf("22:00") }
-    var selectedEntity by remember { mutableStateOf("outdoor_temp") }
-    var selectedCondition by remember { mutableStateOf("below") }
-    var threshold by remember { mutableFloatStateOf(20f) }
+    // When editing an existing condition, start from its stored values.
+    val prefill = remember { initial?.let { prefillCondition(it) } }
+
+    var selectedType by remember { mutableStateOf(prefill?.type?.ifBlank { "time_range" } ?: "time_range") }
+    var fromTime by remember { mutableStateOf(prefill?.fromTime ?: "06:00") }
+    var toTime by remember { mutableStateOf(prefill?.toTime ?: "22:00") }
+    var selectedEntity by remember { mutableStateOf(prefill?.entity ?: "outdoor_temp") }
+    var selectedCondition by remember { mutableStateOf(prefill?.condition ?: "below") }
+    var threshold by remember { mutableFloatStateOf(prefill?.threshold ?: 20f) }
 
     val conditionTypes = listOf(
         "time_range" to "Rango horario",
         "numeric_state" to "Temperatura",
         "presence" to "Presencia"
     )
+
+    // A stored condition whose type this editor does not know is left untouched.
+    val unknownType = initial != null && conditionTypes.none { it.first == prefill?.type }
 
     val tertiary = MaterialTheme.colorScheme.tertiary
 
@@ -68,11 +75,20 @@ fun ConditionEditorBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Añadir condición",
+                text = if (initial == null) "Añadir condición" else "Editar condición",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
+            if (unknownType) {
+                Text(
+                    "Esta condición («${prefill?.type}») no se puede editar aquí. " +
+                        "Elimínala y créala de nuevo si necesitas cambiarla.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else {
 
             SheetLabel("Tipo de condición")
             WrappingFilterChips(
@@ -139,6 +155,9 @@ fun ConditionEditorBottomSheet(
                 }
             }
 
+            }
+
+            if (!unknownType) {
             Spacer(Modifier.height(4.dp))
 
             Button(
@@ -171,7 +190,12 @@ fun ConditionEditorBottomSheet(
                     contentColor = MaterialTheme.colorScheme.onSurface
                 )
             ) {
-                Text("Añadir condición", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (initial == null) "Añadir condición" else "Guardar cambios",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             }
 
             TextButton(
