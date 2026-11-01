@@ -139,6 +139,7 @@ dependencies {
     testImplementation("org.json:json:20240303")
     testImplementation(libs.robolectric)
     "robolectricDeps"("org.robolectric:android-all-instrumented:14-robolectric-10818077-i7")
+    "robolectricDeps"("org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
     testImplementation(libs.androidx.junit)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.ui.test.junit4)
