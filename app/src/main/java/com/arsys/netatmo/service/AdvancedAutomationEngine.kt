@@ -626,7 +626,11 @@ class AdvancedAutomationEngine @Inject constructor(
         DiagnosticLog.log(context, "ACCION", ApiResultLog.describe(what, result))
     }
 
-    private suspend fun executeActions(automation: AdvancedAutomationEntity, alert: TemperatureAlert?): List<Int> {
+    private suspend fun executeActions(
+        automation: AdvancedAutomationEntity,
+        alert: TemperatureAlert?,
+        chain: Set<Long> = setOf(automation.id)
+    ): List<Int> {
         val actions = JSONArray(automation.actionsJson)
         val postedNotificationIds = mutableListOf<Int>()
         // Diagnostic: record what the stored automation actually asks to run. Without this
@@ -637,13 +641,18 @@ class AdvancedAutomationEngine @Inject constructor(
         }
         DiagnosticLog.log(context, "ACCION", "Ejecutando ${actions.length()} acción(es): ${types.joinToString(", ")}")
         for (i in 0 until actions.length()) {
-            executeAction(actions.getJSONObject(i), alert, automation.name)?.let { postedNotificationIds.add(it) }
+            postedNotificationIds.addAll(executeAction(actions.getJSONObject(i), alert, automation.name, chain))
         }
         return postedNotificationIds
     }
 
-    /** Returns the posted notification id for "notify" actions, null for anything else. */
-    private suspend fun executeAction(action: JSONObject, alert: TemperatureAlert?, automationName: String): Int? {
+    /** Returns the posted notification ids ("notify" actions, including chained automations'). */
+    private suspend fun executeAction(
+        action: JSONObject,
+        alert: TemperatureAlert?,
+        automationName: String,
+        chain: Set<Long>
+    ): List<Int> {
         when (action.optString("type")) {
             "set_temperature" -> {
                 val homeId = action.optString("homeId")
@@ -673,7 +682,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 val values = notificationValues(requested, automationName, alert)
                 val title = NotificationTemplate.render(rawTitle, values)
                 val message = NotificationTemplate.render(rawMessage, values)
-                return if (alert != null) notifyTemperatureAlert(title, message, alert) else notifyPlain(title, message)
+                return listOf(if (alert != null) notifyTemperatureAlert(title, message, alert) else notifyPlain(title, message))
             }
             "set_home_mode" -> {
                 val mode = action.optString("mode", "schedule")
@@ -697,7 +706,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 val scenario = automationRepository.getScenarioById(scenarioId)
                 if (scenario == null) {
                     DiagnosticLog.log(context, "ACCION", "Escenario $scenarioId no encontrado: se ignora")
-                    return null
+                    return emptyList()
                 }
                 DiagnosticLog.log(context, "ACCION", "Aplicando escenario '${scenario.name}' (${JSONArray(scenario.actionsJson).length()} acción(es))")
                 val scenarioActions = JSONArray(scenario.actionsJson)
@@ -710,9 +719,70 @@ class AdvancedAutomationEngine @Inject constructor(
                     }
                 }
             }
+            "set_schedule" -> {
+                val scheduleId = action.optString("scheduleId")
+                val scheduleName = action.optString("scheduleName").ifBlank { scheduleId }
+                if (scheduleId.isBlank()) {
+                    DiagnosticLog.log(context, "ACCION", "Programa: ninguno elegido, se ignora")
+                } else {
+                    val homeId = resolveHomeId(action.optString("homeId", ""))
+                    check(homeId.isNotEmpty()) { "No hay instalación disponible" }
+                    val switched = thermostatRepository.switchSchedule(homeId, scheduleId)
+                    logApiResult("Activar programa «$scheduleName»", switched)
+                    if (!ApiResultLog.isError(switched)) {
+                        // Same sequence as the Programs screen: after choosing the schedule the
+                        // home must be back in "schedule" mode, or an away/hg/off mode keeps
+                        // ruling and the chosen program does nothing.
+                        logApiResult("Modo programado tras activar «$scheduleName»", thermostatRepository.setHomeMode(homeId, "schedule"))
+                    }
+                }
+            }
+            "run_automation" -> return runAutomationAction(action, alert, chain)
             else -> DiagnosticLog.log(context, "ACCION", "Tipo de acción desconocido '${action.optString("type")}': se ignora")
         }
-        return null
+        return emptyList()
+    }
+
+    /**
+     * "Run another automation" (José's semantics, 2026-11-01): the target's actions run only
+     * when the target is ENABLED and its CONDITIONS hold right now; its triggers are NOT
+     * evaluated (it did not fire — it is being invoked, so no trigger check applies). A
+     * disabled target or unmet conditions skip the run, always with a diagnostic line, never
+     * silently. [AutomationChain] refuses cycles and chains deeper than its limit, also
+     * logged, so a reference loop can never repeat heating actions.
+     */
+    private suspend fun runAutomationAction(
+        action: JSONObject,
+        alert: TemperatureAlert?,
+        chain: Set<Long>
+    ): List<Int> {
+        val targetId = action.optLong("automationId", -1L)
+        val label = action.optString("automationName").ifBlank { "#$targetId" }
+        val target = if (targetId > 0) advancedAutomationRepository.getById(targetId) else null
+        if (target == null) {
+            DiagnosticLog.log(context, "ACCION", "Automatización «$label» (id $targetId) no encontrada: se ignora")
+            return emptyList()
+        }
+        if (!target.enabled) {
+            DiagnosticLog.log(context, "ACCION", "Automatización «${target.name}» NO ejecutada: está desactivada y solo se invocan automatizaciones activas")
+            return emptyList()
+        }
+        val next = AutomationChain.follow(chain, target.id)
+        if (next == null) {
+            val why = if (target.id in chain) {
+                "ciclo: ya se está ejecutando en esta misma cadena"
+            } else {
+                "la cadena supera ${AutomationChain.MAX_DEPTH} automatizaciones"
+            }
+            DiagnosticLog.log(context, "ACCION", "Automatización «${target.name}» NO ejecutada: $why. Revisa las referencias entre automatizaciones.")
+            return emptyList()
+        }
+        if (!evaluateConditions(target)) {
+            DiagnosticLog.log(context, "ACCION", "Automatización «${target.name}» NO ejecutada: sus condiciones no se cumplen ahora")
+            return emptyList()
+        }
+        DiagnosticLog.log(context, "ACCION", "Automatización «${target.name}»: activa y condiciones cumplidas; ejecutando sus acciones")
+        return executeActions(target, alert, next)
     }
 
     /** Read values at each notification action, including after a delay or a setpoint action. */
