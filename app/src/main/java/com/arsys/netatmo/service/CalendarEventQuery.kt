@@ -6,8 +6,12 @@ import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
 
-/** A calendar event instance: its title and the start of THIS occurrence. */
-data class CalendarEventReading(val title: String, val startMs: Long)
+/**
+ * A calendar event instance: its title, the start of THIS occurrence and the id of the event
+ * it belongs to (stable per CalendarContract.Events row: a recurring series keeps one id for
+ * all its occurrences, a modified occurrence gets its own).
+ */
+data class CalendarEventReading(val title: String, val startMs: Long, val eventId: Long)
 
 /**
  * Reads calendar event instances in [fromMs, toMs] through CalendarContract.Instances, which
@@ -36,7 +40,8 @@ object CalendarEventQuery {
         val projection = arrayOf(
             CalendarContract.Instances.TITLE,
             CalendarContract.Instances.BEGIN,
-            CalendarContract.Instances.ALL_DAY
+            CalendarContract.Instances.ALL_DAY,
+            CalendarContract.Instances.EVENT_ID
         )
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().apply {
             ContentUris.appendId(this, fromMs)
@@ -56,7 +61,7 @@ object CalendarEventQuery {
                         if (cursor.getInt(2) == 1) AutomationTriggerMath.allDayLocalStart(it) else it
                     }
                     if (titleFilter == null || title.contains(titleFilter, ignoreCase = true)) {
-                        events.add(CalendarEventReading(title, startMs))
+                        events.add(CalendarEventReading(title, startMs, cursor.getLong(3)))
                     }
                 }
             }
