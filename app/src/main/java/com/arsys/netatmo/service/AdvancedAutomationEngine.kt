@@ -76,13 +76,23 @@ class AdvancedAutomationEngine @Inject constructor(
     /**
      * Start of the fire window for calendar triggers: the previous evaluation (periodic,
      * immediate or alarm-driven), or one default poll period back when there is none (first
-     * run after install or app-data reset). Each automation also never looks back past its
-     * own creation, so events older than the automation cannot fire.
+     * run after install or app-data reset). Each automation narrows it further: never before
+     * its own creation nor before its last save or re-enable (see the overload below).
      */
     private fun calendarWindowStart(nowMs: Long): Long {
         val last = statePrefs.getLong(KEY_LAST_EVAL_MS, 0L)
         return if (last > 0) last else nowMs - AutomationTriggerMath.DEFAULT_POLL_MS
     }
+
+    /**
+     * Per-automation fire-window start for calendar triggers: never before the global previous
+     * evaluation, never before the automation was created, and never before its last save or
+     * re-enable ("tcal_since_<id>", written by the editor and the enable toggle). Enabling an
+     * old automation or changing its calendar or title filter cannot re-fire matches from
+     * before that moment; only matches since then fire, late rather than never.
+     */
+    private fun calendarWindowStart(automation: AdvancedAutomationEntity, globalWindowStartMs: Long): Long =
+        maxOf(globalWindowStartMs, automation.createdAt, statePrefs.getLong("tcal_since_${automation.id}", 0L))
 
     /**
      * An automation runs when one of its triggers fires and its conditions hold. Without triggers
@@ -105,7 +115,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 statePrefs.edit().putBoolean(metKey, conditionsMet).apply()
                 shouldRun = conditionsMet && !wasMet
             } else {
-                firedTrigger = findFiringTrigger(automation.id, triggers, maxOf(windowStartMs, automation.createdAt))
+                firedTrigger = findFiringTrigger(automation.id, triggers, calendarWindowStart(automation, windowStartMs))
                 shouldRun = firedTrigger != null && evaluateConditions(automation)
             }
             if (firedTrigger != null || triggers.length() == 0) {
