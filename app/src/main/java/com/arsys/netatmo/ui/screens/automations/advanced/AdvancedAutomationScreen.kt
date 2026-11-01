@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.SmartButton
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WbSunny
@@ -130,6 +132,10 @@ data class AutomationAction(
     val minutes: Int = 0,
     val scenarioId: String = "",
     val scenarioName: String = "",
+    val scheduleId: String = "",
+    val scheduleName: String = "",
+    val automationId: Long = -1L,
+    val automationName: String = "",
     val endAt: Long = 0L,
     val durationHours: Double = 0.0
 )
@@ -178,6 +184,10 @@ private fun Map<String, Any>.toAutoAction() = AutomationAction(
     minutes = (this["minutes"] as? Number)?.toInt() ?: 0,
     scenarioId = this["scenarioId"]?.toString() ?: "",
     scenarioName = this["scenarioName"] as? String ?: "",
+    scheduleId = this["scheduleId"] as? String ?: "",
+    scheduleName = this["scheduleName"] as? String ?: "",
+    automationId = (this["automationId"] as? Number)?.toLong() ?: -1L,
+    automationName = this["automationName"] as? String ?: "",
     endAt = (this["endAt"] as? Number)?.toLong() ?: 0L,
     durationHours = (this["durationHours"] as? Number)?.toDouble() ?: 0.0
 )
@@ -194,6 +204,8 @@ fun AdvancedAutomationScreen(
     val uiState by viewModel.uiState.collectAsState()
     val zones by viewModel.zones.collectAsState()
     val scenarios by viewModel.scenarios.collectAsState()
+    val schedules by viewModel.schedules.collectAsState()
+    val otherAutomations by viewModel.automations.collectAsState()
 
     var name by remember { mutableStateOf(uiState.name) }
     var triggerMode by remember { mutableStateOf(uiState.triggerMode) }
@@ -322,6 +334,10 @@ fun AdvancedAutomationScreen(
         ActionEditorBottomSheet(
             initial = editing,
             scenarios = scenarios,
+            schedules = schedules,
+            automations = otherAutomations
+                .filter { it.id != automationId }
+                .map { AutomationOption(it.id, it.name) },
             onDismiss = { actionSheetFor = null },
             onAdd = { map ->
                 if (editing != null) viewModel.updateAction(editingIndex, map)
@@ -936,6 +952,8 @@ private fun actionSummary(action: AutomationAction): String = when (action.type)
     "notify" -> "Notificación: ${action.title.ifBlank { "(sin título)" }}"
     "delay" -> "Esperar ${action.minutes} min"
     "apply_scenario" -> "Escenario: ${action.scenarioName.ifBlank { action.scenarioId }}"
+    "set_schedule" -> "Programa: ${action.scheduleName.ifBlank { action.scheduleId }}"
+    "run_automation" -> "Automatización: ${action.automationName.ifBlank { "#${action.automationId}" }}"
     else -> action.type
 }
 
@@ -986,5 +1004,7 @@ private fun actionIcon(type: String): ImageVector = when (type) {
     "notify" -> Icons.Default.Notifications
     "delay" -> Icons.Default.HourglassEmpty
     "apply_scenario" -> Icons.Default.AutoAwesome
+    "set_schedule" -> Icons.Default.EventRepeat
+    "run_automation" -> Icons.Default.SmartButton
     else -> Icons.Default.PlayArrow
 }
