@@ -127,6 +127,7 @@ data class AutomationAction(
     val title: String = "",
     val minutes: Int = 0,
     val scenarioId: String = "",
+    val scenarioName: String = "",
     val endAt: Long = 0L,
     val durationHours: Double = 0.0
 )
@@ -173,7 +174,8 @@ private fun Map<String, Any>.toAutoAction() = AutomationAction(
     mode = this["mode"] as? String ?: "",
     title = this["title"] as? String ?: "",
     minutes = (this["minutes"] as? Number)?.toInt() ?: 0,
-    scenarioId = this["scenarioId"] as? String ?: "",
+    scenarioId = this["scenarioId"]?.toString() ?: "",
+    scenarioName = this["scenarioName"] as? String ?: "",
     endAt = (this["endAt"] as? Number)?.toLong() ?: 0L,
     durationHours = (this["durationHours"] as? Number)?.toDouble() ?: 0.0
 )
@@ -189,6 +191,7 @@ fun AdvancedAutomationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val zones by viewModel.zones.collectAsState()
+    val scenarios by viewModel.scenarios.collectAsState()
 
     var name by remember { mutableStateOf(uiState.name) }
     var triggerMode by remember { mutableStateOf(uiState.triggerMode) }
@@ -316,6 +319,7 @@ fun AdvancedAutomationScreen(
         val editing = if (editingIndex >= 0) uiState.actions.getOrNull(editingIndex) else null
         ActionEditorBottomSheet(
             initial = editing,
+            scenarios = scenarios,
             onDismiss = { actionSheetFor = null },
             onAdd = { map ->
                 if (editing != null) viewModel.updateAction(editingIndex, map)
@@ -871,7 +875,7 @@ private fun actionSummary(action: AutomationAction): String = when (action.type)
         else if (action.endAt > 0) " hasta ${formatTriggerDateTime(action.endAt)}" else "")
     "notify" -> "Notificación: ${action.title.ifBlank { "(sin título)" }}"
     "delay" -> "Esperar ${action.minutes} min"
-    "apply_scenario" -> "Escenario: ${action.scenarioId}"
+    "apply_scenario" -> "Escenario: ${action.scenarioName.ifBlank { action.scenarioId }}"
     else -> action.type
 }
 
