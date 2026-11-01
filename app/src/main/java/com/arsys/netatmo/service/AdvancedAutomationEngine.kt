@@ -104,7 +104,7 @@ class AdvancedAutomationEngine @Inject constructor(
     ) {
         try {
             migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
-            migrateCalendarConsumption(context, automation.id)
+            migrateCalendarConsumption(context, advancedAutomationRepository, automation.id)
             val triggers = JSONArray(automation.triggersJson)
             var firedTrigger: JSONObject? = null
             val shouldRun: Boolean
@@ -204,7 +204,7 @@ class AdvancedAutomationEngine @Inject constructor(
      */
     suspend fun testRun(automation: AdvancedAutomationEntity): String {
         migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
-        migrateCalendarConsumption(context, automation.id)
+        migrateCalendarConsumption(context, advancedAutomationRepository, automation.id)
         val report = StringBuilder()
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) {
@@ -465,9 +465,10 @@ class AdvancedAutomationEngine @Inject constructor(
      * instant must fall after the previous evaluation ([windowStartMs], never before the
      * automation existed) and not after now: a "0 minutes before" trigger fires on the first
      * check after the event starts, and a battery-delayed check fires late instead of never.
-     * Consumed events are remembered per event instant (never by trigger position), so they
-     * cannot fire twice even if the trigger list is edited or reordered. Every evaluation
-     * logs what the trigger saw, so the diagnostic is never blind for calendar triggers.
+     * Consumed events are remembered per event instant and trigger identity (calendar,
+     * anticipation, title filter), never by trigger position, so they cannot fire twice even
+     * if the trigger list is edited or reordered. Every evaluation logs what the trigger saw,
+     * so the diagnostic is never blind for calendar triggers.
      */
     private fun calendarTriggerFires(automationId: Long, trigger: JSONObject, windowStartMs: Long): Boolean {
         val calendarId = trigger.optLong("calendarId", -1L)
@@ -476,6 +477,7 @@ class AdvancedAutomationEngine @Inject constructor(
         val label = "Disparador calendario «${trigger.optString("calendarName")}»" +
             trigger.optString("title").ifBlank { "" }.let { if (it.isEmpty()) "" else " con «$it»" } +
             ", $minutesBefore min antes"
+        val attrs = AutomationTriggerMath.CalendarTriggerAttrs(calendarId, minutesBefore, trigger.optString("title"))
         if (!CalendarEventQuery.hasCalendarPermission(context)) {
             DiagnosticLog.log(context, "MOTOR", "$label: SIN PERMISO de lectura de calendario; no se puede evaluar. Concédelo en Ajustes del móvil > Aplicaciones > Netatmo Smart > Permisos.")
             return false
@@ -490,7 +492,7 @@ class AdvancedAutomationEngine @Inject constructor(
         var fires = false
         for (event in events) {
             if (AutomationTriggerMath.calendarShouldFire(event.startMs, minutesBefore, now, windowStartMs)) {
-                val key = AutomationTriggerMath.calendarConsumedKey(automationId, event.startMs)
+                val key = AutomationTriggerMath.calendarConsumedKey(automationId, event.startMs, attrs)
                 if (!statePrefs.getBoolean(key, false)) {
                     statePrefs.edit().putBoolean(key, true).apply()
                     fires = true
