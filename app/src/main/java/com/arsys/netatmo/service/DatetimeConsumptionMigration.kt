@@ -161,13 +161,18 @@ internal fun parseCalendarTriggerAttrs(triggersJson: String): Map<Int, Automatio
 
 /**
  * One-time translation of an automation's legacy calendar consumption marks
- * ("tcal_<id>_<index>_<startMs>", positional) to per-event keys. Runs before the first
- * consumption read of each engine path (evaluate, test, reschedule), like the datetime
- * migration. CALLER MUST HOLD saveAutomationStateMutex. [readTriggersJson] must return the
- * trigger list CURRENTLY STORED (fresh read): the legacy marks are positional, so their
- * translation is only exact against the structure they were written for. The whole
- * translation lands in ONE commit: a crash leaves either the legacy state untouched or the
- * migration fully applied.
+ * ("tcal_<id>_<index>_<startMs>", positional) to suppression tombstones ("tcalm_...", without
+ * event id: the legacy format kept none). Runs before the first consumption read of each
+ * engine path (evaluate, test, reschedule), like the datetime migration. CALLER MUST HOLD
+ * saveAutomationStateMutex. [readTriggersJson] must return the trigger list CURRENTLY STORED
+ * (fresh read): the legacy marks are positional, so their translation is only exact against
+ * the structure they were written for. The whole translation lands in ONE commit: a crash
+ * leaves either the legacy state untouched or the migration fully applied.
+ * Tombstones only suppress, never fire: an already-consumed event cannot re-run its actions
+ * after the upgrade. Declared residual: a genuinely different event created or synced AFTER
+ * the upgrade with the EXACT same start instant under the same trigger identity is suppressed
+ * too; the legacy marks carry no event id to tell them apart, and re-firing heating actions
+ * is the worse error. Legacy indices that no longer hold a calendar trigger are dropped.
  */
 internal suspend fun migrateCalendarConsumptionLocked(
     automationId: Long,
