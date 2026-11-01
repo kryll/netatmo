@@ -38,27 +38,49 @@ object AutomationTriggerMath {
         return triggerTime in (windowStartMs + 1)..nowMs
     }
 
+    /** Attributes identifying a calendar trigger, independent of its position in the list. */
+    data class CalendarTriggerAttrs(val calendarId: Long, val minutesBefore: Int, val titleFilter: String)
+
     /**
-     * Consumption key for a calendar trigger, per EVENT instant and independent of the
-     * trigger's position in the list: reordering, inserting or deleting triggers never
-     * replays an already-fired event. "tcal2_" is textually distinct from the legacy
-     * positional "tcal_<id>_<index>_<startMs>" marks.
+     * Consumption key for a calendar trigger, per EVENT instant and trigger identity
+     * (calendar, anticipation and title filter), never by list position: reordering,
+     * inserting or deleting triggers never replays an already-fired event, and two triggers
+     * with different calendars, filters or anticipations fire independently for the same
+     * event, exactly as the legacy positional keys did. "tcal2_" is textually distinct from
+     * the legacy positional "tcal_<id>_<index>_<startMs>" marks.
      */
-    fun calendarConsumedKey(automationId: Long, eventStartMs: Long): String =
-        "tcal2_${automationId}_$eventStartMs"
+    fun calendarConsumedKey(automationId: Long, eventStartMs: Long, attrs: CalendarTriggerAttrs): String =
+        "tcal2_${automationId}_${eventStartMs}_${attrs.calendarId}_${attrs.minutesBefore}_${attrs.titleFilter}"
 
     /**
      * One-time translation of legacy positional calendar marks ("tcal_<id>_<index>_<startMs>")
-     * to per-event keys: each consumed event keeps its consumption whatever its trigger's
-     * position. Exact for every history because the event instant is part of both formats.
+     * to per-event keys, using the trigger CURRENTLY at each legacy index (same conservative
+     * rule as the datetime migration: exact for every history whose trigger list kept its
+     * structure since the mark was written; legacy indices that no longer hold a calendar
+     * trigger are dropped). All-day events fired under the legacy code were marked with their
+     * UTC-midnight start while the new code keys them by local midnight, so for UTC-midnight
+     * instants BOTH keys are written: an already-fired all-day event can only be suppressed,
+     * never re-fired.
      */
-    fun calendarKeyMigration(automationId: Long, legacyKeys: Set<String>): Set<String> {
+    fun calendarKeyMigration(
+        automationId: Long,
+        legacyKeys: Set<String>,
+        calendarTriggersByIndex: Map<Int, CalendarTriggerAttrs>,
+        zone: java.util.TimeZone = java.util.TimeZone.getDefault()
+    ): Set<String> {
         val legacyPrefix = "tcal_${automationId}_"
-        return legacyKeys.mapNotNull { key ->
-            if (!key.startsWith(legacyPrefix)) return@mapNotNull null
-            val startMs = key.removePrefix(legacyPrefix).substringAfter('_').toLongOrNull()
-                ?: return@mapNotNull null
-            calendarConsumedKey(automationId, startMs)
+        return legacyKeys.flatMap { key ->
+            if (!key.startsWith(legacyPrefix)) return@flatMap emptySet()
+            val rest = key.removePrefix(legacyPrefix)
+            val index = rest.substringBefore('_').toIntOrNull() ?: return@flatMap emptySet()
+            val startMs = rest.substringAfter('_').toLongOrNull() ?: return@flatMap emptySet()
+            val attrs = calendarTriggersByIndex[index] ?: return@flatMap emptySet()
+            buildSet {
+                add(calendarConsumedKey(automationId, startMs, attrs))
+                if (startMs % 86_400_000L == 0L) {
+                    add(calendarConsumedKey(automationId, allDayLocalStart(startMs, zone), attrs))
+                }
+            }
         }.toSet()
     }
 
