@@ -13,7 +13,8 @@ data class CalendarEventReading(val title: String, val startMs: Long)
  * Reads calendar event instances in [fromMs, toMs] through CalendarContract.Instances, which
  * expands recurring events into each occurrence overlapping the window (the Events table only
  * stores the FIRST occurrence's DTSTART, so a repeating event would never match again).
- * All-day events come back at their UTC-midnight start. Returns an empty list without the
+ * All-day events are converted to local (device-zone) midnight of their date. Returns an
+ * empty list without the
  * calendar permission or on a provider error; callers report the permission case themselves
  * via [hasCalendarPermission].
  */
@@ -32,7 +33,11 @@ object CalendarEventQuery {
     ): List<CalendarEventReading> {
         if (!hasCalendarPermission(context)) return emptyList()
         val events = mutableListOf<CalendarEventReading>()
-        val projection = arrayOf(CalendarContract.Instances.TITLE, CalendarContract.Instances.BEGIN)
+        val projection = arrayOf(
+            CalendarContract.Instances.TITLE,
+            CalendarContract.Instances.BEGIN,
+            CalendarContract.Instances.ALL_DAY
+        )
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().apply {
             ContentUris.appendId(this, fromMs)
             ContentUris.appendId(this, toMs)
@@ -46,8 +51,12 @@ object CalendarEventQuery {
             )?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val title = cursor.getString(0) ?: ""
+                    // All-day instances come as UTC midnight; the trigger means local midnight.
+                    val startMs = cursor.getLong(1).let {
+                        if (cursor.getInt(2) == 1) AutomationTriggerMath.allDayLocalStart(it) else it
+                    }
                     if (titleFilter == null || title.contains(titleFilter, ignoreCase = true)) {
-                        events.add(CalendarEventReading(title, cursor.getLong(1)))
+                        events.add(CalendarEventReading(title, startMs))
                     }
                 }
             }
