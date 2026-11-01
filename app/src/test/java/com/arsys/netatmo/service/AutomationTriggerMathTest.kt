@@ -438,16 +438,61 @@ class AutomationTriggerMathTest {
     }
 
     @Test
-    fun `calendar consumed key is per event instant and independent of trigger position`() {
-        assertEquals("tcal2_7_1730000000000", AutomationTriggerMath.calendarConsumedKey(7L, 1_730_000_000_000L))
+    fun `calendar consumed key is per event instant and trigger identity, never position`() {
+        val attrs = AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "libre")
+        assertEquals(
+            "tcal2_7_1730000000000_11_0_libre",
+            AutomationTriggerMath.calendarConsumedKey(7L, 1_730_000_000_000L, attrs)
+        )
     }
 
     @Test
-    fun `legacy positional calendar marks migrate to per-event keys keeping their instants`() {
-        val legacy = setOf("tcal_7_0_1730000000000", "tcal_7_2_1730003600000", "tcal2_7_1", "tcal_8_0_1730000000000")
+    fun `two triggers with different anticipations fire independently for the same event`() {
+        val start = 1_730_000_000_000L
+        val thirty = AutomationTriggerMath.CalendarTriggerAttrs(11L, 30, "")
+        val zero = AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "")
+        assertTrue(
+            AutomationTriggerMath.calendarConsumedKey(7L, start, thirty) !=
+                AutomationTriggerMath.calendarConsumedKey(7L, start, zero)
+        )
+    }
+
+    @Test
+    fun `legacy positional calendar marks migrate keeping instants and trigger identity`() {
+        val legacy = setOf(
+            "tcal_7_0_1730000000000", // index 0: calendar trigger below
+            "tcal_7_2_1730086400000", // index 2: calendar trigger below
+            "tcal_7_9_1730000000000", // index 9: no calendar trigger anymore -> dropped
+            "tcal2_7_1",              // new-format keys never match the legacy scan
+            "tcal_8_0_1730000000000"  // another automation's marks are untouched
+        )
+        val attrsByIndex = mapOf(
+            0 to AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "libre"),
+            2 to AutomationTriggerMath.CalendarTriggerAttrs(11L, 30, "")
+        )
         assertEquals(
-            setOf("tcal2_7_1730000000000", "tcal2_7_1730003600000"),
-            AutomationTriggerMath.calendarKeyMigration(7L, legacy)
+            setOf("tcal2_7_1730000000000_11_0_libre", "tcal2_7_1730086400000_11_30_"),
+            AutomationTriggerMath.calendarKeyMigration(7L, legacy, attrsByIndex)
+        )
+    }
+
+    @Test
+    fun `legacy all-day marks also cover the local-midnight key so they never re-fire`() {
+        // 2 Nov 2026 00:00 UTC: an all-day start as the legacy Events query returned it.
+        val utcMidnight = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+            set(2026, 10, 2, 0, 0, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val attrs = mapOf(0 to AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, ""))
+        val madrid = java.util.TimeZone.getTimeZone("Europe/Madrid") // CET in November: UTC+1
+        val migrated = AutomationTriggerMath.calendarKeyMigration(
+            7L, setOf("tcal_7_0_" + utcMidnight), attrs, madrid
+        )
+        assertEquals(
+            setOf(
+                "tcal2_7_" + utcMidnight + "_11_0_",
+                "tcal2_7_" + (utcMidnight - 1 * 60 * 60_000L) + "_11_0_" // local midnight = 23:00 UTC
+            ),
+            migrated
         )
     }
 
@@ -465,8 +510,9 @@ class AutomationTriggerMathTest {
 
     @Test
     fun `each occurrence of a recurring event gets its own consumption key`() {
-        val first = AutomationTriggerMath.calendarConsumedKey(7L, 1_730_000_000_000L)
-        val nextOccurrence = AutomationTriggerMath.calendarConsumedKey(7L, 1_730_604_800_000L)
+        val attrs = AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "libre")
+        val first = AutomationTriggerMath.calendarConsumedKey(7L, 1_730_000_000_000L, attrs)
+        val nextOccurrence = AutomationTriggerMath.calendarConsumedKey(7L, 1_730_604_800_000L, attrs)
         assertTrue(first != nextOccurrence)
     }
 }
