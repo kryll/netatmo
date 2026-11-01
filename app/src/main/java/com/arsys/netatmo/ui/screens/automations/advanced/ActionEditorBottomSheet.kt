@@ -41,7 +41,8 @@ import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 fun ActionEditorBottomSheet(
     onDismiss: () -> Unit,
     onAdd: (Map<String, Any>) -> Unit,
-    initial: Map<String, Any>? = null
+    initial: Map<String, Any>? = null,
+    scenarios: List<com.arsys.netatmo.data.local.entities.ScenarioEntity> = emptyList()
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -65,18 +66,23 @@ fun ActionEditorBottomSheet(
     // delay
     var delayMinutes by remember { mutableStateOf(prefill?.delayMinutes ?: "5") }
 
+    // apply_scenario
+    var scenarioId by remember { mutableStateOf(prefill?.scenarioId ?: -1L) }
+
     // set_home_mode / set_mode
     var homeMode by remember { mutableStateOf(prefill?.mode ?: "schedule") }
     var modeHours by remember { mutableStateOf(prefill?.durationText ?: "") }
     var modeHoursError by remember { mutableStateOf(false) }
 
+    // "apply_scenario" is not offered for new actions (scenarios have their own screen);
+    // it appears only when editing an action that already applies one.
     val actionTypes = listOf(
         "set_temperature" to "Temperatura",
         "set_mode" to "Modo",
         "set_home_mode" to "Modo de la casa",
         "notify" to "Notificación",
         "delay" to "Esperar"
-    )
+    ) + if (prefill?.type == "apply_scenario") listOf("apply_scenario" to "Escenario") else emptyList()
 
     // Netatmo home modes (setthermmode); "heating"/"cooling" are not valid values there.
     val modes = listOf(
@@ -86,8 +92,8 @@ fun ActionEditorBottomSheet(
         "off" to "Apagado"
     )
 
-    // A stored action whose type this editor does not know (e.g. apply_scenario)
-    // is left untouched: better read-only than silently replacing it with an empty map.
+    // A stored action whose type this editor does not know is left untouched:
+    // better read-only than silently replacing it with an empty map.
     val unknownType = initial != null && actionTypes.none { it.first == prefill?.type }
 
     val secondary = MaterialTheme.colorScheme.secondary
@@ -302,6 +308,42 @@ fun ActionEditorBottomSheet(
                         label = "Minutos"
                     )
                 }
+
+                "apply_scenario" -> {
+                    SheetLabel("Escenario")
+                    if (scenarios.isEmpty()) {
+                        Text(
+                            "No hay escenarios guardados. Créalos desde la pantalla de escenarios.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            scenarios.forEach { scenario ->
+                                FilterChip(
+                                    selected = scenarioId == scenario.id,
+                                    onClick = { scenarioId = scenario.id },
+                                    label = { Text(scenario.name, style = MaterialTheme.typography.labelMedium) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = secondaryContainer.copy(alpha = 0.20f),
+                                        selectedLabelColor = secondary,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = scenarioId == scenario.id,
+                                        selectedBorderColor = secondary.copy(alpha = 0.45f),
+                                        borderColor = OutlineVariant
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             }
@@ -310,6 +352,7 @@ fun ActionEditorBottomSheet(
             Spacer(Modifier.height(4.dp))
 
             Button(
+                enabled = selectedType != "apply_scenario" || scenarios.any { it.id == scenarioId },
                 onClick = {
                     if (selectedType == "set_home_mode" || selectedType == "set_mode") {
                         // Never save an invalid duration silently as "until changed":
@@ -361,6 +404,11 @@ fun ActionEditorBottomSheet(
                         "delay" -> mapOf(
                             "type" to "delay",
                             "minutes" to (delayMinutes.toIntOrNull() ?: 5)
+                        )
+                        "apply_scenario" -> mapOf(
+                            "type" to "apply_scenario",
+                            "scenarioId" to scenarioId,
+                            "scenarioName" to (scenarios.firstOrNull { it.id == scenarioId }?.name ?: "")
                         )
                         else -> emptyMap()
                     }
