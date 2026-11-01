@@ -450,4 +450,23 @@ class AutomationTriggerMathTest {
             AutomationTriggerMath.calendarKeyMigration(7L, legacy)
         )
     }
+
+    // ── Calendar: all-day events and per-occurrence keys ────────────────────
+
+    @Test
+    fun `all-day event triggers at local midnight, not UTC midnight shifted`() {
+        val utcMidnight = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+            set(2026, 10, 2, 0, 0, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis // all-day "2 Nov 2026" as the provider returns it
+        val madrid = java.util.TimeZone.getTimeZone("Europe/Madrid") // CET in November: UTC+1
+        val expected = utcMidnight - 1 * 60 * 60_000L // local midnight 2 Nov = 23:00 UTC 1 Nov
+        assertEquals(expected, AutomationTriggerMath.allDayLocalStart(utcMidnight, madrid))
+    }
+
+    @Test
+    fun `each occurrence of a recurring event gets its own consumption key`() {
+        val first = AutomationTriggerMath.calendarConsumedKey(7L, 1_730_000_000_000L)
+        val nextOccurrence = AutomationTriggerMath.calendarConsumedKey(7L, 1_730_604_800_000L)
+        assertTrue(first != nextOccurrence)
+    }
 }
