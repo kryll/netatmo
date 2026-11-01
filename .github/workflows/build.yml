@@ -73,6 +73,14 @@ jobs:
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
+      - name: Dump failing test reports
+        if: failure()
+        run: |
+          for f in app/build/test-results/testDebugUnitTest/*.xml; do
+            echo "===== $f"
+            cat "$f"
+          done
+
       - name: Upload unit test reports
         if: always()
         uses: actions/upload-artifact@v4
