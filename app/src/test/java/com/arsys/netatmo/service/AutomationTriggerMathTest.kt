@@ -438,11 +438,11 @@ class AutomationTriggerMathTest {
     }
 
     @Test
-    fun `calendar consumed key is per event instant and trigger identity, never position`() {
+    fun `calendar consumed key is per event, occurrence and trigger identity, never position`() {
         val attrs = AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "libre")
         assertEquals(
-            "tcal2_7_1730000000000_11_0_libre",
-            AutomationTriggerMath.calendarConsumedKey(7L, 1_730_000_000_000L, attrs)
+            "tcal2_7_555_1730000000000_11_0_libre",
+            AutomationTriggerMath.calendarConsumedKey(7L, 555L, 1_730_000_000_000L, attrs)
         )
     }
 
@@ -452,18 +452,30 @@ class AutomationTriggerMathTest {
         val thirty = AutomationTriggerMath.CalendarTriggerAttrs(11L, 30, "")
         val zero = AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "")
         assertTrue(
-            AutomationTriggerMath.calendarConsumedKey(7L, start, thirty) !=
-                AutomationTriggerMath.calendarConsumedKey(7L, start, zero)
+            AutomationTriggerMath.calendarConsumedKey(7L, 555L, start, thirty) !=
+                AutomationTriggerMath.calendarConsumedKey(7L, 555L, start, zero)
         )
     }
 
     @Test
-    fun `legacy positional calendar marks migrate keeping instants and trigger identity`() {
+    fun `two different events with the same start instant fire independently`() {
+        // An event created or synced after another one fired at the exact same start instant
+        // has a different event id, so the first one's consumption never suppresses it.
+        val start = 1_730_000_000_000L
+        val attrs = AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "libre")
+        assertTrue(
+            AutomationTriggerMath.calendarConsumedKey(7L, 555L, start, attrs) !=
+                AutomationTriggerMath.calendarConsumedKey(7L, 777L, start, attrs)
+        )
+    }
+
+    @Test
+    fun `legacy positional calendar marks migrate to suppression tombstones keeping their instants`() {
         val legacy = setOf(
             "tcal_7_0_1730000000000", // index 0: calendar trigger below
             "tcal_7_2_1730086400000", // index 2: calendar trigger below
             "tcal_7_9_1730000000000", // index 9: no calendar trigger anymore -> dropped
-            "tcal2_7_1",              // new-format keys never match the legacy scan
+            "tcal2_7_555_1",          // new-format keys never match the legacy scan
             "tcal_8_0_1730000000000"  // another automation's marks are untouched
         )
         val attrsByIndex = mapOf(
@@ -471,13 +483,26 @@ class AutomationTriggerMathTest {
             2 to AutomationTriggerMath.CalendarTriggerAttrs(11L, 30, "")
         )
         assertEquals(
-            setOf("tcal2_7_1730000000000_11_0_libre", "tcal2_7_1730086400000_11_30_"),
+            setOf("tcalm_7_1730000000000_11_0_libre", "tcalm_7_1730086400000_11_30_"),
             AutomationTriggerMath.calendarKeyMigration(7L, legacy, attrsByIndex)
         )
     }
 
     @Test
-    fun `legacy all-day marks also cover the local-midnight key so they never re-fire`() {
+    fun `a migrated tombstone suppresses the legacy-fired event under the new per-event check`() {
+        // The tombstone (no event id, the legacy format kept none) is one of the consumption
+        // keys the engine checks for any event at that start instant and trigger identity.
+        val attrs = AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "libre")
+        val start = 1_730_000_000_000L
+        val tombstones = AutomationTriggerMath.calendarKeyMigration(
+            7L, setOf("tcal_7_0_" + start), mapOf(0 to attrs)
+        )
+        val consumptionKeys = AutomationTriggerMath.calendarConsumptionKeys(7L, 555L, start, attrs)
+        assertTrue(consumptionKeys.any { it in tombstones })
+    }
+
+    @Test
+    fun `legacy all-day marks also cover the local-midnight tombstone so they never re-fire`() {
         // 2 Nov 2026 00:00 UTC: an all-day start as the legacy Events query returned it.
         val utcMidnight = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
             set(2026, 10, 2, 0, 0, 0); set(java.util.Calendar.MILLISECOND, 0)
@@ -489,8 +514,8 @@ class AutomationTriggerMathTest {
         )
         assertEquals(
             setOf(
-                "tcal2_7_" + utcMidnight + "_11_0_",
-                "tcal2_7_" + (utcMidnight - 1 * 60 * 60_000L) + "_11_0_" // local midnight = 23:00 UTC
+                "tcalm_7_" + utcMidnight + "_11_0_",
+                "tcalm_7_" + (utcMidnight - 1 * 60 * 60_000L) + "_11_0_" // local midnight = 23:00 UTC
             ),
             migrated
         )
@@ -510,9 +535,10 @@ class AutomationTriggerMathTest {
 
     @Test
     fun `each occurrence of a recurring event gets its own consumption key`() {
+        // A recurring series keeps one event id; the occurrence start distinguishes each fire.
         val attrs = AutomationTriggerMath.CalendarTriggerAttrs(11L, 0, "libre")
-        val first = AutomationTriggerMath.calendarConsumedKey(7L, 1_730_000_000_000L, attrs)
-        val nextOccurrence = AutomationTriggerMath.calendarConsumedKey(7L, 1_730_604_800_000L, attrs)
+        val first = AutomationTriggerMath.calendarConsumedKey(7L, 555L, 1_730_000_000_000L, attrs)
+        val nextOccurrence = AutomationTriggerMath.calendarConsumedKey(7L, 555L, 1_730_604_800_000L, attrs)
         assertTrue(first != nextOccurrence)
     }
 }
