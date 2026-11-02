@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -63,6 +64,7 @@ fun TriggerEditorBottomSheet(
     onAdd: (Map<String, Any>) -> Unit,
     zones: List<ZoneEntity> = emptyList(),
     onManageZones: () -> Unit = {},
+    triggersMode: String = "any",
     initial: Map<String, Any>? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -71,6 +73,7 @@ fun TriggerEditorBottomSheet(
     val prefill = remember { initial?.let { prefillTrigger(it) } }
 
     var selectedType by remember { mutableStateOf(prefill?.type?.ifBlank { "time" } ?: "time") }
+    var invert by remember { mutableStateOf(prefill?.invert ?: false) }
 
     // Time
     var time by remember { mutableStateOf(prefill?.time ?: "07:00") }
@@ -400,6 +403,21 @@ fun TriggerEditorBottomSheet(
             }
 
             if (!unknownType) {
+            // Negation only has meaning in "Todas" mode, where each trigger also reads as a
+            // state; in "Cualquiera" a trigger is a punctual occurrence that cannot be negated.
+            if (triggersMode == "all") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Switch(checked = invert, onCheckedChange = { invert = it })
+                    Text(
+                        "Negar: en modo «Todas» cuenta como cumplido cuando NO lo está",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             Spacer(Modifier.height(4.dp))
 
             // Add/save button
@@ -459,7 +477,7 @@ fun TriggerEditorBottomSheet(
                         }
                         else -> emptyMap()
                     }
-                    onAdd(map)
+                    onAdd(if (invert) map + ("invert" to true) else map)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

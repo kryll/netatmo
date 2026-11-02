@@ -28,7 +28,7 @@ import com.arsys.netatmo.data.local.entities.MaintenanceRecordEntity
         MaintenanceRecordEntity::class,
         ZoneEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -74,6 +74,13 @@ abstract class AppDatabase : RoomDatabase() {
                     "`isHome` INTEGER NOT NULL, " +
                     "`addedAt` INTEGER NOT NULL)"
                 )
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // "any" keeps the pre-v9 behaviour: any single trigger fires the automation.
+                db.execSQL("ALTER TABLE advanced_automations ADD COLUMN triggersMode TEXT NOT NULL DEFAULT 'any'")
             }
         }
 

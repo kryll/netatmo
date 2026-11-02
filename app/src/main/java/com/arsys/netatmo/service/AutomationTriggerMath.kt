@@ -12,6 +12,42 @@ object AutomationTriggerMath {
     const val TIME_TRIGGER_WINDOW_MIN = 20
 
     /**
+     * Three-valued answer to "does this hold right now?": YES it holds, NO it does not, or
+     * UNKNOWN when the data cannot be read (no calendar permission, zone state never recorded,
+     * temperature unreadable). UNKNOWN never enables a heating action, and negating it must
+     * stay UNKNOWN rather than become YES.
+     */
+    enum class Check { YES, NO, UNKNOWN }
+
+    /** Negation: flipping an UNKNOWN would turn unreadable data into a permission to heat. */
+    fun Check.not(): Check = when (this) {
+        Check.YES -> Check.NO
+        Check.NO -> Check.YES
+        Check.UNKNOWN -> Check.UNKNOWN
+    }
+
+    /** Applies a stored "invert" flag to a check result. */
+    fun Check.withInvert(invert: Boolean): Check = if (invert) not() else this
+
+    /** OR: one YES is enough; without one, any UNKNOWN leaves the result unknown. */
+    fun combineAny(checks: List<Check>): Check = when {
+        checks.any { it == Check.YES } -> Check.YES
+        checks.any { it == Check.UNKNOWN } -> Check.UNKNOWN
+        else -> Check.NO
+    }
+
+    /** AND: one NO is enough; without one, any UNKNOWN leaves the result unknown. */
+    fun combineAll(checks: List<Check>): Check = when {
+        checks.any { it == Check.NO } -> Check.NO
+        checks.any { it == Check.UNKNOWN } -> Check.UNKNOWN
+        else -> Check.YES
+    }
+
+    /** Whether an event instance covering [startMs, endMs) is under way at [nowMs]. */
+    fun eventActiveNow(startMs: Long, endMs: Long, nowMs: Long): Boolean =
+        endMs > startMs && nowMs >= startMs && nowMs < endMs
+
+    /**
      * Whether [nowMinutes] (minutes since midnight) on [isoDay] (1=Mon..7=Sun) is inside the
      * window. Overnight windows (start > end) wrap past midnight. [days] null means every day.
      */
@@ -194,6 +230,47 @@ object AutomationTriggerMath {
         }
         return null
     }
+
+    /**
+     * "Todas" mode: the index of the first trigger that OCCURRED while every other trigger
+     * holds as a state, or null. States that merely hold - however many are YES - never fire
+     * on their own: creating, saving, reordering or restarting the automation is not an
+     * occurrence, and the unknown past never re-fires.
+     */
+    fun allModeDecision(occurred: List<Boolean>, states: List<Check>): Int? {
+        for (i in occurred.indices) {
+            if (!occurred[i]) continue
+            if (combineAll(states.filterIndexed { idx, _ -> idx != i }) == Check.YES) return i
+        }
+        return null
+    }
+
+    /** Value identity of a time trigger: same time and days, wherever it sits in the list. */
+    fun timeIdentity(targetMinutes: Int, days: Set<Int>?): String =
+        "time:$targetMinutes:${days?.sorted()?.joinToString(",") ?: "all"}"
+
+    /** Value identity of a numeric-state trigger: same entity, direction and threshold. */
+    fun numericIdentity(entity: String, below: Boolean, value: Double): String =
+        "num:$entity:${if (below) "below" else "above"}:$value"
+
+    /** Daily fire mark of a time trigger, keyed by value: reordering never replays it. */
+    fun timeDailyKey(automationId: Long, identity: String): String = "tday2_${automationId}_$identity"
+
+    /** Last-seen level mark of a numeric-state trigger, keyed by value. */
+    fun numericLevelKey(automationId: Long, identity: String): String = "tact2_${automationId}_$identity"
+
+    /**
+     * Same-day SUPPRESSION tombstone produced when migrating a legacy positional time mark
+     * ("tday_<id>_<index>", value "<year>-<dayOfYear>"). The legacy format kept no trigger
+     * identity, so the tombstone suppresses EVERY time trigger of that automation until the
+     * end of that day: deliberately conservative (it can delay a second same-day trigger that
+     * genuinely had not fired; it can never REPEAT an action whose identity is in doubt).
+     */
+    fun timeMigratedKey(automationId: Long, dayKey: String): String = "tdaym_${automationId}_$dayKey"
+
+    /** A time trigger counts as fired today when its value-keyed mark or the migrated same-day tombstone says so. */
+    fun timeFiredToday(valueMark: String?, migratedTombstone: Boolean, dayKey: String): Boolean =
+        valueMark == dayKey || migratedTombstone
 
     /** One-shot instant trigger: armed at [atMs] unless already consumed. */
     fun nextDatetimeInstant(atMs: Long, consumed: Boolean): Long? =

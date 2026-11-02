@@ -72,7 +72,8 @@ data class TriggerPrefill(
     val calendarId: Long,
     val calendarName: String,
     val calendarTitle: String,
-    val calendarMinutesBefore: String
+    val calendarMinutesBefore: String,
+    val invert: Boolean
 )
 
 internal fun prefillTrigger(map: Map<String, Any>): TriggerPrefill {
@@ -104,7 +105,8 @@ internal fun prefillTrigger(map: Map<String, Any>): TriggerPrefill {
         calendarId = mapNumber(map, "calendarId")?.toLong() ?: -1L,
         calendarName = mapString(map, "calendarName"),
         calendarTitle = mapString(map, "title"),
-        calendarMinutesBefore = (mapNumber(map, "minutesBefore")?.toInt() ?: 30).toString()
+        calendarMinutesBefore = (mapNumber(map, "minutesBefore")?.toInt() ?: 30).toString(),
+        invert = map["invert"] as? Boolean ?: false
     )
 }
 
@@ -116,7 +118,11 @@ data class ConditionPrefill(
     val toTime: String,
     val entity: String,
     val condition: String,
-    val threshold: Float
+    val threshold: Float,
+    val calendarId: Long,
+    val calendarName: String,
+    val calendarTitle: String,
+    val invert: Boolean
 )
 
 internal fun prefillCondition(map: Map<String, Any>): ConditionPrefill = ConditionPrefill(
@@ -125,7 +131,11 @@ internal fun prefillCondition(map: Map<String, Any>): ConditionPrefill = Conditi
     toTime = mapString(map, "before", "to").ifBlank { "22:00" },
     entity = mapString(map, "entity").ifBlank { "outdoor_temp" },
     condition = if (map.containsKey("below")) "below" else "above",
-    threshold = mapNumber(map, "below", "above", "value")?.toFloat() ?: 20f
+    threshold = mapNumber(map, "below", "above", "value")?.toFloat() ?: 20f,
+    calendarId = mapNumber(map, "calendarId")?.toLong() ?: -1L,
+    calendarName = mapString(map, "calendarName"),
+    calendarTitle = mapString(map, "title"),
+    invert = map["invert"] as? Boolean ?: false
 )
 
 // ── Action ────────────────────────────────────────────────────────────────────

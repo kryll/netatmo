@@ -100,6 +100,14 @@ app/
 
 En el editor avanzado, los disparadores, las condiciones y las acciones de cada automatización se pueden reordenar con las flechas ▲▼ de cada elemento (por ejemplo, para que la notificación avise antes o después del cambio de modo). Las flechas solo aparecen cuando el elemento puede moverse en esa dirección.
 
+### Operadores lógicos
+
+- **Disparadores**: con dos o más aparece el modo **Cualquiera / Todas**. Con «Cualquiera» salta el primero que ocurra (comportamiento de siempre). Con «Todas» salta cuando **ocurre uno y los demás se cumplen en ese momento**: un calendario se cumple mientras el evento está en curso (su antelación solo cuenta para su propio disparo), una zona mientras estás dentro (o fuera), una franja mientras estás dentro, una temperatura mientras supera el umbral, una hora durante unos minutos después y una fecha pasada mientras no se haya consumido. Dos citas puntuales (hora o fecha) casi nunca coinciden. Sin un disparo puntual no salta nunca: crearla, guardarla, reordenarla o reiniciar el móvil no es un disparo, y una fecha ya consumida no vuelve a cumplirse.
+- **Condiciones**: el modo Cualquiera / Todas combina las condiciones, igual que antes.
+- **Negar**: cada condición (y cada disparador en modo «Todas») puede negarse con el interruptor «Negar». Negar un dato que no se puede comprobar (sin permiso de calendario, zona sin estado conocido, temperatura sin lectura) sigue sin poder comprobarse: **nunca se convierte en cumplido ni ejecuta acciones**, y queda anotado en el diagnóstico.
+- **Condición «Calendario vigente»**: se cumple mientras un evento del calendario elegido (con filtro de título opcional) está en curso; un evento de día completo cubre su día. Ejemplo: disparador «al llegar a trabajo» + modo «Todas» + disparador de calendario «día libre», o la misma idea como condición.
+- **Anti-repetición al actualizar**: las marcas de disparo por hora y temperatura pasan a identificarse por su valor (hora+días, entidad+umbral), así que reordenar, insertar o borrar disparadores nunca las mueve ni las repite. Las marcas antiguas por posición no pueden reasignarse con seguridad si la lista cambió antes de actualizar, así que se migran de forma conservadora: una marca de hora se convierte en supresión para ese día de TODOS los disparadores por hora de esa automatización (puede retrasar uno pendiente hasta mañana; jamás repite uno ya ejecutado) y cada disparador de temperatura arranca con su nivel actual (un cruce justo en el momento de actualizar se registra, no se dispara).
+
 Las acciones disponibles incluyen, además de temperatura, modos, notificación y espera:
 
 - **Programa**: activa uno de los programas (horarios) de la instalación Netatmo y devuelve la casa al modo programado, igual que al activarlo desde la pantalla Programas.

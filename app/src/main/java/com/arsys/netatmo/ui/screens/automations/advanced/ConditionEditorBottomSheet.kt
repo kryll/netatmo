@@ -4,6 +4,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +18,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -26,6 +28,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,11 +53,33 @@ fun ConditionEditorBottomSheet(
     var selectedEntity by remember { mutableStateOf(prefill?.entity ?: "outdoor_temp") }
     var selectedCondition by remember { mutableStateOf(prefill?.condition ?: "below") }
     var threshold by remember { mutableFloatStateOf(prefill?.threshold ?: 20f) }
+    var invert by remember { mutableStateOf(prefill?.invert ?: false) }
+
+    // Calendar event (vigente ahora)
+    var calendars by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
+    var calendarId by remember { mutableStateOf(prefill?.calendarId ?: -1L) }
+    var calendarTitle by remember { mutableStateOf(prefill?.calendarTitle ?: "") }
+    var calendarPermissionDenied by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val calendarPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) calendars = queryDeviceCalendars(context) else calendarPermissionDenied = true
+    }
+    androidx.compose.runtime.LaunchedEffect(selectedType) {
+        if (selectedType == "calendar_event" && calendars.isEmpty() &&
+            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALENDAR) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            calendars = queryDeviceCalendars(context)
+        }
+    }
 
     val conditionTypes = listOf(
         "time_range" to "Rango horario",
         "numeric_state" to "Temperatura",
-        "presence" to "Presencia"
+        "presence" to "Presencia",
+        "calendar_event" to "Calendario vigente"
     )
 
     // A stored condition whose type this editor does not know is left untouched.
@@ -156,11 +181,58 @@ fun ConditionEditorBottomSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                "calendar_event" -> {
+                    Text(
+                        text = "Se cumple mientras un evento del calendario está en curso (uno de día completo cubre su día).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (calendarPermissionDenied) {
+                        Text(
+                            "Sin permiso de calendario no se puede comprobar; la condición no se cumplirá nunca.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    if (calendars.isEmpty() && !calendarPermissionDenied) {
+                        Text(
+                            "Se necesita permiso de calendario para listar tus calendarios.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = { calendarPermissionLauncher.launch(android.Manifest.permission.READ_CALENDAR) }) {
+                            Text("Conceder permiso")
+                        }
+                    }
+                    if (calendars.isNotEmpty()) {
+                        SheetLabel("Calendario")
+                        WrappingFilterChips(
+                            items = calendars.map { it.first.toString() to it.second },
+                            selected = calendarId.toString(),
+                            accentColor = tertiary,
+                            onSelect = { calendarId = it.toLong() }
+                        )
+                        SheetLabel("Título del evento contiene (opcional)")
+                        SheetTextField(value = calendarTitle, onValueChange = { calendarTitle = it }, label = "Filtro de título")
+                    }
+                }
             }
 
             }
 
             if (!unknownType) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Switch(checked = invert, onCheckedChange = { invert = it })
+                Text(
+                    "Negar: se cumple cuando NO pasa lo de arriba",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(Modifier.height(4.dp))
 
             Button(
@@ -180,10 +252,18 @@ fun ConditionEditorBottomSheet(
                             "type" to "presence",
                             "state" to "someone_home"
                         )
+                        "calendar_event" -> mapOf(
+                            "type" to "calendar_event",
+                            "calendarId" to calendarId,
+                            "calendarName" to (calendars.firstOrNull { it.first == calendarId }?.second
+                                ?: prefill?.calendarName ?: ""),
+                            "title" to calendarTitle
+                        )
                         else -> emptyMap()
                     }
-                    onAdd(map)
+                    onAdd(if (invert) map + ("invert" to true) else map)
                 },
+                enabled = selectedType != "calendar_event" || calendarId >= 0,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
