@@ -707,8 +707,11 @@ class AutomationTriggerMathTest {
         // can never repeat a fired one - even if the list was reordered before the upgrade.
         val tomb = AutomationTriggerMath.timeMigratedKey(7, "2026-305")
         assertEquals("tdaym_7_2026-305", tomb)
+        // The tombstone key carries the day, so another day's lookup finds nothing.
+        assertTrue(tomb != AutomationTriggerMath.timeMigratedKey(7, "2026-306"))
+        // The engine looks the tombstone up by TODAY's key and passes the result here:
         assertTrue(AutomationTriggerMath.timeFiredToday(null, migratedTombstone = true, dayKey = "2026-305"))
-        assertFalse(AutomationTriggerMath.timeFiredToday(null, migratedTombstone = true, dayKey = "2026-306"))
+        assertFalse(AutomationTriggerMath.timeFiredToday(null, migratedTombstone = false, dayKey = "2026-306"))
         assertTrue(AutomationTriggerMath.timeFiredToday("2026-305", migratedTombstone = false, dayKey = "2026-305"))
         assertFalse(AutomationTriggerMath.timeFiredToday("2026-304", migratedTombstone = false, dayKey = "2026-305"))
     }
