@@ -510,43 +510,10 @@ fun AdvancedAutomationScreen(
                     Spacer(Modifier.height(12.dp))
 
                     if (uiState.triggers.size >= 2) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                "Modo:",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            listOf("any" to "Cualquiera", "all" to "Todas").forEach { (value, label) ->
-                                FilterChip(
-                                    selected = triggersMode == value,
-                                    onClick = { triggersMode = value },
-                                    label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                        selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    border = FilterChipDefaults.filterChipBorder(
-                                        enabled = true,
-                                        selected = triggersMode == value,
-                                        selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                    )
-                                )
-                            }
-                        }
-                        if (triggersMode == "all") {
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                "Salta cuando ocurra uno y los demás se cumplan en ese momento. " +
-                                    "Un calendario se cumple mientras el evento está en curso y una zona mientras estás dentro (o fuera). " +
-                                    "Dos citas puntuales (hora o fecha) casi nunca coinciden.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        TriggersModeSelector(
+                            triggersMode = triggersMode,
+                            onModeChange = { triggersMode = it }
+                        )
                         Spacer(Modifier.height(12.dp))
                     }
 
@@ -579,35 +546,11 @@ fun AdvancedAutomationScreen(
                     )
                     Spacer(Modifier.height(8.dp))
 
-                    // Trigger mode selector
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "Modo:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        listOf("any" to "Cualquiera", "all" to "Todas").forEach { (value, label) ->
-                            FilterChip(
-                                selected = triggerMode == value,
-                                onClick = { triggerMode = value },
-                                label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
-                                    selectedLabelColor = MaterialTheme.colorScheme.tertiary,
-                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    enabled = true,
-                                    selected = triggerMode == value,
-                                    selectedBorderColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
-                                    borderColor = OutlineVariant
-                                )
-                            )
-                        }
-                    }
+                    // Conditions combination mode selector
+                    ConditionsModeSelector(
+                        triggerMode = triggerMode,
+                        onModeChange = { triggerMode = it }
+                    )
                     Spacer(Modifier.height(12.dp))
 
                     uiState.conditions.forEachIndexed { index, map ->
@@ -1079,4 +1022,85 @@ private fun actionIcon(type: String): ImageVector = when (type) {
     "set_schedule" -> Icons.Default.EventRepeat
     "run_automation" -> Icons.Default.SmartButton
     else -> Icons.Default.PlayArrow
+}
+
+// ── Mode selectors (extracted so UI tests can render the real controls) ──────
+
+@Composable
+internal fun TriggersModeSelector(
+    triggersMode: String,
+    onModeChange: (String) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            "Modo:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        listOf("any" to "Cualquiera", "all" to "Todas").forEach { (value, label) ->
+            FilterChip(
+                selected = triggersMode == value,
+                onClick = { onModeChange(value) },
+                label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    selectedLabelColor = MaterialTheme.colorScheme.primary,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = triggersMode == value,
+                    selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                )
+            )
+        }
+    }
+    if (triggersMode == "all") {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Salta cuando ocurra uno y los demás se cumplan en ese momento. " +
+                "Un calendario se cumple mientras el evento está en curso y una zona mientras estás dentro (o fuera). " +
+                "Dos citas puntuales (hora o fecha) casi nunca coinciden.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+internal fun ConditionsModeSelector(
+    triggerMode: String,
+    onModeChange: (String) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            "Modo:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        listOf("any" to "Cualquiera", "all" to "Todas").forEach { (value, label) ->
+            FilterChip(
+                selected = triggerMode == value,
+                onClick = { onModeChange(value) },
+                label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                    selectedLabelColor = MaterialTheme.colorScheme.tertiary,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = triggerMode == value,
+                    selectedBorderColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
+                    borderColor = OutlineVariant
+                )
+            )
+        }
+    }
 }
