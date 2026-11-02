@@ -12,6 +12,42 @@ object AutomationTriggerMath {
     const val TIME_TRIGGER_WINDOW_MIN = 20
 
     /**
+     * Three-valued answer to "does this hold right now?": YES it holds, NO it does not, or
+     * UNKNOWN when the data cannot be read (no calendar permission, zone state never recorded,
+     * temperature unreadable). UNKNOWN never enables a heating action, and negating it must
+     * stay UNKNOWN rather than become YES.
+     */
+    enum class Check { YES, NO, UNKNOWN }
+
+    /** Negation: flipping an UNKNOWN would turn unreadable data into a permission to heat. */
+    fun Check.not(): Check = when (this) {
+        Check.YES -> Check.NO
+        Check.NO -> Check.YES
+        Check.UNKNOWN -> Check.UNKNOWN
+    }
+
+    /** Applies a stored "invert" flag to a check result. */
+    fun Check.withInvert(invert: Boolean): Check = if (invert) not() else this
+
+    /** OR: one YES is enough; without one, any UNKNOWN leaves the result unknown. */
+    fun combineAny(checks: List<Check>): Check = when {
+        checks.any { it == Check.YES } -> Check.YES
+        checks.any { it == Check.UNKNOWN } -> Check.UNKNOWN
+        else -> Check.NO
+    }
+
+    /** AND: one NO is enough; without one, any UNKNOWN leaves the result unknown. */
+    fun combineAll(checks: List<Check>): Check = when {
+        checks.any { it == Check.NO } -> Check.NO
+        checks.any { it == Check.UNKNOWN } -> Check.UNKNOWN
+        else -> Check.YES
+    }
+
+    /** Whether an event instance covering [startMs, endMs) is under way at [nowMs]. */
+    fun eventActiveNow(startMs: Long, endMs: Long, nowMs: Long): Boolean =
+        endMs > startMs && nowMs >= startMs && nowMs < endMs
+
+    /**
      * Whether [nowMinutes] (minutes since midnight) on [isoDay] (1=Mon..7=Sun) is inside the
      * window. Overnight windows (start > end) wrap past midnight. [days] null means every day.
      */
