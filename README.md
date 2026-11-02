@@ -100,6 +100,13 @@ app/
 
 En el editor avanzado, los disparadores, las condiciones y las acciones de cada automatización se pueden reordenar con las flechas ▲▼ de cada elemento (por ejemplo, para que la notificación avise antes o después del cambio de modo). Las flechas solo aparecen cuando el elemento puede moverse en esa dirección.
 
+### Operadores lógicos
+
+- **Disparadores**: con dos o más aparece el modo **Cualquiera / Todas**. Con «Cualquiera» salta el primero que ocurra (comportamiento de siempre). Con «Todas» salta cuando **ocurre uno y los demás se cumplen en ese momento**: un calendario se cumple mientras el evento está en curso (su antelación solo cuenta para su propio disparo), una zona mientras estás dentro (o fuera), una franja mientras estás dentro, una temperatura mientras supera el umbral, una hora durante unos minutos después y una fecha una vez pasada. Dos citas puntuales (hora o fecha) casi nunca coinciden. Si no hay ningún disparo puntual, la combinación salta una vez cuando todos pasan a cumplirse a la vez.
+- **Condiciones**: el modo Cualquiera / Todas combina las condiciones, igual que antes.
+- **Negar**: cada condición (y cada disparador en modo «Todas») puede negarse con el interruptor «Negar». Negar un dato que no se puede comprobar (sin permiso de calendario, zona sin estado conocido, temperatura sin lectura) sigue sin poder comprobarse: **nunca se convierte en cumplido ni ejecuta acciones**, y queda anotado en el diagnóstico.
+- **Condición «Calendario vigente»**: se cumple mientras un evento del calendario elegido (con filtro de título opcional) está en curso; un evento de día completo cubre su día. Ejemplo: disparador «al llegar a trabajo» + modo «Todas» + disparador de calendario «día libre», o la misma idea como condición.
+
 Las acciones disponibles incluyen, además de temperatura, modos, notificación y espera:
 
 - **Programa**: activa uno de los programas (horarios) de la instalación Netatmo y devuelve la casa al modo programado, igual que al activarlo desde la pantalla Programas.
