@@ -7,6 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -221,7 +224,7 @@ class AutomationEditorsUiTest {
         captureSheet("condition-add-calendar-event-negate")
         composeRule.onAllNodes(isToggleable(), useUnmergedTree = true)[0].performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Añadir condición", useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.onAllNodesWithText("Añadir condición", useUnmergedTree = true).onLast().performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals("time_range", saved?.get("type"))
         assertEquals(true, saved?.get("invert"))
@@ -247,7 +250,7 @@ class AutomationEditorsUiTest {
         captureSheet("trigger-add-all-mode-negate")
         composeRule.onAllNodes(isToggleable(), useUnmergedTree = true)[0].performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("Añadir disparador", useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.onAllNodesWithText("Añadir disparador", useUnmergedTree = true).onLast().performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals("time", saved?.get("type"))
         assertEquals(true, saved?.get("invert"))
