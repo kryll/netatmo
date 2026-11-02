@@ -576,42 +576,44 @@ class AdvancedAutomationEngine @Inject constructor(
     private data class TriggerMatch(val trigger: JSONObject, val commits: List<() -> Unit>)
 
     /**
-     * One-time re-key of legacy positional time/numeric marks ("tday_<id>_<index>",
-     * "tact_<id>_<index>") to value-keyed ones ("tday2_", "tact2_"): each mark follows the
-     * trigger currently sitting at its index, so past fires survive the upgrade and any later
-     * reordering without replaying. Idempotent: legacy keys are deleted after the copy.
+     * One-time migration of legacy POSITIONAL time/numeric marks ("tday_<id>_<index>",
+     * "tact_<id>_<index>"). A positional mark cannot be re-attached to its trigger once the
+     * list was reordered or edited before the upgrade, and guessing could REPEAT an action, so
+     * the migration is deliberately conservative:
+     * - Each legacy time mark becomes a same-day tombstone ("tdaym_") that suppresses EVERY
+     *   time trigger of this automation until the end of that day. Residual: a second time
+     *   trigger of the same automation that had genuinely not fired yet stays silent for the
+     *   rest of that day (visible in diagnostics). It can never re-fire one already fired.
+     * - Legacy numeric marks are dropped and each numeric trigger's CURRENT level is seeded as
+     *   its starting mark, so the first post-upgrade evaluation tracks the level instead of
+     *   re-firing it as a new crossing. Residual: a genuine crossing in the exact upgrade
+     *   window is tracked, not fired.
+     * Idempotent: legacy keys are deleted. From then on marks are value-keyed ("tday2_",
+     * "tact2_") and no reorder, insert, delete or mode switch can move or replay them.
      */
-    private fun migrateTimeNumericMarks(automationId: Long, triggers: JSONArray) {
+    private suspend fun migrateTimeNumericMarks(automationId: Long, triggers: JSONArray) {
         val tdayPrefix = "tday_${automationId}_"
         val tactPrefix = "tact_${automationId}_"
         val legacyTday = statePrefs.all.keys.filter { it.startsWith(tdayPrefix) }
-            .mapNotNull { k -> k.removePrefix(tdayPrefix).toIntOrNull()?.let { it to k } }.toMap()
         val legacyTact = statePrefs.all.keys.filter { it.startsWith(tactPrefix) }
-            .mapNotNull { k -> k.removePrefix(tactPrefix).toIntOrNull()?.let { it to k } }.toMap()
         if (legacyTday.isEmpty() && legacyTact.isEmpty()) return
-        val timeIds = (0 until triggers.length()).map { i ->
-            val t = triggers.getJSONObject(i)
-            if (t.optString("type") != "time") null else {
-                val target = try { parseTimeToMinutes(t.optString("time", "")) } catch (e: Exception) { -1 }
-                if (target < 0) null else AutomationTriggerMath.timeIdentity(target,
-                    t.optJSONArray("days")?.let { arr -> (0 until arr.length()).map { arr.getInt(it) }.toSet() })
-            }
-        }
-        val numIds = (0 until triggers.length()).map { i ->
-            val t = triggers.getJSONObject(i)
-            if (t.optString("type") != "numeric_state") null
-            else AutomationTriggerMath.numericIdentity(t.optString("entity"), t.optBoolean("below", true), t.optDouble("value", 0.0))
-        }
         val editor = statePrefs.edit()
-        AutomationTriggerMath.rekeyMarksByIdentity(legacyTday.mapValues { statePrefs.getString(it.value, null) }, timeIds) {
-            AutomationTriggerMath.timeDailyKey(automationId, it)
-        }.forEach { (k, v) -> if (v != null) editor.putString(k, v) }
-        AutomationTriggerMath.rekeyMarksByIdentity(legacyTact.mapValues { statePrefs.getBoolean(it.value, false) }, numIds) {
-            AutomationTriggerMath.numericLevelKey(automationId, it)
-        }.forEach { (k, v) -> editor.putBoolean(k, v) }
-        (legacyTday.values + legacyTact.values).forEach { editor.remove(it) }
+        legacyTday.forEach { k ->
+            statePrefs.getString(k, null)?.let { day ->
+                editor.putBoolean(AutomationTriggerMath.timeMigratedKey(automationId, day), true)
+            }
+            editor.remove(k)
+        }
+        legacyTact.forEach { editor.remove(it) }
+        for (i in 0 until triggers.length()) {
+            val t = triggers.getJSONObject(i)
+            if (t.optString("type") != "numeric_state") continue
+            val active = numericStateActive(t) ?: continue
+            editor.putBoolean(AutomationTriggerMath.numericLevelKey(automationId,
+                AutomationTriggerMath.numericIdentity(t.optString("entity"), t.optBoolean("below", true), t.optDouble("value", 0.0))), active)
+        }
         editor.apply()
-        DiagnosticLog.log(context, "MOTOR", "Migradas ${legacyTday.size + legacyTact.size} marca(s) de disparo a claves por valor")
+        DiagnosticLog.log(context, "MOTOR", "Migradas ${legacyTday.size + legacyTact.size} marca(s) antiguas de disparo (supresión conservadora, nunca repite)")
     }
 
     /**
@@ -648,7 +650,8 @@ class AdvancedAutomationEngine @Inject constructor(
                         if ((days == null || isoDay in days) && (nowMinutes - target) in 0 until AutomationTriggerMath.TIME_TRIGGER_WINDOW_MIN) {
                             val key = AutomationTriggerMath.timeDailyKey(automationId, AutomationTriggerMath.timeIdentity(target, days))
                             val dayKey = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
-                            if (statePrefs.getString(key, null) != dayKey) {
+                            if (!AutomationTriggerMath.timeFiredToday(statePrefs.getString(key, null),
+                                    statePrefs.getBoolean(AutomationTriggerMath.timeMigratedKey(automationId, dayKey), false), dayKey)) {
                                 candidates.add(Candidate(i, trigger) { statePrefs.edit().putString(key, dayKey).apply() })
                             }
                         }
@@ -797,7 +800,8 @@ class AdvancedAutomationEngine @Inject constructor(
         if (elapsed !in 0 until AutomationTriggerMath.TIME_TRIGGER_WINDOW_MIN) return false
         val dayKey = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
         val key = AutomationTriggerMath.timeDailyKey(automationId, AutomationTriggerMath.timeIdentity(target, days))
-        if (statePrefs.getString(key, null) == dayKey) return false
+        if (AutomationTriggerMath.timeFiredToday(statePrefs.getString(key, null),
+                statePrefs.getBoolean(AutomationTriggerMath.timeMigratedKey(automationId, dayKey), false), dayKey)) return false
         statePrefs.edit().putString(key, dayKey).apply()
         DiagnosticLog.log(context, "MOTOR", "Disparador hora ${trigger.optString("time")}: dentro de la ventana (${elapsed} min tras la hora), se ejecuta")
         return true
