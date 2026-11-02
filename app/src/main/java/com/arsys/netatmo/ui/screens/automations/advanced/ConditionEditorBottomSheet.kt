@@ -40,7 +40,9 @@ import com.arsys.netatmo.ui.theme.SurfaceContainerLow
 fun ConditionEditorBottomSheet(
     onDismiss: () -> Unit,
     onAdd: (Map<String, Any>) -> Unit,
-    initial: Map<String, Any>? = null
+    initial: Map<String, Any>? = null,
+    // Test hook: seed the calendar list so the form can be rendered without the permission flow.
+    initialCalendars: List<Pair<Long, String>> = emptyList()
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -56,7 +58,7 @@ fun ConditionEditorBottomSheet(
     var invert by remember { mutableStateOf(prefill?.invert ?: false) }
 
     // Calendar event (vigente ahora)
-    var calendars by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
+    var calendars by remember { mutableStateOf(initialCalendars) }
     var calendarId by remember { mutableStateOf(prefill?.calendarId ?: -1L) }
     var calendarTitle by remember { mutableStateOf(prefill?.calendarTitle ?: "") }
     var calendarPermissionDenied by remember { mutableStateOf(false) }
