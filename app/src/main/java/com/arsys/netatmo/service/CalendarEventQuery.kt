@@ -7,11 +7,12 @@ import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
 
 /**
- * A calendar event instance: its title, the start of THIS occurrence and the id of the event
- * it belongs to (stable per CalendarContract.Events row: a recurring series keeps one id for
- * all its occurrences, a modified occurrence gets its own).
+ * A calendar event instance: its title, the start and end of THIS occurrence and the id of
+ * the event it belongs to (stable per CalendarContract.Events row: a recurring series keeps
+ * one id for all its occurrences, a modified occurrence gets its own). For all-day events
+ * both instants are local (device-zone) midnights, so [startMs, endMs) covers the day(s).
  */
-data class CalendarEventReading(val title: String, val startMs: Long, val eventId: Long)
+data class CalendarEventReading(val title: String, val startMs: Long, val endMs: Long, val eventId: Long)
 
 /**
  * Reads calendar event instances in [fromMs, toMs] through CalendarContract.Instances, which
@@ -41,6 +42,7 @@ object CalendarEventQuery {
             CalendarContract.Instances.TITLE,
             CalendarContract.Instances.BEGIN,
             CalendarContract.Instances.ALL_DAY,
+            CalendarContract.Instances.END,
             CalendarContract.Instances.EVENT_ID
         )
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().apply {
@@ -57,11 +59,15 @@ object CalendarEventQuery {
                 while (cursor.moveToNext()) {
                     val title = cursor.getString(0) ?: ""
                     // All-day instances come as UTC midnight; the trigger means local midnight.
+                    val allDay = cursor.getInt(2) == 1
                     val startMs = cursor.getLong(1).let {
-                        if (cursor.getInt(2) == 1) AutomationTriggerMath.allDayLocalStart(it) else it
+                        if (allDay) AutomationTriggerMath.allDayLocalStart(it) else it
+                    }
+                    val endMs = cursor.getLong(3).let {
+                        if (allDay) AutomationTriggerMath.allDayLocalStart(it) else it
                     }
                     if (titleFilter == null || title.contains(titleFilter, ignoreCase = true)) {
-                        events.add(CalendarEventReading(title, startMs, cursor.getLong(3)))
+                        events.add(CalendarEventReading(title, startMs, endMs, cursor.getLong(4)))
                     }
                 }
             }
