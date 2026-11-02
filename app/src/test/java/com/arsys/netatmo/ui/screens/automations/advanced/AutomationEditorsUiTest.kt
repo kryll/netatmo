@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.hasSetTextAction
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
 import com.arsys.netatmo.ui.theme.NetatmoTheme
 import org.junit.Assert.assertEquals
@@ -52,6 +54,17 @@ class AutomationEditorsUiTest {
         val view = dialog?.window?.decorView ?: error("No dialog to capture for $name")
         assertTrue("dialog has no width for $name", view.width > 0)
         assertTrue("dialog has no height for $name", view.height > 0)
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        val dir = File("build/outputs/compose-shots").apply { mkdirs() }
+        FileOutputStream(File(dir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    // For content rendered straight into the activity (no dialog), e.g. screen composables.
+    private fun captureActivity(name: String) {
+        val view = composeRule.activity.window.decorView
+        assertTrue("activity has no width for $name", view.width > 0)
+        assertTrue("activity has no height for $name", view.height > 0)
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
         val dir = File("build/outputs/compose-shots").apply { mkdirs() }
@@ -221,7 +234,7 @@ class AutomationEditorsUiTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Negar: se cumple cuando NO pasa lo de arriba", useUnmergedTree = true)
             .performScrollTo().assertIsDisplayed()
-        captureSheet("condition-add-calendar-event-negate")
+        captureSheet("condition-add-time-range-negate")
         composeRule.onAllNodes(isToggleable(), useUnmergedTree = true)[0].performClick()
         composeRule.waitForIdle()
         composeRule.onAllNodesWithText("Añadir condición", useUnmergedTree = true).onLast().performScrollTo().performClick()
@@ -250,7 +263,9 @@ class AutomationEditorsUiTest {
         captureSheet("trigger-add-all-mode-negate")
         composeRule.onAllNodes(isToggleable(), useUnmergedTree = true)[0].performClick()
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithText("Añadir disparador", useUnmergedTree = true).onLast().performScrollTo().performClick()
+        composeRule.onAllNodesWithText("Añadir disparador", useUnmergedTree = true).onLast().performScrollTo().assertIsDisplayed()
+        captureSheet("trigger-add-all-mode-save")
+        composeRule.onAllNodesWithText("Añadir disparador", useUnmergedTree = true).onLast().performClick()
         composeRule.waitForIdle()
         assertEquals("time", saved?.get("type"))
         assertEquals(true, saved?.get("invert"))
@@ -270,5 +285,66 @@ class AutomationEditorsUiTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Negar: en modo «Todas» cuenta como cumplido cuando NO lo está", useUnmergedTree = true)
             .assertDoesNotExist()
+    }
+
+    @Test
+    fun automationEditor_modeSelectors_areTheRealEditorControls() {
+        // The main screen cannot be composed in a unit test (its ViewModel pulls the whole
+        // repository graph), so the screen's own selector composables render here as they
+        // appear inside the editor section cards.
+        composeRule.setContent {
+            NetatmoTheme {
+                Column {
+                    AutomationSectionCard {
+                        TriggersModeSelector(triggersMode = "all", onModeChange = {})
+                    }
+                    AutomationSectionCard {
+                        ConditionsModeSelector(triggerMode = "all", onModeChange = {})
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals(2, composeRule.onAllNodesWithText("Cualquiera", useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals(2, composeRule.onAllNodesWithText("Todas", useUnmergedTree = true).fetchSemanticsNodes().size)
+        composeRule.onNodeWithText(
+            "Salta cuando ocurra uno y los demás se cumplan en ese momento.",
+            substring = true, useUnmergedTree = true
+        ).assertIsDisplayed()
+        captureActivity("automation-edit-mode-selectors")
+    }
+
+    @Test
+    fun conditionEditor_calendarEvent_showsFormAndSaveReachableByScroll() {
+        // José's own example as fixture data: calendar "Trabajo Nazaret", title filter "día libre".
+        var saved: Map<String, Any>? = null
+        composeRule.setContent {
+            NetatmoTheme {
+                ConditionEditorBottomSheet(
+                    onDismiss = {},
+                    onAdd = { saved = it },
+                    initialCalendars = listOf(1L to "Trabajo Nazaret", 2L to "Personal")
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Calendario vigente", useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Trabajo Nazaret", useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        // The only text field in the calendar form is the title filter.
+        composeRule.onAllNodes(hasSetTextAction(), useUnmergedTree = true).onFirst()
+            .performScrollTo().performTextReplacement("día libre")
+        composeRule.waitForIdle()
+        captureSheet("condition-add-calendar-event-form")
+        composeRule.onAllNodesWithText("Añadir condición", useUnmergedTree = true).onLast()
+            .performScrollTo().assertIsDisplayed()
+        captureSheet("condition-add-calendar-event-save")
+        composeRule.onAllNodesWithText("Añadir condición", useUnmergedTree = true).onLast().performClick()
+        composeRule.waitForIdle()
+        assertEquals("calendar_event", saved?.get("type"))
+        assertEquals(1L, saved?.get("calendarId"))
+        assertEquals("Trabajo Nazaret", saved?.get("calendarName"))
+        assertEquals("día libre", saved?.get("title"))
     }
 }
