@@ -109,7 +109,8 @@ class AutomationAlarmScheduler @Inject constructor(
                     ?.let { arr -> (0 until arr.length()).map { arr.getInt(it) }.toSet() }
                 val cal = Calendar.getInstance().apply { timeInMillis = now }
                 val dayKey = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
-                val firedToday = statePrefs.getString("tday_${automationId}_$index", null) == dayKey
+                val firedToday = statePrefs.getString(AutomationTriggerMath.timeDailyKey(automationId,
+                    AutomationTriggerMath.timeIdentity(minutes, days)), null) == dayKey
                 AutomationTriggerMath.nextTimeTriggerInstant(days, minutes, firedToday, now)
             }
             "datetime" -> {
