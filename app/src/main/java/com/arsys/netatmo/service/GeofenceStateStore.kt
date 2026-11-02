@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import com.google.android.gms.location.Geofence
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -45,6 +46,14 @@ class GeofenceStateStore @Inject constructor(
         }
         return accepted
     }
+
+    /**
+     * Last recorded state for [geofenceId]: true inside, false outside, null when nothing was
+     * ever recorded (fresh install, or the zone was edited and its state reset). Null is
+     * "unknown": callers must not treat it as inside or outside.
+     */
+    suspend fun isInside(geofenceId: String): Boolean? =
+        dataStore.data.first()[insideKey(geofenceId)]
 
     /** Forgets the state, e.g. when the geofence location or radius was edited. */
     suspend fun reset(geofenceId: String) {
