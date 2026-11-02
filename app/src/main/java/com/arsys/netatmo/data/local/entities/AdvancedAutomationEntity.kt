@@ -12,7 +12,10 @@ data class AdvancedAutomationEntity(
     val triggersJson: String = "[]",   // JSON array of trigger objects
     val conditionsJson: String = "[]", // JSON array of condition objects
     val actionsJson: String = "[]",    // JSON array of action objects
+    // Historical name: this is the CONDITIONS combine mode. The TRIGGERS combine mode
+    // lives in triggersMode (added in DB v9).
     val triggerMode: String = "any",   // "any" | "all"
+    val triggersMode: String = "any",  // "any" | "all" — how the triggers combine
     val mode: String = "single",       // "single" | "restart" | "queued"
     val createdAt: Long = System.currentTimeMillis(),
     val lastTriggeredAt: Long? = null,
