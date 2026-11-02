@@ -701,27 +701,15 @@ class AutomationTriggerMathTest {
     }
 
     @Test
-    fun `rekeying maps a legacy positional mark to the value key of the trigger at its index`() {
-        val timeId = AutomationTriggerMath.timeIdentity(480, setOf(1, 2, 3))
-        // Same caveat as the datetime migration: the legacy mark follows the trigger sitting
-        // at its index TODAY. Once value-keyed, no later reorder can move or replay the mark.
-        val migrated = AutomationTriggerMath.rekeyMarksByIdentity(mapOf(0 to "2026-305"), listOf(timeId, null)) {
-            AutomationTriggerMath.timeDailyKey(7, it)
-        }
-        assertEquals(mapOf("tday2_7_$timeId" to "2026-305"), migrated)
-        assertEquals("tday2_7_time:480:1,2,3", AutomationTriggerMath.timeDailyKey(7, timeId))
-    }
-
-    @Test
-    fun `rekeying drops marks whose trigger is gone and ignores inserts`() {
-        val numId = AutomationTriggerMath.numericIdentity("indoor_temp", false, 21.5)
-        val dropped = AutomationTriggerMath.rekeyMarksByIdentity(mapOf(2 to true), listOf(numId, null)) {
-            AutomationTriggerMath.numericLevelKey(3, it)
-        }
-        assertEquals(emptyMap<String, Boolean>(), dropped)
-        val kept = AutomationTriggerMath.rekeyMarksByIdentity(mapOf(0 to true), listOf(numId, null)) {
-            AutomationTriggerMath.numericLevelKey(3, it)
-        }
-        assertEquals(mapOf("tact2_3_$numId" to true), kept)
+    fun `a legacy time mark suppresses the whole day and never re-fires`() {
+        // The legacy positional format kept no identity, so migration writes a same-day
+        // tombstone: it can delay a genuinely pending second trigger until tomorrow, but it
+        // can never repeat a fired one - even if the list was reordered before the upgrade.
+        val tomb = AutomationTriggerMath.timeMigratedKey(7, "2026-305")
+        assertEquals("tdaym_7_2026-305", tomb)
+        assertTrue(AutomationTriggerMath.timeFiredToday(null, migratedTombstone = true, dayKey = "2026-305"))
+        assertFalse(AutomationTriggerMath.timeFiredToday(null, migratedTombstone = true, dayKey = "2026-306"))
+        assertTrue(AutomationTriggerMath.timeFiredToday("2026-305", migratedTombstone = false, dayKey = "2026-305"))
+        assertFalse(AutomationTriggerMath.timeFiredToday("2026-304", migratedTombstone = false, dayKey = "2026-305"))
     }
 }
