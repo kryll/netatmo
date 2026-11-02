@@ -117,6 +117,7 @@ class AdvancedAutomationEngine @Inject constructor(
             migrateDatetimeConsumption(context, advancedAutomationRepository, automation.id)
             migrateCalendarConsumption(context, advancedAutomationRepository, automation.id)
             val triggers = JSONArray(automation.triggersJson)
+            migrateTimeNumericMarks(automation.id, triggers)
             var firedTrigger: JSONObject? = null
             val shouldRun: Boolean
             if (triggers.length() == 0) {
@@ -184,9 +185,12 @@ class AdvancedAutomationEngine @Inject constructor(
                     // trigger must hold as a state right now. An unreadable state (no calendar
                     // permission, a zone state never recorded) blocks the run: it never
                     // enables heating.
+                    val typeAtPairs = (0 until triggers.length()).map {
+                        triggers.getJSONObject(it).optString("type") to triggers.getJSONObject(it).optLong("at", 0L)
+                    }
                     val others = (0 until triggers.length())
                         .filter { it != matchingIndex }
-                        .map { triggerStateCheck(automation.id, it, triggers.getJSONObject(it)) }
+                        .map { triggerStateCheck(automation.id, it, triggers.getJSONObject(it), typeAtPairs) }
                     when (AutomationTriggerMath.combineAll(others)) {
                         AutomationTriggerMath.Check.YES -> {}
                         AutomationTriggerMath.Check.UNKNOWN -> {
@@ -243,8 +247,9 @@ class AdvancedAutomationEngine @Inject constructor(
         statePrefs.all.keys
             .filter {
                 it.startsWith("tact_${automation.id}_") || it.startsWith("tday_${automation.id}_") ||
+                    it.startsWith("tact2_${automation.id}_") || it.startsWith("tday2_${automation.id}_") ||
                     it.startsWith("tdt_${automation.id}_") || it.startsWith("tdt3_${automation.id}_") ||
-                    it.startsWith("tcal_${automation.id}_") || it == "tall_${automation.id}"
+                    it.startsWith("tcal_${automation.id}_")
             }
             .forEach { editor.remove(it) }
         editor.apply()
@@ -320,7 +325,7 @@ class AdvancedAutomationEngine @Inject constructor(
                 for (i in 0 until triggers.length()) {
                     val t = triggers.getJSONObject(i)
                     val noPrefix = if (t.optBoolean("invert", false)) "NO " else ""
-                    report.appendLine("  Disparador ${i + 1} (${noPrefix}${t.optString("type")}): " + checkText(triggerStateCheck(automation.id, i, t)))
+                    report.appendLine("  Disparador ${i + 1} (${noPrefix}${t.optString("type")}): " + checkText(triggerStateCheck(automation.id, i, t, typeAtPairs)))
                 }
             }
             val conditionsCheck = evaluateConditions(automation)
@@ -522,11 +527,11 @@ class AdvancedAutomationEngine @Inject constructor(
      * after its time; a one-shot date trigger holds once its instant has passed. Anything
      * that cannot be checked is UNKNOWN and never enables the run.
      */
-    private suspend fun triggerStateCheck(automationId: Long, index: Int, trigger: JSONObject): AutomationTriggerMath.Check {
-        return triggerStateCheckRaw(automationId, index, trigger).withInvert(trigger.optBoolean("invert", false))
+    private suspend fun triggerStateCheck(automationId: Long, index: Int, trigger: JSONObject, typeAtPairs: List<Pair<String, Long>>): AutomationTriggerMath.Check {
+        return triggerStateCheckRaw(automationId, index, trigger, typeAtPairs).withInvert(trigger.optBoolean("invert", false))
     }
 
-    private suspend fun triggerStateCheckRaw(automationId: Long, index: Int, trigger: JSONObject): AutomationTriggerMath.Check {
+    private suspend fun triggerStateCheckRaw(automationId: Long, index: Int, trigger: JSONObject, typeAtPairs: List<Pair<String, Long>>): AutomationTriggerMath.Check {
         return when (trigger.optString("type")) {
             "time" -> {
                 val target = try { parseTimeToMinutes(trigger.optString("time", "")) } catch (e: Exception) { return AutomationTriggerMath.Check.NO }
@@ -545,8 +550,12 @@ class AdvancedAutomationEngine @Inject constructor(
             }
             "calendar" -> calendarEventActiveNow(trigger)
             "datetime" -> {
+                // A past one-shot date holds only while UNCONSUMED: once it fired it can never
+                // hold again, so a consumed date neither re-fires nor enables another occurrence.
                 val at = trigger.optLong("at", 0L)
-                if (at > 0 && System.currentTimeMillis() >= at) AutomationTriggerMath.Check.YES else AutomationTriggerMath.Check.NO
+                val occurrence = AutomationTriggerMath.datetimeOccurrence(typeAtPairs, index)
+                val consumed = statePrefs.getBoolean(AutomationTriggerMath.datetimeConsumedKey(automationId, at, occurrence), false)
+                if (AutomationTriggerMath.datetimeShouldFire(at, consumed, System.currentTimeMillis())) AutomationTriggerMath.Check.YES else AutomationTriggerMath.Check.NO
             }
             "geofence" -> {
                 val zoneId = trigger.optString("zoneId")
@@ -567,12 +576,52 @@ class AdvancedAutomationEngine @Inject constructor(
     private data class TriggerMatch(val trigger: JSONObject, val commits: List<() -> Unit>)
 
     /**
-     * "Todas" mode: a match when one trigger OCCURS (hour, one-shot date, calendar start,
-     * temperature crossing) and every other trigger holds as a state at that moment, or when
-     * a combination with no occurring trigger starts holding entirely (rising edge: once,
-     * until it stops holding). Consumption marks are deferred: the caller writes them only
-     * when the run really happens, so a match blocked by a condition or an unreadable state
-     * retries on the next check. UNKNOWN states never enable the run.
+     * One-time re-key of legacy positional time/numeric marks ("tday_<id>_<index>",
+     * "tact_<id>_<index>") to value-keyed ones ("tday2_", "tact2_"): each mark follows the
+     * trigger currently sitting at its index, so past fires survive the upgrade and any later
+     * reordering without replaying. Idempotent: legacy keys are deleted after the copy.
+     */
+    private fun migrateTimeNumericMarks(automationId: Long, triggers: JSONArray) {
+        val tdayPrefix = "tday_${automationId}_"
+        val tactPrefix = "tact_${automationId}_"
+        val legacyTday = statePrefs.all.keys.filter { it.startsWith(tdayPrefix) }
+            .mapNotNull { k -> k.removePrefix(tdayPrefix).toIntOrNull()?.let { it to k } }.toMap()
+        val legacyTact = statePrefs.all.keys.filter { it.startsWith(tactPrefix) }
+            .mapNotNull { k -> k.removePrefix(tactPrefix).toIntOrNull()?.let { it to k } }.toMap()
+        if (legacyTday.isEmpty() && legacyTact.isEmpty()) return
+        val timeIds = (0 until triggers.length()).map { i ->
+            val t = triggers.getJSONObject(i)
+            if (t.optString("type") != "time") null else {
+                val target = try { parseTimeToMinutes(t.optString("time", "")) } catch (e: Exception) { -1 }
+                if (target < 0) null else AutomationTriggerMath.timeIdentity(target,
+                    t.optJSONArray("days")?.let { arr -> (0 until arr.length()).map { arr.getInt(it) }.toSet() })
+            }
+        }
+        val numIds = (0 until triggers.length()).map { i ->
+            val t = triggers.getJSONObject(i)
+            if (t.optString("type") != "numeric_state") null
+            else AutomationTriggerMath.numericIdentity(t.optString("entity"), t.optBoolean("below", true), t.optDouble("value", 0.0))
+        }
+        val editor = statePrefs.edit()
+        AutomationTriggerMath.rekeyMarksByIdentity(legacyTday.mapValues { statePrefs.getString(it.value, null) }, timeIds) {
+            AutomationTriggerMath.timeDailyKey(automationId, it)
+        }.forEach { (k, v) -> if (v != null) editor.putString(k, v) }
+        AutomationTriggerMath.rekeyMarksByIdentity(legacyTact.mapValues { statePrefs.getBoolean(it.value, false) }, numIds) {
+            AutomationTriggerMath.numericLevelKey(automationId, it)
+        }.forEach { (k, v) -> editor.putBoolean(k, v) }
+        (legacyTday.values + legacyTact.values).forEach { editor.remove(it) }
+        editor.apply()
+        DiagnosticLog.log(context, "MOTOR", "Migradas ${legacyTday.size + legacyTact.size} marca(s) de disparo a claves por valor")
+    }
+
+    /**
+     * "Todas" mode: a match only when one trigger OCCURS (hour in its window, one-shot date,
+     * calendar start, temperature crossing; a zone transition occurs via onZoneTransition) and
+     * every other trigger holds as a state at that moment. States that merely hold never fire
+     * on their own: creating, saving, reordering or restarting is not an occurrence. A past
+     * one-shot date holds only while unconsumed. Consumption marks are deferred: the caller
+     * writes them only when the run really happens, so a match blocked by a condition or an
+     * unreadable state retries on the next check. UNKNOWN states never enable the run.
      */
     private suspend fun allModeFire(automation: AdvancedAutomationEntity, triggers: JSONArray, windowStartMs: Long): TriggerMatch? {
         val automationId = automation.id
@@ -590,14 +639,14 @@ class AdvancedAutomationEngine @Inject constructor(
         val states = mutableListOf<AutomationTriggerMath.Check>()
         for (i in 0 until triggers.length()) {
             val trigger = triggers.getJSONObject(i)
-            states.add(triggerStateCheck(automationId, i, trigger))
+            states.add(triggerStateCheck(automationId, i, trigger, typeAtPairs))
             when (trigger.optString("type")) {
                 "time" -> {
                     val target = try { parseTimeToMinutes(trigger.optString("time", "")) } catch (e: Exception) { -1 }
                     if (target >= 0) {
                         val days = trigger.optJSONArray("days")?.let { arr -> (0 until arr.length()).map { arr.getInt(it) }.toSet() }
                         if ((days == null || isoDay in days) && (nowMinutes - target) in 0 until AutomationTriggerMath.TIME_TRIGGER_WINDOW_MIN) {
-                            val key = "tday_${automationId}_$i"
+                            val key = AutomationTriggerMath.timeDailyKey(automationId, AutomationTriggerMath.timeIdentity(target, days))
                             val dayKey = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
                             if (statePrefs.getString(key, null) != dayKey) {
                                 candidates.add(Candidate(i, trigger) { statePrefs.edit().putString(key, dayKey).apply() })
@@ -608,7 +657,8 @@ class AdvancedAutomationEngine @Inject constructor(
                 "numeric_state" -> {
                     // The crossing, not the level, is the occurrence; the stored level keeps
                     // tracking every evaluation so the crossing is detected once.
-                    val key = "tact_${automationId}_$i"
+                    val key = AutomationTriggerMath.numericLevelKey(automationId,
+                        AutomationTriggerMath.numericIdentity(trigger.optString("entity"), trigger.optBoolean("below", true), trigger.optDouble("value", 0.0)))
                     val wasActive = statePrefs.getBoolean(key, false)
                     val active = numericStateActive(trigger)
                     if (active != null) statePrefs.edit().putBoolean(key, active).apply()
@@ -630,37 +680,26 @@ class AdvancedAutomationEngine @Inject constructor(
             }
         }
 
-        // A trigger occurred: run only if every OTHER trigger holds right now.
-        for (candidate in candidates) {
-            val others = states.filterIndexed { idx, _ -> idx != candidate.index }
-            when (AutomationTriggerMath.combineAll(others)) {
-                AutomationTriggerMath.Check.YES -> {
-                    DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: disparador ${candidate.index + 1} (${candidate.trigger.optString("type")}) ocurrió y el resto se cumple (modo Todas)")
-                    return TriggerMatch(candidate.trigger, listOf(candidate.commit))
+        // A trigger occurred: run only if every OTHER trigger holds right now. Without an
+        // occurrence nothing fires - states that merely hold are not an event, so creating,
+        // saving, reordering or restarting never runs the automation on its own.
+        val occurred = (0 until triggers.length()).map { i -> candidates.any { it.index == i } }
+        val decision = AutomationTriggerMath.allModeDecision(occurred, states)
+        if (decision == null) {
+            candidates.forEach { candidate ->
+                when (AutomationTriggerMath.combineAll(states.filterIndexed { idx, _ -> idx != candidate.index })) {
+                    AutomationTriggerMath.Check.UNKNOWN ->
+                        DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: disparador ${candidate.index + 1} (${candidate.trigger.optString("type")}) ocurrió pero otro disparador no se pudo comprobar; no se ejecuta")
+                    AutomationTriggerMath.Check.NO ->
+                        DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: disparador ${candidate.index + 1} (${candidate.trigger.optString("type")}) ocurrió pero otro disparador no se cumple; no se ejecuta")
+                    AutomationTriggerMath.Check.YES -> {}
                 }
-                AutomationTriggerMath.Check.UNKNOWN ->
-                    DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: disparador ${candidate.index + 1} (${candidate.trigger.optString("type")}) ocurrió pero otro disparador no se pudo comprobar; no se ejecuta")
-                AutomationTriggerMath.Check.NO ->
-                    DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: disparador ${candidate.index + 1} (${candidate.trigger.optString("type")}) ocurrió pero otro disparador no se cumple; no se ejecuta")
             }
+            return null
         }
-
-        // No occurrence: a pure-state combination fires once when it starts holding entirely.
-        val allKey = "tall_${automationId}"
-        return when (AutomationTriggerMath.combineAll(states)) {
-            AutomationTriggerMath.Check.YES ->
-                if (statePrefs.getBoolean(allKey, false)) {
-                    null
-                } else {
-                    DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: todos los disparadores pasan a cumplirse a la vez (modo Todas)")
-                    TriggerMatch(triggers.getJSONObject(0), listOf { statePrefs.edit().putBoolean(allKey, true).apply() })
-                }
-            AutomationTriggerMath.Check.NO -> {
-                statePrefs.edit().remove(allKey).apply()
-                null
-            }
-            AutomationTriggerMath.Check.UNKNOWN -> null // keep the edge mark; unknown never enables
-        }
+        val firing = candidates.first { it.index == decision }
+        DiagnosticLog.log(context, "MOTOR", "«${automation.name}»: disparador ${decision + 1} (${firing.trigger.optString("type")}) ocurrió y el resto se cumple (modo Todas)")
+        return TriggerMatch(firing.trigger, listOf(firing.commit))
     }
 
     /**
@@ -729,10 +768,11 @@ class AdvancedAutomationEngine @Inject constructor(
         for (i in 0 until triggers.length()) {
             val trigger = triggers.getJSONObject(i)
             val fires = when (trigger.optString("type")) {
-                "time" -> timeTriggerFires(automationId, i, trigger)
+                "time" -> timeTriggerFires(automationId, trigger)
                 "numeric_state" -> {
                     val active = numericStateActive(trigger)
-                    val key = "tact_${automationId}_$i"
+                    val key = AutomationTriggerMath.numericLevelKey(automationId,
+                        AutomationTriggerMath.numericIdentity(trigger.optString("entity"), trigger.optBoolean("below", true), trigger.optDouble("value", 0.0)))
                     val wasActive = statePrefs.getBoolean(key, false)
                     if (active != null) statePrefs.edit().putBoolean(key, active).apply()
                     active == true && !wasActive
@@ -747,7 +787,7 @@ class AdvancedAutomationEngine @Inject constructor(
         return fired
     }
 
-    private fun timeTriggerFires(automationId: Long, index: Int, trigger: JSONObject): Boolean {
+    private fun timeTriggerFires(automationId: Long, trigger: JSONObject): Boolean {
         val target = try { parseTimeToMinutes(trigger.optString("time", "")) } catch (e: Exception) { return false }
         val days = trigger.optJSONArray("days")?.let { arr -> (0 until arr.length()).map { arr.getInt(it) }.toSet() }
         val cal = Calendar.getInstance()
@@ -756,7 +796,7 @@ class AdvancedAutomationEngine @Inject constructor(
         val elapsed = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE) - target
         if (elapsed !in 0 until AutomationTriggerMath.TIME_TRIGGER_WINDOW_MIN) return false
         val dayKey = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}"
-        val key = "tday_${automationId}_$index"
+        val key = AutomationTriggerMath.timeDailyKey(automationId, AutomationTriggerMath.timeIdentity(target, days))
         if (statePrefs.getString(key, null) == dayKey) return false
         statePrefs.edit().putString(key, dayKey).apply()
         DiagnosticLog.log(context, "MOTOR", "Disparador hora ${trigger.optString("time")}: dentro de la ventana (${elapsed} min tras la hora), se ejecuta")
