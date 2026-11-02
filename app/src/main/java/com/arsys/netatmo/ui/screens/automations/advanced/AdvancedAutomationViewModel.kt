@@ -32,6 +32,7 @@ data class AdvancedAutomationUiState(
     val conditions: List<Map<String, Any>> = emptyList(),
     val actions: List<Map<String, Any>> = emptyList(),
     val triggerMode: String = "all",
+    val triggersMode: String = "any",
     val isLoading: Boolean = false,
     val isSaved: Boolean = false,
     val isDeleted: Boolean = false,
@@ -87,6 +88,7 @@ class AdvancedAutomationViewModel @Inject constructor(
                             conditions = jsonArrayToMaps(entity.conditionsJson),
                             actions = jsonArrayToMaps(entity.actionsJson),
                             triggerMode = entity.triggerMode,
+                            triggersMode = entity.triggersMode,
                             isLoading = false
                         )
                     }
@@ -185,6 +187,10 @@ class AdvancedAutomationViewModel @Inject constructor(
         _uiState.update { it.copy(triggerMode = mode) }
     }
 
+    fun setTriggersMode(mode: String) {
+        _uiState.update { it.copy(triggersMode = mode) }
+    }
+
     fun setEnabled(enabled: Boolean) {
         _uiState.update { it.copy(enabled = enabled) }
     }
@@ -209,6 +215,7 @@ class AdvancedAutomationViewModel @Inject constructor(
         conditions: List<Map<String, Any>>,
         actions: List<Map<String, Any>>,
         triggerMode: String,
+        triggersMode: String,
         enabled: Boolean
     ) {
         viewModelScope.launch {
@@ -220,7 +227,8 @@ class AdvancedAutomationViewModel @Inject constructor(
                 triggersJson = mapsToJsonArray(triggers),
                 conditionsJson = mapsToJsonArray(conditions),
                 actionsJson = mapsToJsonArray(actions),
-                triggerMode = triggerMode
+                triggerMode = triggerMode,
+                triggersMode = triggersMode
             )
             // Inside the short shared section: migrate the legacy marks against the STORED
             // trigger list BEFORE overwriting it, so the positional marks are always
@@ -250,7 +258,8 @@ class AdvancedAutomationViewModel @Inject constructor(
         triggers: List<Map<String, Any>>,
         conditions: List<Map<String, Any>>,
         actions: List<Map<String, Any>>,
-        triggerMode: String
+        triggerMode: String,
+        triggersMode: String
     ) {
         if (_uiState.value.isTesting) return
         viewModelScope.launch {
@@ -261,7 +270,8 @@ class AdvancedAutomationViewModel @Inject constructor(
                 triggersJson = mapsToJsonArray(triggers),
                 conditionsJson = mapsToJsonArray(conditions),
                 actionsJson = mapsToJsonArray(actions),
-                triggerMode = triggerMode
+                triggerMode = triggerMode,
+                triggersMode = triggersMode
             )
             val report = try {
                 engine.testRun(entity)
