@@ -112,7 +112,8 @@ data class AutomationTrigger(
     val calendarId: Long = -1L,
     val calendarName: String = "",
     val title: String = "",
-    val minutesBefore: Int = 30
+    val minutesBefore: Int = 30,
+    val invert: Boolean = false
 )
 
 data class AutomationCondition(
@@ -121,7 +122,11 @@ data class AutomationCondition(
     val to: String = "",
     val entity: String = "",
     val below: Boolean = true,
-    val value: Double = 0.0
+    val value: Double = 0.0,
+    val calendarId: Long = -1L,
+    val calendarName: String = "",
+    val title: String = "",
+    val invert: Boolean = false
 )
 
 data class AutomationAction(
@@ -163,7 +168,8 @@ private fun Map<String, Any>.toAutoTrigger() = AutomationTrigger(
     calendarId = (this["calendarId"] as? Number)?.toLong() ?: -1L,
     calendarName = this["calendarName"] as? String ?: "",
     title = this["title"] as? String ?: "",
-    minutesBefore = (this["minutesBefore"] as? Number)?.toInt() ?: 30
+    minutesBefore = (this["minutesBefore"] as? Number)?.toInt() ?: 30,
+    invert = this["invert"] as? Boolean ?: false
 )
 
 private fun Map<String, Any>.toAutoCondition() = AutomationCondition(
@@ -173,7 +179,11 @@ private fun Map<String, Any>.toAutoCondition() = AutomationCondition(
     entity = this["entity"] as? String ?: "",
     below = this["below"] != null,
     value = (this["below"] as? Number)?.toDouble() ?: (this["above"] as? Number)?.toDouble()
-        ?: (this["value"] as? Number)?.toDouble() ?: 0.0
+        ?: (this["value"] as? Number)?.toDouble() ?: 0.0,
+    calendarId = (this["calendarId"] as? Number)?.toLong() ?: -1L,
+    calendarName = this["calendarName"] as? String ?: "",
+    title = this["title"] as? String ?: "",
+    invert = this["invert"] as? Boolean ?: false
 )
 
 private fun Map<String, Any>.toAutoAction() = AutomationAction(
@@ -209,6 +219,7 @@ fun AdvancedAutomationScreen(
 
     var name by remember { mutableStateOf(uiState.name) }
     var triggerMode by remember { mutableStateOf(uiState.triggerMode) }
+    var triggersMode by remember { mutableStateOf(uiState.triggersMode) }
     var enabled by remember { mutableStateOf(uiState.enabled) }
 
     // Index of the item being edited in its sheet; -1 = new item, null = sheet closed.
@@ -235,6 +246,7 @@ fun AdvancedAutomationScreen(
 
     LaunchedEffect(uiState.name) { name = uiState.name }
     LaunchedEffect(uiState.triggerMode) { triggerMode = uiState.triggerMode }
+    LaunchedEffect(uiState.triggersMode) { triggersMode = uiState.triggersMode }
     LaunchedEffect(uiState.enabled) { enabled = uiState.enabled }
     LaunchedEffect(uiState.isSaved) { if (uiState.isSaved) navController.popBackStack() }
     LaunchedEffect(uiState.isDeleted) { if (uiState.isDeleted) navController.popBackStack() }
@@ -311,6 +323,7 @@ fun AdvancedAutomationScreen(
                 triggerSheetFor = null
             },
             zones = zones,
+            triggersMode = triggersMode,
             onManageZones = {
                 triggerSheetFor = null
                 navController.navigate("zones")
@@ -409,7 +422,8 @@ fun AdvancedAutomationScreen(
                                 triggers = uiState.triggers,
                                 conditions = uiState.conditions,
                                 actions = uiState.actions,
-                                triggerMode = triggerMode
+                                triggerMode = triggerMode,
+                                triggersMode = triggersMode
                             )
                         },
                         enabled = !uiState.isTesting,
@@ -431,6 +445,7 @@ fun AdvancedAutomationScreen(
                                 conditions = uiState.conditions,
                                 actions = uiState.actions,
                                 triggerMode = triggerMode,
+                                triggersMode = triggersMode,
                                 enabled = enabled
                             )
                         },
@@ -493,6 +508,47 @@ fun AdvancedAutomationScreen(
                         accentColor = MaterialTheme.colorScheme.primary
                     )
                     Spacer(Modifier.height(12.dp))
+
+                    if (uiState.triggers.size >= 2) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                "Modo:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            listOf("any" to "Cualquiera", "all" to "Todas").forEach { (value, label) ->
+                                FilterChip(
+                                    selected = triggersMode == value,
+                                    onClick = { triggersMode = value },
+                                    label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                        selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = triggersMode == value,
+                                        selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                    )
+                                )
+                            }
+                        }
+                        if (triggersMode == "all") {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Salta cuando ocurra uno y los demás se cumplan en ese momento. " +
+                                    "Un calendario se cumple mientras el evento está en curso y una zona mientras estás dentro (o fuera). " +
+                                    "Dos citas puntuales (hora o fecha) casi nunca coinciden.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
 
                     uiState.triggers.forEachIndexed { index, map ->
                         TriggerPill(
@@ -891,7 +947,12 @@ private fun ItemPill(
 
 // ── Summary helpers ───────────────────────────────────────────────────────────
 
-private fun triggerSummary(trigger: AutomationTrigger): String = when (trigger.type) {
+private fun triggerSummary(trigger: AutomationTrigger): String {
+    val base = triggerSummaryText(trigger)
+    return if (trigger.invert) "NO: $base" else base
+}
+
+private fun triggerSummaryText(trigger: AutomationTrigger): String = when (trigger.type) {
     "time" -> {
         val time = trigger.let {
             val t = (it as? AutomationTrigger)
@@ -928,7 +989,12 @@ private fun triggerSummary(trigger: AutomationTrigger): String = when (trigger.t
     else -> trigger.type
 }
 
-private fun conditionSummary(condition: AutomationCondition): String = when (condition.type) {
+private fun conditionSummary(condition: AutomationCondition): String {
+    val base = conditionSummaryText(condition)
+    return if (condition.invert) "NO: $base" else base
+}
+
+private fun conditionSummaryText(condition: AutomationCondition): String = when (condition.type) {
     "time_range" -> "Entre ${condition.from} y ${condition.to}"
     "numeric_state" -> {
         val entity = if (condition.entity == "outdoor_temp") "Temp. exterior" else "Temp. interior"
@@ -936,6 +1002,11 @@ private fun conditionSummary(condition: AutomationCondition): String = when (con
         "$entity $dir ${condition.value.toInt()}°C"
     }
     "presence" -> "Alguien en casa"
+    "calendar_event" -> {
+        val cal = condition.calendarName.ifBlank { "calendario" }
+        val filter = if (condition.title.isBlank()) "" else " con «${condition.title}»"
+        "Evento vigente en $cal$filter"
+    }
     else -> condition.type
 }
 
@@ -994,6 +1065,7 @@ private fun conditionIcon(type: String): ImageVector = when (type) {
     "time_range" -> Icons.Default.AccessTime
     "numeric_state" -> Icons.Default.Thermostat
     "presence" -> Icons.Default.Group
+    "calendar_event" -> Icons.Default.DateRange
     else -> Icons.Default.CheckCircle
 }
 
