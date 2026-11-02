@@ -4,13 +4,16 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.isToggleable
 import com.arsys.netatmo.data.local.entities.ScenarioEntity
 import com.arsys.netatmo.ui.theme.NetatmoTheme
 import org.junit.Assert.assertEquals
@@ -189,5 +192,82 @@ class AutomationEditorsUiTest {
 
         composeRule.onNodeWithText("Editar acción", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNode(hasText("21", substring = true), useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun conditionEditor_calendarEventAndNegate_offersBothAndSavesFlags() {
+        // The new pieces: a "Calendario vigente" condition type and the "Negar" switch.
+        var saved: Map<String, Any>? = null
+        composeRule.setContent {
+            NetatmoTheme {
+                ConditionEditorBottomSheet(
+                    onDismiss = {},
+                    onAdd = { saved = it }
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        // Without the calendar permission the picker explains itself instead of listing.
+        composeRule.onNodeWithText("Calendario vigente", useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Se necesita permiso de calendario para listar tus calendarios.", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Conceder permiso", useUnmergedTree = true).assertIsDisplayed()
+
+        // Negate a time-range condition: the saved map must carry the invert flag.
+        composeRule.onNodeWithText("Rango horario", useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Negar: se cumple cuando NO pasa lo de arriba", useUnmergedTree = true)
+            .performScrollTo().assertIsDisplayed()
+        captureSheet("condition-add-calendar-event-negate")
+        composeRule.onAllNodes(isToggleable(), useUnmergedTree = true)[0].performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Añadir condición", useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals("time_range", saved?.get("type"))
+        assertEquals(true, saved?.get("invert"))
+    }
+
+    @Test
+    fun triggerEditor_allMode_showsNegateSwitchAndSavesInvert() {
+        // In "Todas" mode each trigger can be negated; in "Cualquiera" the switch stays hidden
+        // because a punctual occurrence cannot be negated.
+        var saved: Map<String, Any>? = null
+        composeRule.setContent {
+            NetatmoTheme {
+                TriggerEditorBottomSheet(
+                    onDismiss = {},
+                    onAdd = { saved = it },
+                    triggersMode = "all"
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Negar: en modo «Todas» cuenta como cumplido cuando NO lo está", useUnmergedTree = true)
+            .performScrollTo().assertIsDisplayed()
+        captureSheet("trigger-add-all-mode-negate")
+        composeRule.onAllNodes(isToggleable(), useUnmergedTree = true)[0].performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Añadir disparador", useUnmergedTree = true).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals("time", saved?.get("type"))
+        assertEquals(true, saved?.get("invert"))
+    }
+
+    @Test
+    fun triggerEditor_anyMode_hidesNegateSwitch() {
+        composeRule.setContent {
+            NetatmoTheme {
+                TriggerEditorBottomSheet(
+                    onDismiss = {},
+                    onAdd = {},
+                    triggersMode = "any"
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Negar: en modo «Todas» cuenta como cumplido cuando NO lo está", useUnmergedTree = true)
+            .assertDoesNotExist()
     }
 }
