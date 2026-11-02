@@ -260,13 +260,17 @@ object AutomationTriggerMath {
     fun numericLevelKey(automationId: Long, identity: String): String = "tact2_${automationId}_$identity"
 
     /**
-     * Re-keys legacy positional marks ("tday_<id>_<index>", "tact_<id>_<index>") through the
-     * trigger currently sitting at each index: the mark follows the trigger's VALUE, so a
-     * reorder, insert or delete that happened while on the old version keeps the mark on its
-     * trigger; an index that no longer holds a matching trigger drops its mark.
+     * Same-day SUPPRESSION tombstone produced when migrating a legacy positional time mark
+     * ("tday_<id>_<index>", value "<year>-<dayOfYear>"). The legacy format kept no trigger
+     * identity, so the tombstone suppresses EVERY time trigger of that automation until the
+     * end of that day: deliberately conservative (it can delay a second same-day trigger that
+     * genuinely had not fired; it can never REPEAT an action whose identity is in doubt).
      */
-    fun <T> rekeyMarksByIdentity(legacy: Map<Int, T>, identities: List<String?>, newKey: (String) -> String): Map<String, T> =
-        legacy.mapNotNull { (index, value) -> identities.getOrNull(index)?.let { newKey(it) to value } }.toMap()
+    fun timeMigratedKey(automationId: Long, dayKey: String): String = "tdaym_${automationId}_$dayKey"
+
+    /** A time trigger counts as fired today when its value-keyed mark or the migrated same-day tombstone says so. */
+    fun timeFiredToday(valueMark: String?, migratedTombstone: Boolean, dayKey: String): Boolean =
+        valueMark == dayKey || migratedTombstone
 
     /** One-shot instant trigger: armed at [atMs] unless already consumed. */
     fun nextDatetimeInstant(atMs: Long, consumed: Boolean): Long? =
