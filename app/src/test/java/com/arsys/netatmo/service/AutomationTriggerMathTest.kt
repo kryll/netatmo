@@ -13,6 +13,115 @@ import java.util.Calendar
 
 class AutomationTriggerMathTest {
 
+    // ── Three-valued combination (Cualquiera/Todas) ─────────────────────────
+
+    @Test
+    fun `combineAll holds only when every check holds`() {
+        assertEquals(AutomationTriggerMath.Check.YES, AutomationTriggerMath.combineAll(emptyList()))
+        assertEquals(
+            AutomationTriggerMath.Check.YES,
+            AutomationTriggerMath.combineAll(listOf(AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.YES))
+        )
+        assertEquals(
+            AutomationTriggerMath.Check.NO,
+            AutomationTriggerMath.combineAll(listOf(AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.NO))
+        )
+    }
+
+    @Test
+    fun `combineAll stays unknown when a check cannot be read`() {
+        // UNKNOWN must not silently become a pass: with no NO, an unreadable check leaves the
+        // whole combination unknown (and the engine never runs on UNKNOWN).
+        assertEquals(
+            AutomationTriggerMath.Check.UNKNOWN,
+            AutomationTriggerMath.combineAll(listOf(AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.UNKNOWN))
+        )
+        assertEquals(
+            AutomationTriggerMath.Check.NO,
+            AutomationTriggerMath.combineAll(listOf(AutomationTriggerMath.Check.NO, AutomationTriggerMath.Check.UNKNOWN))
+        )
+    }
+
+    @Test
+    fun `combineAny holds when one check holds even with unknowns`() {
+        assertEquals(
+            AutomationTriggerMath.Check.YES,
+            AutomationTriggerMath.combineAny(
+                listOf(AutomationTriggerMath.Check.NO, AutomationTriggerMath.Check.UNKNOWN, AutomationTriggerMath.Check.YES)
+            )
+        )
+    }
+
+    @Test
+    fun `combineAny without a holding check is unknown if any check is unreadable`() {
+        assertEquals(
+            AutomationTriggerMath.Check.UNKNOWN,
+            AutomationTriggerMath.combineAny(listOf(AutomationTriggerMath.Check.NO, AutomationTriggerMath.Check.UNKNOWN))
+        )
+        assertEquals(
+            AutomationTriggerMath.Check.NO,
+            AutomationTriggerMath.combineAny(listOf(AutomationTriggerMath.Check.NO, AutomationTriggerMath.Check.NO))
+        )
+    }
+
+    @Test
+    fun `negating an unknown stays unknown`() {
+        // The safety rule behind the NO operator: flipping unreadable data must never turn it
+        // into a pass that enables heating.
+        with(AutomationTriggerMath) {
+            assertEquals(AutomationTriggerMath.Check.NO, AutomationTriggerMath.Check.YES.not())
+            assertEquals(AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.NO.not())
+            assertEquals(AutomationTriggerMath.Check.UNKNOWN, AutomationTriggerMath.Check.UNKNOWN.not())
+        }
+    }
+
+    @Test
+    fun `withInvert only flips when the flag is set`() {
+        with(AutomationTriggerMath) {
+            assertEquals(AutomationTriggerMath.Check.NO, AutomationTriggerMath.Check.YES.withInvert(true))
+            assertEquals(AutomationTriggerMath.Check.UNKNOWN, AutomationTriggerMath.Check.UNKNOWN.withInvert(true))
+            assertEquals(AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.YES.withInvert(false))
+        }
+    }
+
+    // ── Event under way (calendar as a state) ────────────────────────────────
+
+    @Test
+    fun `eventActiveNow contains its whole span`() {
+        assertTrue(AutomationTriggerMath.eventActiveNow(1_000L, 2_000L, 1_000L))
+        assertTrue(AutomationTriggerMath.eventActiveNow(1_000L, 2_000L, 1_999L))
+    }
+
+    @Test
+    fun `eventActiveNow excludes the end and degenerate spans`() {
+        assertFalse(AutomationTriggerMath.eventActiveNow(1_000L, 2_000L, 2_000L))
+        assertFalse(AutomationTriggerMath.eventActiveNow(1_000L, 2_000L, 999L))
+        assertFalse(AutomationTriggerMath.eventActiveNow(2_000L, 1_000L, 1_500L))
+        assertFalse(AutomationTriggerMath.eventActiveNow(1_000L, 1_000L, 1_000L))
+    }
+
+    @Test
+    fun `all-day event covers its local day`() {
+        // All-day instances arrive as UTC midnight of the day; the local start can shift a day
+        // back or forward depending on the zone. Whatever the shift, [start, end) spans 24 h
+        // and covers the local day: noon of the local day is always inside, the next local
+        // midnight is always outside.
+        val start = AutomationTriggerMath.allDayLocalStart(
+            Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                set(2026, 1, 10, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        )
+        val end = AutomationTriggerMath.allDayLocalStart(
+            Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                set(2026, 1, 11, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        )
+        assertTrue(AutomationTriggerMath.eventActiveNow(start, end, start + 12L * 60 * 60 * 1000))
+        assertFalse(AutomationTriggerMath.eventActiveNow(start, end, end))
+    }
+
     // ── Time windows ─────────────────────────────────────────────────────────
 
     @Test
