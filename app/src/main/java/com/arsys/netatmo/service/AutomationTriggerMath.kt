@@ -231,6 +231,43 @@ object AutomationTriggerMath {
         return null
     }
 
+    /**
+     * "Todas" mode: the index of the first trigger that OCCURRED while every other trigger
+     * holds as a state, or null. States that merely hold - however many are YES - never fire
+     * on their own: creating, saving, reordering or restarting the automation is not an
+     * occurrence, and the unknown past never re-fires.
+     */
+    fun allModeDecision(occurred: List<Boolean>, states: List<Check>): Int? {
+        for (i in occurred.indices) {
+            if (!occurred[i]) continue
+            if (combineAll(states.filterIndexed { idx, _ -> idx != i }) == Check.YES) return i
+        }
+        return null
+    }
+
+    /** Value identity of a time trigger: same time and days, wherever it sits in the list. */
+    fun timeIdentity(targetMinutes: Int, days: Set<Int>?): String =
+        "time:$targetMinutes:${days?.sorted()?.joinToString(",") ?: "all"}"
+
+    /** Value identity of a numeric-state trigger: same entity, direction and threshold. */
+    fun numericIdentity(entity: String, below: Boolean, value: Double): String =
+        "num:$entity:${if (below) "below" else "above"}:$value"
+
+    /** Daily fire mark of a time trigger, keyed by value: reordering never replays it. */
+    fun timeDailyKey(automationId: Long, identity: String): String = "tday2_${automationId}_$identity"
+
+    /** Last-seen level mark of a numeric-state trigger, keyed by value. */
+    fun numericLevelKey(automationId: Long, identity: String): String = "tact2_${automationId}_$identity"
+
+    /**
+     * Re-keys legacy positional marks ("tday_<id>_<index>", "tact_<id>_<index>") through the
+     * trigger currently sitting at each index: the mark follows the trigger's VALUE, so a
+     * reorder, insert or delete that happened while on the old version keeps the mark on its
+     * trigger; an index that no longer holds a matching trigger drops its mark.
+     */
+    fun <T> rekeyMarksByIdentity(legacy: Map<Int, T>, identities: List<String?>, newKey: (String) -> String): Map<String, T> =
+        legacy.mapNotNull { (index, value) -> identities.getOrNull(index)?.let { newKey(it) to value } }.toMap()
+
     /** One-shot instant trigger: armed at [atMs] unless already consumed. */
     fun nextDatetimeInstant(atMs: Long, consumed: Boolean): Long? =
         if (atMs > 0 && !consumed) atMs else null
