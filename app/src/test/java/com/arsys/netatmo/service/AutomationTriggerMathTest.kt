@@ -650,4 +650,76 @@ class AutomationTriggerMathTest {
         val nextOccurrence = AutomationTriggerMath.calendarConsumedKey(7L, 555L, 1_730_604_800_000L, attrs)
         assertTrue(first != nextOccurrence)
     }
+
+    // ── "Todas" mode: occurrence-gated semantics ────────────────────────────
+
+    @Test
+    fun `all mode never fires without an occurring trigger, even when every state holds`() {
+        // Creating, saving, reordering or restarting only re-evaluates states: no occurrence, no fire.
+        assertNull(AutomationTriggerMath.allModeDecision(listOf(false, false, false), listOf(AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.YES)))
+    }
+
+    @Test
+    fun `all mode fires on the trigger that occurs while the rest hold`() {
+        assertEquals(1, AutomationTriggerMath.allModeDecision(listOf(false, true), listOf(AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.YES)))
+        assertEquals(0, AutomationTriggerMath.allModeDecision(listOf(true, false), listOf(AutomationTriggerMath.Check.YES, AutomationTriggerMath.Check.YES)))
+    }
+
+    @Test
+    fun `all mode blocks the run when another state is unknown`() {
+        assertNull(AutomationTriggerMath.allModeDecision(listOf(false, true), listOf(AutomationTriggerMath.Check.UNKNOWN, AutomationTriggerMath.Check.YES)))
+    }
+
+    @Test
+    fun `all mode blocks the run when another state does not hold`() {
+        assertNull(AutomationTriggerMath.allModeDecision(listOf(false, true), listOf(AutomationTriggerMath.Check.NO, AutomationTriggerMath.Check.YES)))
+    }
+
+    @Test
+    fun `all mode negated unknown stays unknown and blocks`() {
+        val negatedUnknown = with(AutomationTriggerMath) { AutomationTriggerMath.Check.UNKNOWN.withInvert(true) }
+        assertEquals(AutomationTriggerMath.Check.UNKNOWN, negatedUnknown)
+        assertNull(AutomationTriggerMath.allModeDecision(listOf(false, true), listOf(negatedUnknown, AutomationTriggerMath.Check.YES)))
+    }
+
+    @Test
+    fun `a consumed past date neither fires nor holds as a state`() {
+        assertFalse(AutomationTriggerMath.datetimeShouldFire(1_000L, consumed = true, nowMs = 2_000L))
+        assertTrue(AutomationTriggerMath.datetimeShouldFire(1_000L, consumed = false, nowMs = 2_000L))
+        assertFalse(AutomationTriggerMath.datetimeShouldFire(3_000L, consumed = false, nowMs = 2_000L))
+    }
+
+    // ── Value-keyed marks: reordering, inserting, deleting never replays ────
+
+    @Test
+    fun `time and numeric identities carry no position`() {
+        assertEquals("time:480:1,2,3", AutomationTriggerMath.timeIdentity(480, setOf(3, 1, 2)))
+        assertEquals("time:480:all", AutomationTriggerMath.timeIdentity(480, null))
+        assertEquals("num:outdoor_temp:below:5.0", AutomationTriggerMath.numericIdentity("outdoor_temp", true, 5.0))
+        assertEquals("tday2_7_time:480:1,2,3", AutomationTriggerMath.timeDailyKey(7, AutomationTriggerMath.timeIdentity(480, setOf(1, 2, 3))))
+        assertEquals("tact2_7_num:outdoor_temp:below:5.0", AutomationTriggerMath.numericLevelKey(7, AutomationTriggerMath.numericIdentity("outdoor_temp", true, 5.0)))
+    }
+
+    @Test
+    fun `rekeying follows the trigger through a reorder`() {
+        val timeId = AutomationTriggerMath.timeIdentity(480, setOf(1, 2, 3))
+        // The trigger sat at index 0 when the legacy mark was written; it now sits at index 1.
+        val migrated = AutomationTriggerMath.rekeyMarksByIdentity(mapOf(0 to "2026-305"), listOf(null, timeId)) {
+            AutomationTriggerMath.timeDailyKey(7, it)
+        }
+        assertEquals(mapOf("tday2_7_$timeId" to "2026-305"), migrated)
+    }
+
+    @Test
+    fun `rekeying drops marks whose trigger is gone and ignores inserts`() {
+        val numId = AutomationTriggerMath.numericIdentity("indoor_temp", false, 21.5)
+        val dropped = AutomationTriggerMath.rekeyMarksByIdentity(mapOf(2 to true), listOf(numId, null)) {
+            AutomationTriggerMath.numericLevelKey(3, it)
+        }
+        assertEquals(emptyMap<String, Boolean>(), dropped)
+        val kept = AutomationTriggerMath.rekeyMarksByIdentity(mapOf(0 to true), listOf(numId, null)) {
+            AutomationTriggerMath.numericLevelKey(3, it)
+        }
+        assertEquals(mapOf("tact2_3_$numId" to true), kept)
+    }
 }
