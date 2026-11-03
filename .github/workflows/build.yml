@@ -7,75 +7,66 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      new_signing_key:
-        description: "Create a NEW signing key (installed apps will have to be uninstalled once)"
+      publish:
+        description: "Publish the verified signed APK after security review"
         type: boolean
         default: false
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      apk_artifact_id: ${{ steps.transfer.outputs.artifact-id }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3 (peeled v4 tag)
 
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
+      # Repository API secrets stay in their current scope for this minimal change.
+      # This workflow passes them only on main, never on pull_request.
+      # Internal-PR secret isolation requires a separate API-secret migration.
       - name: Create local.properties
+        env:
+          CLIENT_ID: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.NETATMO_CLIENT_ID || '' }}
+          CLIENT_SECRET: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.NETATMO_CLIENT_SECRET || '' }}
+          WEATHER_KEY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && secrets.METEOSOURCE_API_KEY || '' }}
         run: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-          echo "netatmo.clientId=${{ secrets.NETATMO_CLIENT_ID }}" >> local.properties
-          echo "netatmo.clientSecret=${{ secrets.NETATMO_CLIENT_SECRET }}" >> local.properties
-          echo "meteosource.apiKey=${{ secrets.METEOSOURCE_API_KEY }}" >> local.properties
-          echo "meteosource.placeId=logrono" >> local.properties
+          set +x
+          python3 - <<'PYTHON'
+          import os, pathlib
+          def prop(value):
+              return value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
+          entries = {'sdk.dir': os.environ['ANDROID_SDK_ROOT'], 'netatmo.clientId': os.environ['CLIENT_ID'], 'netatmo.clientSecret': os.environ['CLIENT_SECRET'], 'meteosource.apiKey': os.environ['WEATHER_KEY'], 'meteosource.placeId': 'logrono'}
+          pathlib.Path('local.properties').write_text(''.join(k + '=' + prop(v) + '\n' for k,v in entries.items()))
+          PYTHON
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Restore persistent debug keystore
-        uses: actions/cache@v4
-        id: keystore-cache
-        with:
-          path: debug.keystore
-          key: netatmo-debug-keystore-v2
-
-      - name: Create debug keystore (only when explicitly requested)
-        if: steps.keystore-cache.outputs.cache-hit != 'true'
-        run: |
-          # GitHub deletes caches unused for 7 days. Silently generating a new key here would
-          # publish an APK that Android refuses to install over the current app.
-          if [ "${{ github.event.inputs.new_signing_key }}" != "true" ]; then
-            echo "::error::Signing keystore cache not found. Refusing to build with a different key. Run this workflow manually with new_signing_key=true to create a new one on purpose."
-            exit 1
-          fi
-          keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 \
-            -validity 36500 -dname "CN=Android Debug,O=Android,C=US" \
-            -storepass android -keypass android -noprompt
-
-      - name: Install debug keystore for Gradle
-        run: |
-          mkdir -p "$HOME/.android"
-          cp debug.keystore "$HOME/.android/debug.keystore"
-
+      # Gradle uses only a fresh runner-local debug key. No production key here.
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
       - name: Upload unit test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: unit-test-results
           path: app/build/test-results/testDebugUnitTest/
@@ -84,7 +75,7 @@ jobs:
 
       - name: Upload Compose UI captures
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: compose-shots
           path: app/build/outputs/compose-shots/
@@ -127,21 +118,156 @@ jobs:
           fi
           echo "OK: Hilt worker factory binding present: $BINDING"
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload APK for isolated signing
+        id: transfer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unsigned-production-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  sign:
+    needs: build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: signing-release
+    outputs:
+      signed_artifact_id: ${{ steps.signed.outputs.artifact-id }}
+    permissions:
+      contents: read
+    steps:
+      - name: Download exact candidate from this run only
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.build.outputs.apk_artifact_id }}
+          path: candidate
+          merge-multiple: true
+
+      - name: Check candidate, source, identity and tools before accessing secrets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f candidate/app-debug.apk
+          test ! -L candidate/app-debug.apk
+          test "$(find candidate -type f | wc -l)" -eq 1
+          SDK_TOOLS=$(find "$ANDROID_SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          test -x "$SDK_TOOLS/apksigner"
+          "$SDK_TOOLS/apksigner" version
+          command -v gpg
+          command -v keytool
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')" = "$GITHUB_SHA"
+          "$SDK_TOOLS/aapt2" dump badging candidate/app-debug.apk > "$RUNNER_TEMP/candidate-badging.txt"
+          python3 - <<'PYTHON'
+          import os, pathlib, re
+          line = pathlib.Path(os.environ['RUNNER_TEMP'] + '/candidate-badging.txt').read_text().splitlines()[0]
+          package = re.search(r"name='([^']+)'", line)
+          version = re.search(r"versionCode='([^']+)'", line)
+          if not package or package[1] != 'com.arsys.netatmo' or not version or version[1] != os.environ['GITHUB_RUN_NUMBER']:
+              raise SystemExit('Candidate package/version mismatch')
+          PYTHON
+          printf 'SDK_TOOLS=%s\n' "$SDK_TOOLS" >> "$GITHUB_ENV"
+
+      - name: Decrypt existing key and sign candidate without running app code
+        env:
+          SIGNING_CIPHERTEXT: ${{ secrets.SIGNING_CIPHERTEXT }}
+          SIGNING_BACKUP_PASSPHRASE: ${{ secrets.SIGNING_BACKUP_PASSPHRASE }}
+        shell: bash
+        run: |
+          set +x
+          set -euo pipefail
+          umask 077
+          export SIGN_TEMP="$RUNNER_TEMP/netatmo-sign-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir -m 700 -- "$SIGN_TEMP"
+          trap 'rm -rf -- "$SIGN_TEMP"' EXIT
+          python3 - <<'PYTHON'
+          import hashlib, os, pathlib, subprocess
+          p = pathlib.Path(os.environ['SIGN_TEMP'])
+          (p/'gnupg').mkdir(mode=0o700)
+          os.environ['GNUPGHOME'] = str(p/'gnupg')
+          (p/'key.asc').write_text(os.environ.pop('SIGNING_CIPHERTEXT'), encoding='ascii')
+          (p/'phrase').write_text(os.environ.pop('SIGNING_BACKUP_PASSPHRASE'))
+          (p/'phrase').chmod(0o600)
+          def quiet(args, error):
+              r = subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              if r.returncode:
+                  raise SystemExit(error)
+          quiet(['gpg','--batch','--yes','--pinentry-mode','loopback','--passphrase-file',str(p/'phrase'),'--output',str(p/'existing.keystore'),'--decrypt',str(p/'key.asc')], 'Signing key decryption failed')
+          (p/'phrase').unlink()
+          (p/'existing.keystore').chmod(0o600)
+          expected = '58c109c9a76ca8897ec575490b420df20af5c878445ba4ecc3f392932f82961c'
+          cert = subprocess.run(['keytool','-exportcert','-keystore',str(p/'existing.keystore'),'-alias','androiddebugkey','-storepass','android'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+          if cert.returncode or hashlib.sha256(cert.stdout).hexdigest() != expected:
+              raise SystemExit('Existing certificate mismatch')
+          pathlib.Path('signed').mkdir(mode=0o700)
+          apksigner = str(pathlib.Path(os.environ['SDK_TOOLS'])/'apksigner')
+          quiet([apksigner,'sign','--ks',str(p/'existing.keystore'),'--ks-key-alias','androiddebugkey','--ks-pass','pass:android','--key-pass','pass:android','--v4-signing-enabled','false','--out','signed/app-debug.apk','candidate/app-debug.apk'], 'Signing failed')
+          (p/'existing.keystore').unlink()
+          result = subprocess.run([apksigner,'verify','--verbose','--print-certs','signed/app-debug.apk'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
+          fingerprints = [line.split(': ',1)[1].strip() for line in result.stdout.splitlines() if 'certificate SHA-256 digest:' in line]
+          if result.returncode or fingerprints != [expected]:
+              raise SystemExit('Signed APK verification failed')
+          badging = subprocess.check_output([str(pathlib.Path(os.environ['SDK_TOOLS'])/'aapt2'),'dump','badging','signed/app-debug.apk'], text=True).splitlines()[0]
+          import re
+          package = re.search(r"name='([^']+)'", badging)
+          version = re.search(r"versionCode='([^']+)'", badging)
+          if not package or package[1] != 'com.arsys.netatmo' or not version or version[1] != os.environ['GITHUB_RUN_NUMBER']:
+              raise SystemExit('Signed APK package/version mismatch')
+          print('Signed APK verified with existing certificate: ' + expected)
+          print('Package: com.arsys.netatmo; versionCode: ' + os.environ['GITHUB_RUN_NUMBER'])
+          PYTHON
+
+      - name: Remove private signing material on success or failure
+        if: always()
+        shell: bash
+        run: |
+          set +x
+          rm -rf -- "$RUNNER_TEMP/netatmo-sign-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test ! -e "$RUNNER_TEMP/netatmo-sign-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Upload verified signed APK
+        id: signed
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: signed/app-debug.apk
+          if-no-files-found: error
           retention-days: 14
 
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        uses: softprops/action-gh-release@v2
+  publish:
+    needs: sign
+    concurrency:
+      group: netatmo-publish
+      cancel-in-progress: false
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified signed APK from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          tag_name: v${{ github.run_number }}
-          name: "Versión ${{ github.run_number }}"
-          body: "Build automático #${{ github.run_number }} · ${{ github.sha }}"
-          files: app/build/outputs/apk/debug/app-debug.apk
-          make_latest: true
+          artifact-ids: ${{ needs.sign.outputs.signed_artifact_id }}
+          path: signed
+          merge-multiple: true
+      - name: Publish verified APK
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ github.run_number }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')" = "$SOURCE_SHA"
+          python3 - <<'PYTHON'
+          import json, os, subprocess
+          releases = json.loads(subprocess.check_output(['gh','api','repos/' + os.environ['GH_REPO'] + '/releases?per_page=100']))
+          previous = [int(r['tag_name'][1:]) for r in releases if not r['draft'] and r['tag_name'].startswith('v') and r['tag_name'][1:].isdigit()]
+          if previous and int(os.environ['VERSION']) <= max(previous):
+              raise SystemExit('Refusing non-increasing release version')
+          PYTHON
+          gh release create "v$VERSION" signed/app-debug.apk --target "$SOURCE_SHA" --title "Versión $VERSION" --notes "Build automático #$VERSION · $SOURCE_SHA" --latest
