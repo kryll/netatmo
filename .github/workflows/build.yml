@@ -218,9 +218,12 @@ jobs:
           apksigner = str(pathlib.Path(os.environ['SDK_TOOLS'])/'apksigner')
           quiet([apksigner,'sign','--ks',str(p/'existing.keystore'),'--ks-key-alias','androiddebugkey','--ks-pass','pass:android','--key-pass','pass:android','--v4-signing-enabled','false','--out','signed/app-debug.apk','candidate/app-debug.apk'], 'Signing failed')
           (p/'existing.keystore').unlink()
-          result = subprocess.run([apksigner,'verify','--verbose','--print-certs','signed/app-debug.apk'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
+          result = subprocess.run([apksigner,'verify','--verbose','--print-certs','signed/app-debug.apk'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
           fingerprints = [line.split(': ',1)[1].strip() for line in result.stdout.splitlines() if 'certificate SHA-256 digest:' in line]
           if result.returncode or fingerprints != [expected]:
+              print('Public APK verification return code: ' + str(result.returncode))
+              print(result.stdout)
+              print(result.stderr)
               raise SystemExit('Signed APK verification failed')
           badging = subprocess.check_output([str(pathlib.Path(os.environ['SDK_TOOLS'])/'aapt2'),'dump','badging','signed/app-debug.apk'], text=True).splitlines()[0]
           import re
