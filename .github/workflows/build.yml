@@ -60,7 +60,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # Gradle uses only a fresh runner-local debug key. No production key here.
+      - name: Create disposable candidate key (never the production signer)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          rm -f -- "$HOME/.android/debug.keystore"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 2 -dname "CN=CI EPHEMERAL CANDIDATE ONLY" -storepass android -keypass android -noprompt
+
+      # Candidate signature is replaced only by the isolated sign job.
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
@@ -117,6 +124,10 @@ jobs:
             exit 1
           fi
           echo "OK: Hilt worker factory binding present: $BINDING"
+
+      - name: Remove disposable candidate key
+        if: always()
+        run: rm -f -- "$HOME/.android/debug.keystore"
 
       - name: Upload APK for isolated signing
         id: transfer
