@@ -178,4 +178,37 @@ class AwaySheetUiTest {
         assertEquals(30, cal.get(java.util.Calendar.MINUTE))
         assertNull(epochSecondsFrom("not-a-date", "18:30"))
     }
+
+    @Test
+    fun epochSecondsFrom_rejectsValuesCalendarWouldNormalize() {
+        // Feb 30 does not exist: lenient Calendar would roll it into March.
+        assertNull(epochSecondsFrom("2026-02-30", "12:00"))
+        // 25:00 is not a time of day.
+        assertNull(epochSecondsFrom("2026-11-20", "25:00"))
+        // Month 13 neither.
+        assertNull(epochSecondsFrom("2026-13-10", "10:00"))
+    }
+
+    @Test
+    fun epochSecondsFrom_rejectsDstGapTime_europeMadrid() {
+        // Europe/Madrid 2026-03-29: clocks jump 02:00 -> 03:00, so 02:30 never happens.
+        // A lenient Calendar silently moves it to 03:30; the round-trip check must reject it.
+        val default = java.util.TimeZone.getDefault()
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Europe/Madrid"))
+            assertNull(epochSecondsFrom("2026-03-29", "02:30"))
+            // Same day outside the gap is fine.
+            assertNotNull(epochSecondsFrom("2026-03-29", "03:30"))
+        } finally {
+            java.util.TimeZone.setDefault(default)
+        }
+    }
+
+    @Test
+    fun awayEndTimeOrError_rejectsPastAndAcceptsFuture() {
+        val now = 1_800_000_000L // fixed reference instant
+        assertNull(awayEndTimeOrError("2020-01-01", "10:00", now))
+        assertNull(awayEndTimeOrError("not-a-date", "10:00", now))
+        assertNotNull(awayEndTimeOrError("2099-01-01", "10:00", now))
+    }
 }

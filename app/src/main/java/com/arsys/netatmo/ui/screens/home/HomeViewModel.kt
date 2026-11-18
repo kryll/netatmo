@@ -163,6 +163,12 @@ class HomeViewModel @Inject constructor(
      */
     fun setAwayMode(endTimeEpochSeconds: Long?) {
         val homeId = _uiState.value.selectedHomeId ?: return
+        // Defensive: a past end time must never reach the API (Netatmo would reject or
+        // end the mode immediately); the sheet validates too, but do not rely on it.
+        if (endTimeEpochSeconds != null && endTimeEpochSeconds <= System.currentTimeMillis() / 1000) {
+            _uiState.update { it.copy(error = "La fecha y hora debe ser posterior a ahora") }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isSettingTemp = true) }
             when (val result = repository.setHomeMode(homeId, "away", endTimeEpochSeconds)) {
