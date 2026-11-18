@@ -9,7 +9,9 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import com.arsys.netatmo.domain.model.RoomState
 import com.arsys.netatmo.domain.model.ThermostatMode
+import com.arsys.netatmo.domain.model.ThermostatState
 import com.arsys.netatmo.ui.theme.NetatmoTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -48,6 +50,17 @@ class AwaySheetUiTest {
         val view = dialog?.window?.decorView ?: error("No dialog to capture for $name")
         assertTrue("dialog has no width for $name", view.width > 0)
         assertTrue("dialog has no height for $name", view.height > 0)
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        val dir = File("build/outputs/compose-shots").apply { mkdirs() }
+        FileOutputStream(File(dir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    // For content rendered straight into the activity (no dialog), e.g. the home screen.
+    private fun captureActivity(name: String) {
+        val view = composeRule.activity.window.decorView
+        assertTrue("activity has no width for $name", view.width > 0)
+        assertTrue("activity has no height for $name", view.height > 0)
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
         val dir = File("build/outputs/compose-shots").apply { mkdirs() }
@@ -105,6 +118,13 @@ class AwaySheetUiTest {
             .performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Hora de vuelta", useUnmergedTree = true)
             .performScrollTo().assertIsDisplayed()
+
+        // The confirm button sits below the fold on a small screen: prove it is
+        // reachable by scrolling, and capture it in view as evidence.
+        composeRule.onNodeWithText("Activar modo Ausente", useUnmergedTree = true)
+            .performScrollTo().assertIsDisplayed()
+        composeRule.waitForIdle()
+        captureSheet("away-sheet-datetime-scrolled")
 
         // Default target is now + 3h, always in the future.
         composeRule.onNodeWithText("Activar modo Ausente", useUnmergedTree = true)
@@ -164,6 +184,38 @@ class AwaySheetUiTest {
             "Ahora la casa está en modo Anticongelación. Al terminar volverá a Programado, no a Anticongelación.",
             useUnmergedTree = true
         ).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun homeScreen_showsAwayButtonNextToTurbo() {
+        val room = RoomState(
+            id = "r1", name = "Salón", currentTemp = 20.5, targetTemp = 21.0,
+            mode = ThermostatMode.SCHEDULE, heatingActive = true, reachable = true,
+            setpointEndTime = null
+        )
+        val state = ThermostatState(
+            homeId = "home-1", homeName = "PEDREGALES",
+            rooms = listOf(room), modules = emptyList()
+        )
+        val vm = io.mockk.mockk<HomeViewModel>(relaxed = true)
+        io.mockk.every { vm.uiState } returns
+            kotlinx.coroutines.flow.MutableStateFlow(HomeUiState(thermostatState = state))
+        io.mockk.every { vm.boostState } returns
+            kotlinx.coroutines.flow.MutableStateFlow(null)
+        io.mockk.every { vm.boostRemainingMinutes } returns
+            kotlinx.coroutines.flow.MutableStateFlow(0)
+        val nav = io.mockk.mockk<androidx.navigation.NavController>(relaxed = true)
+
+        composeRule.setContent {
+            NetatmoTheme {
+                HomeScreen(navController = nav, viewModel = vm)
+            }
+        }
+        composeRule.waitForIdle()
+        captureActivity("home-away-turbo-fabs")
+
+        composeRule.onNodeWithText("Ausente", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Modo Turbo", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
