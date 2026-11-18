@@ -8,6 +8,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,9 @@ import com.arsys.netatmo.domain.model.RoomState
 import com.arsys.netatmo.domain.model.ScheduleInfo
 import com.arsys.netatmo.domain.model.ThermostatMode
 import com.arsys.netatmo.ui.components.TemperatureSlider
+import com.arsys.netatmo.ui.screens.automations.advanced.DatePickerField
+import com.arsys.netatmo.ui.screens.automations.advanced.SheetLabel
+import com.arsys.netatmo.ui.screens.automations.advanced.TimePickerField
 import com.arsys.netatmo.ui.theme.*
 
 // ─── Color constants ──────────────────────────────────────────────────────────
@@ -52,6 +57,19 @@ fun HomeScreen(
     val remainingMinutes by viewModel.boostRemainingMinutes.collectAsState()
     var selectedRoom by remember { mutableStateOf<String?>(null) }
     var showBoostSheet by remember { mutableStateOf(false) }
+    var showAwaySheet by remember { mutableStateOf(false) }
+
+    // Home-level away mode shows up per room as therm_setpoint_mode == "away".
+    val awayRoom = uiState.thermostatState?.rooms?.firstOrNull { it.mode == ThermostatMode.AWAY }
+    val awayActive = awayRoom != null
+    val awayEndTime = awayRoom?.setpointEndTime
+    val rooms = uiState.thermostatState?.rooms ?: emptyList()
+    val currentHomeMode: ThermostatMode = when {
+        awayActive -> ThermostatMode.AWAY
+        rooms.any { it.mode == ThermostatMode.FROST_GUARD } -> ThermostatMode.FROST_GUARD
+        rooms.isNotEmpty() && rooms.all { it.mode == ThermostatMode.OFF } -> ThermostatMode.OFF
+        else -> ThermostatMode.SCHEDULE
+    }
 
     val avgTemp = uiState.thermostatState?.rooms
         ?.mapNotNull { it.currentTemp }
@@ -175,6 +193,18 @@ fun HomeScreen(
                                             onDeactivate = { viewModel.stopBoost() }
                                         )
                                     }
+
+                                    // Away mode active banner
+                                    AnimatedVisibility(
+                                        visible = awayActive,
+                                        enter = fadeIn() + expandVertically(),
+                                        exit = fadeOut() + shrinkVertically()
+                                    ) {
+                                        AwayActiveBanner(
+                                            endTime = awayEndTime,
+                                            onDeactivate = { viewModel.returnToSchedule() }
+                                        )
+                                    }
                                 }
                             }
 
@@ -231,31 +261,56 @@ fun HomeScreen(
                     }
                 }
 
-                // Turbo FAB — pill shape, orange, fire icon + label
+                // Away + Turbo FABs — pill shapes, side by side
                 if (uiState.thermostatState != null && boostState == null) {
-                    ExtendedFloatingActionButton(
-                        onClick = { showBoostSheet = true },
+                    Row(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 16.dp, bottom = 24.dp),
-                        containerColor = SecondaryContainerOrange,
-                        contentColor = Color.White,
-                        shape = RoundedCornerShape(50),
-                        icon = {
-                            Icon(
-                                Icons.Default.LocalFireDepartment,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        text = {
-                            Text(
-                                "Modo Turbo",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ExtendedFloatingActionButton(
+                            onClick = { showAwaySheet = true },
+                            containerColor = AwayColor,
+                            contentColor = Color.White,
+                            shape = RoundedCornerShape(50),
+                            icon = {
+                                Icon(
+                                    Icons.Default.DirectionsWalk,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            text = {
+                                Text(
+                                    if (awayActive) "Ausente activo" else "Ausente",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        )
+                        ExtendedFloatingActionButton(
+                            onClick = { showBoostSheet = true },
+                            containerColor = SecondaryContainerOrange,
+                            contentColor = Color.White,
+                            shape = RoundedCornerShape(50),
+                            icon = {
+                                Icon(
+                                    Icons.Default.LocalFireDepartment,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            text = {
+                                Text(
+                                    "Modo Turbo",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        )
+                    }
                 }
 
                 // Success snackbar
@@ -302,6 +357,24 @@ fun HomeScreen(
             onConfirm = { delta, duration ->
                 viewModel.startBoost(delta, duration)
                 showBoostSheet = false
+            }
+        )
+    }
+
+    // Away mode bottom sheet
+    if (showAwaySheet) {
+        AwayBottomSheet(
+            active = awayActive,
+            currentEndTime = awayEndTime,
+            currentMode = currentHomeMode,
+            onDismiss = { showAwaySheet = false },
+            onActivate = { endTime ->
+                viewModel.setAwayMode(endTime)
+                showAwaySheet = false
+            },
+            onDeactivate = {
+                viewModel.returnToSchedule()
+                showAwaySheet = false
             }
         )
     }
@@ -857,6 +930,59 @@ private fun BoostActiveBanner(remainingMinutes: Int, onDeactivate: () -> Unit) {
                     "Desactivar",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                )
+            }
+        }
+    }
+}
+
+// ─── Away Mode Active Banner ──────────────────────────────────────────────────
+
+@Composable
+internal fun AwayActiveBanner(endTime: Long?, onDeactivate: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, AwayColor.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        color = AwayColor.copy(alpha = 0.15f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.DirectionsWalk, null, tint = AwayColor, modifier = Modifier.size(20.dp))
+                Column {
+                    Text(
+                        "MODO AUSENTE ACTIVO",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        endTime?.let { "Vuelve a Programado el ${formatEndTimeEs(it)}" }
+                            ?: "Hasta que lo cambies",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Surface(
+                onClick = onDeactivate,
+                shape = RoundedCornerShape(100.dp),
+                color = AwayColor.copy(alpha = 0.25f)
+            ) {
+                Text(
+                    "Desactivar",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                 )
             }
@@ -1603,6 +1729,206 @@ private fun TurboBottomSheet(
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        }
+    }
+}
+
+// ─── Away Mode Bottom Sheet ───────────────────────────────────────────────────
+
+/** Combines a "yyyy-MM-dd" date and "HH:mm" time (device timezone) into epoch seconds. */
+internal fun epochSecondsFrom(ymd: String, hm: String): Long? = try {
+    val d = ymd.split("-").map { it.toInt() }
+    val t = hm.split(":").map { it.toInt() }
+    val cal = java.util.Calendar.getInstance()
+    cal.set(d[0], d[1] - 1, d[2], t[0], t[1], 0)
+    cal.set(java.util.Calendar.MILLISECOND, 0)
+    cal.timeInMillis / 1000
+} catch (e: Exception) {
+    null
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AwayBottomSheet(
+    active: Boolean,
+    currentEndTime: Long?,
+    currentMode: ThermostatMode = ThermostatMode.SCHEDULE,
+    onDismiss: () -> Unit,
+    onActivate: (endTimeEpochSeconds: Long?) -> Unit,
+    onDeactivate: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Default return time: 3 hours from now (handles day rollover).
+    val defaultCal = remember {
+        java.util.Calendar.getInstance().apply { add(java.util.Calendar.HOUR_OF_DAY, 3) }
+    }
+    var untilChange by remember { mutableStateOf(true) }
+    var dateYmd by remember {
+        mutableStateOf(
+            "%04d-%02d-%02d".format(
+                defaultCal.get(java.util.Calendar.YEAR),
+                defaultCal.get(java.util.Calendar.MONTH) + 1,
+                defaultCal.get(java.util.Calendar.DAY_OF_MONTH)
+            )
+        )
+    }
+    var timeHm by remember {
+        mutableStateOf(
+            "%02d:%02d".format(
+                defaultCal.get(java.util.Calendar.HOUR_OF_DAY),
+                defaultCal.get(java.util.Calendar.MINUTE)
+            )
+        )
+    }
+    var dateError by remember { mutableStateOf<String?>(null) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SurfaceContainerHigh,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Handle
+            Box(modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(OutlineVariant)
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.DirectionsWalk, null, tint = AwayColor, modifier = Modifier.size(24.dp))
+                Text(
+                    "Modo Ausente",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (active) {
+                Text(
+                    currentEndTime?.let { "El modo Ausente está activo hasta el ${formatEndTimeEs(it)}." }
+                        ?: "El modo Ausente está activo hasta que lo cambies.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(
+                    onClick = onDeactivate,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AwayColor,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.Schedule, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Volver a Programado",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else {
+                Text(
+                    "Pone toda la casa en modo Ausente. Si eliges fecha y hora, Netatmo vuelve solo al modo Programado al llegar, aunque la app esté cerrada.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Netatmo's endtime always returns to schedule: warn when the home is
+                // in another home-level mode, so the limit is visible before activating.
+                if (currentMode == ThermostatMode.FROST_GUARD || currentMode == ThermostatMode.OFF) {
+                    Text(
+                        "Ahora la casa está en modo ${currentMode.displayName}. Al terminar volverá a Programado, no a ${currentMode.displayName}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                SheetLabel("Duración")
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(true to "Hasta que lo cambie", false to "Fecha y hora").forEach { (value, label) ->
+                        val isSelected = untilChange == value
+                        Surface(
+                            onClick = { untilChange = value; dateError = null },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) AwayColor else SurfaceContainer,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) AwayColor else OutlineVariant
+                            ),
+                            modifier = Modifier.weight(1f).height(52.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (!untilChange) {
+                    DatePickerField("Fecha de vuelta", dateYmd) { dateYmd = it; dateError = null }
+                    TimePickerField("Hora de vuelta", timeHm) { timeHm = it; dateError = null }
+                    dateError?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        if (untilChange) {
+                            onActivate(null)
+                        } else {
+                            val epoch = epochSecondsFrom(dateYmd, timeHm)
+                            if (epoch == null || epoch <= System.currentTimeMillis() / 1000) {
+                                dateError = "Elige una fecha y hora posterior a ahora"
+                            } else {
+                                onActivate(epoch)
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AwayColor,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.DirectionsWalk, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Activar modo Ausente",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
