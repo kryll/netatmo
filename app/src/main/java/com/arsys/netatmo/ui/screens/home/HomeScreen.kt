@@ -1739,24 +1739,26 @@ private fun TurboBottomSheet(
 /** Combines a "yyyy-MM-dd" date and "HH:mm" time (device timezone) into epoch seconds.
  *  Strict: values Calendar would silently normalize (Feb 30, 25:00, or a nonexistent
  *  local time inside a DST gap) are rejected via round-trip comparison. */
-internal fun epochSecondsFrom(ymd: String, hm: String): Long? = try {
-    val d = ymd.split("-").map { it.toInt() }
-    val t = hm.split(":").map { it.toInt() }
-    if (d.size != 3 || t.size != 2) return null
-    val cal = java.util.Calendar.getInstance()
-    cal.set(d[0], d[1] - 1, d[2], t[0], t[1], 0)
-    cal.set(java.util.Calendar.MILLISECOND, 0)
-    if (cal.get(java.util.Calendar.YEAR) != d[0] ||
-        cal.get(java.util.Calendar.MONTH) != d[1] - 1 ||
-        cal.get(java.util.Calendar.DAY_OF_MONTH) != d[2] ||
-        cal.get(java.util.Calendar.HOUR_OF_DAY) != t[0] ||
-        cal.get(java.util.Calendar.MINUTE) != t[1]
-    ) {
-        return null
+internal fun epochSecondsFrom(ymd: String, hm: String): Long? {
+    return try {
+        val d = ymd.split("-").map { it.toInt() }
+        val t = hm.split(":").map { it.toInt() }
+        if (d.size != 3 || t.size != 2) return null
+        val cal = java.util.Calendar.getInstance()
+        cal.set(d[0], d[1] - 1, d[2], t[0], t[1], 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        if (cal.get(java.util.Calendar.YEAR) != d[0] ||
+            cal.get(java.util.Calendar.MONTH) != d[1] - 1 ||
+            cal.get(java.util.Calendar.DAY_OF_MONTH) != d[2] ||
+            cal.get(java.util.Calendar.HOUR_OF_DAY) != t[0] ||
+            cal.get(java.util.Calendar.MINUTE) != t[1]
+        ) {
+            return null
+        }
+        cal.timeInMillis / 1000
+    } catch (e: Exception) {
+        null
     }
-    cal.timeInMillis / 1000
-} catch (e: Exception) {
-    null
 }
 
 /** End time for away mode, or null when the date/time is invalid or not in the future. */

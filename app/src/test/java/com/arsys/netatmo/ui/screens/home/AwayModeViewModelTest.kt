@@ -56,9 +56,6 @@ class AwayModeViewModelTest {
         every { boostManager.remainingMinutes } returns MutableStateFlow(0)
         coEvery { getThermostatState(any()) } returns ApiResult.Error("sin datos en test")
         coEvery { repository.setHomeMode(any(), any(), any()) } returns ApiResult.Success(Unit)
-        viewModel = HomeViewModel(
-            getThermostatState, setTemperature, setMode, authRepository, repository, boostManager
-        )
     }
 
     @After
@@ -66,8 +63,17 @@ class AwayModeViewModelTest {
         Dispatchers.resetMain()
     }
 
+    /** Creates the ViewModel and lets the init collector run, so selectedHomeId is set. */
+    private fun kotlinx.coroutines.test.TestScope.createViewModel() {
+        viewModel = HomeViewModel(
+            getThermostatState, setTemperature, setMode, authRepository, repository, boostManager
+        )
+        advanceUntilIdle()
+    }
+
     @Test
     fun setAwayMode_withEndTime_passesExactHomeModeAndEndTime() = runTest {
+        createViewModel()
         val end = System.currentTimeMillis() / 1000 + 7200
         viewModel.setAwayMode(end)
         advanceUntilIdle()
@@ -77,6 +83,7 @@ class AwayModeViewModelTest {
 
     @Test
     fun setAwayMode_withoutEndTime_passesNullEndTime() = runTest {
+        createViewModel()
         viewModel.setAwayMode(null)
         advanceUntilIdle()
         coVerify(exactly = 1) { repository.setHomeMode("home-1", "away", null) }
@@ -85,6 +92,7 @@ class AwayModeViewModelTest {
 
     @Test
     fun setAwayMode_pastEndTime_neverReachesApi() = runTest {
+        createViewModel()
         val past = System.currentTimeMillis() / 1000 - 60
         viewModel.setAwayMode(past)
         advanceUntilIdle()
@@ -94,6 +102,7 @@ class AwayModeViewModelTest {
 
     @Test
     fun returnToSchedule_restoresScheduleMode() = runTest {
+        createViewModel()
         viewModel.returnToSchedule()
         advanceUntilIdle()
         coVerify(exactly = 1) { repository.setHomeMode("home-1", "schedule", null) }
