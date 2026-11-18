@@ -156,6 +156,57 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Activates home-level away mode. When [endTimeEpochSeconds] is null the mode stays
+     * until the user changes it; otherwise Netatmo's servers return the home to schedule
+     * mode at that time (works with the app closed — no local timer involved).
+     */
+    fun setAwayMode(endTimeEpochSeconds: Long?) {
+        val homeId = _uiState.value.selectedHomeId ?: return
+        // Defensive: a past end time must never reach the API (Netatmo would reject or
+        // end the mode immediately); the sheet validates too, but do not rely on it.
+        if (endTimeEpochSeconds != null && endTimeEpochSeconds <= System.currentTimeMillis() / 1000) {
+            _uiState.update { it.copy(error = "La fecha y hora debe ser posterior a ahora") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSettingTemp = true) }
+            when (val result = repository.setHomeMode(homeId, "away", endTimeEpochSeconds)) {
+                is ApiResult.Success -> {
+                    val msg = if (endTimeEpochSeconds != null)
+                        "Modo Ausente activado hasta el ${formatEndTimeEs(endTimeEpochSeconds)}"
+                    else
+                        "Modo Ausente activado hasta que lo cambies"
+                    _uiState.update { it.copy(isSettingTemp = false, successMessage = msg) }
+                    delay(500)
+                    loadThermostatData()
+                }
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(isSettingTemp = false, error = "No se pudo activar el modo Ausente: ${result.message}") }
+                }
+                ApiResult.Loading -> {}
+            }
+        }
+    }
+
+    /** Leaves away mode (or any home-level mode) and returns to the scheduled mode. */
+    fun returnToSchedule() {
+        val homeId = _uiState.value.selectedHomeId ?: return
+        viewModelScope.launch {
+            when (val result = repository.setHomeMode(homeId, "schedule")) {
+                is ApiResult.Success -> {
+                    _uiState.update { it.copy(successMessage = "Modo Programado restaurado") }
+                    delay(500)
+                    loadThermostatData()
+                }
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(error = "No se pudo volver al modo Programado: ${result.message}") }
+                }
+                ApiResult.Loading -> {}
+            }
+        }
+    }
+
     /** Map low-level network/API errors to a clear, actionable Spanish message. */
     private fun friendlyConnectionError(message: String?): String {
         val msg = message ?: return "No se puede conectar con Netatmo. Inténtalo de nuevo."
@@ -172,4 +223,10 @@ class HomeViewModel @Inject constructor(
 
     fun dismissError() = _uiState.update { it.copy(error = null) }
     fun dismissSuccess() = _uiState.update { it.copy(successMessage = null) }
+}
+
+/** "20/11 a las 18:30" — device-local rendering of an epoch-seconds instant. */
+internal fun formatEndTimeEs(epochSeconds: Long): String {
+    val fmt = java.text.SimpleDateFormat("dd/MM 'a las' HH:mm", java.util.Locale.getDefault())
+    return fmt.format(java.util.Date(epochSeconds * 1000))
 }
